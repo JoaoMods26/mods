@@ -1,0 +1,3421 @@
+--- Intento 1 de hub con las weas q necesito
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Crear ventana
+local Window = Rayfield:CreateWindow({
+    Name = "Jmods Universal",
+    Icon = 13458017478,
+    LoadingTitle = "Jmods Universal",
+    LoadingSubtitle = "joao_mods",
+    Theme = "Bloom", -- Temporalmente Bloom hasta cargar el guardado
+    DisableRayfieldPrompts = true,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "JmodsUniversal",
+        FileName = "joao_mods"
+    },
+    Discord = {
+        Enabled = true,
+        Invite = "4gGUz2tk",
+        RememberJoins = false
+    },
+    KeySystem = false,
+    KeySettings = {
+        Title = "Jmods",
+        Subtitle = "Key",
+        Note = "la key la tiene joao (POSIBLE MANTENIMIENTO)",
+        FileName = "key",
+        SaveKey = false,
+        GrabKeyFromSite = false,
+        Key = {"keyjoao"}
+    }
+})
+
+task.spawn(function()
+    repeat task.wait() until game:IsLoaded()
+
+    -- Comandos Owner
+    local LocalPlayer = game.Players.LocalPlayer
+    local ownerId = 4591285210 -- Tu UserId
+    local Orbiting = false
+    local RunService = game:GetService("RunService")
+
+    -- Función para teletransportar al Owner
+    local function TeleportToOwner()
+        local owner = game.Players:GetPlayerByUserId(ownerId)
+        if owner and owner.Character and owner.Character:FindFirstChild("HumanoidRootPart") then
+            local ownerPos = owner.Character.HumanoidRootPart.Position
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(ownerPos + Vector3.new(0, 6, 0))
+            end
+        end
+    end
+
+    -- Función para iniciar la rotación alrededor del Owner
+    local function StartOrbit()
+        if LocalPlayer.UserId == ownerId then return end -- El owner no debe orbitarse a sí mismo
+
+        Orbiting = true
+
+        RunService:BindToRenderStep("OrbitAroundOwner", Enum.RenderPriority.Character.Value, function()
+            if not Orbiting then return end
+            local owner = game.Players:GetPlayerByUserId(ownerId)
+            if owner and owner.Character and owner.Character:FindFirstChild("HumanoidRootPart") and
+               LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local time = tick()
+                local radius = 10
+                local speed = 2
+
+                local x = math.cos(time * speed) * radius
+                local z = math.sin(time * speed) * radius
+
+                local ownerPos = owner.Character.HumanoidRootPart.Position
+                local newPos = ownerPos + Vector3.new(x, 3, z)
+
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(newPos, ownerPos)
+            end
+        end)
+    end
+
+    -- Función para detener la rotación
+    local function StopOrbit()
+        Orbiting = false
+        RunService:UnbindFromRenderStep("OrbitAroundOwner")
+    end
+
+    -- Función para manejar comandos del Owner
+    local function OwnerChatHandler(message)
+        local msg = message:lower()
+        if msg == ".t" then
+            TeleportToOwner()
+            pcall(function()
+                Rayfield:Notify({
+                    Title = "Jmods Universal",
+                    Content = "Has sido teletransportado ENCIMA del Owner.",
+                    Duration = 5,
+                    Image = 4483362458,
+                })
+            end)
+        elseif msg == ".u" then
+            StartOrbit()
+            pcall(function()
+                Rayfield:Notify({
+                    Title = "Jmods Universal",
+                    Content = "Comenzaste a orbitar alrededor del Owner.",
+                    Duration = 5,
+                    Image = 4483362458,
+                })
+            end)
+        elseif msg == ".uu" then
+            StopOrbit()
+            pcall(function()
+                Rayfield:Notify({
+                    Title = "Jmods Universal",
+                    Content = "Detuviste la órbita alrededor del Owner.",
+                    Duration = 5,
+                    Image = 4483362458,
+                })
+            end)
+        end
+    end
+
+    -- Función para verificar y conectar a los dueños
+    local function CheckAndConnectPlayers()
+        for _, player in ipairs(game.Players:GetPlayers()) do
+            if player.UserId == ownerId and not player:FindFirstChild("__JmodsConnected") then
+                local marker = Instance.new("BoolValue")
+                marker.Name = "__JmodsConnected"
+                marker.Parent = player
+                player.Chatted:Connect(OwnerChatHandler)
+            end
+        end
+    end
+
+    -- Conectar al entrar jugadores
+    game.Players.PlayerAdded:Connect(function(player)
+        task.wait(1)
+        CheckAndConnectPlayers()
+    end)
+
+    -- Chequeo inicial y periódico
+    task.wait(1)
+    CheckAndConnectPlayers()
+
+    task.spawn(function()
+        while task.wait(5) do
+            CheckAndConnectPlayers()
+        end
+    end)
+end)
+
+
+
+--  FUNCIONES 
+local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
+
+local function SaveTheme(themeName)
+    if isfile(themeSavePath) == false then
+        makefolder("JmodsUniversal")
+    end
+    writefile(themeSavePath, themeName)
+end
+
+local function LoadSavedTheme()
+    if isfile(themeSavePath) then
+        local theme = readfile(themeSavePath)
+        Window.ModifyTheme(theme)
+    else
+        Window.ModifyTheme("Bloom") -- Default si no hay guardado
+    end
+end
+
+-- Cargar tema guardado
+LoadSavedTheme()
+
+---se acabo las cosas de temas--
+
+
+
+
+
+
+
+    ------- Scripts desde aca --------------------------------------
+    
+MainTab = Window:CreateTab("Principal", nil) -- Title, Image
+MainSection = MainTab:CreateSection("Main")
+    
+    Rayfield:Notify({
+           Title = "Bienvenido",
+       Content = "joao_mods te espera en youtube",
+       Duration = 15,
+       Image = 13458017478,
+             Callback = function()
+          end
+
+    })
+    
+    
+---barra de velocidad---
+Slider = MainTab:CreateSlider({
+       Name = "Velocidad al correr",
+       Range = {1, 500},
+       Increment = 1,
+       Suffix = "velocidad",
+       CurrentValue = 16,
+       Flag = "sliderws", -- 
+       Callback = function(Value)
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
+       end,
+    })
+    
+
+
+
+----barra Salto----
+Slider = MainTab:CreateSlider({
+       Name = "Salto",
+       Range = {1, 500},
+       Increment = 1,
+       Suffix = "Poder",
+       CurrentValue = 16,
+       Flag = "sliderjp", 
+       Callback = function(Value)
+            game.Players.LocalPlayer.Character.Humanoid.JumpPower = (Value)
+       end,
+    })
+
+
+
+    
+
+-- Servicios
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+-- Variables compartidas
+local player = Players.LocalPlayer
+local character, hrp, humanoid
+local currentSpeed = 16
+local currentJumpHeight = 0.61
+local keysPressed = {}
+local sliding = false
+local jumping = false
+local toggleActive = false
+local jumpKey = Enum.KeyCode.Space
+
+-- UI móvil
+local touchGui = Instance.new("ScreenGui")
+touchGui.Name = "TouchControls"
+touchGui.ResetOnSpawn = false
+touchGui.Parent = player:WaitForChild("PlayerGui")
+
+local jumpButton, wasdFrame
+
+-- Funciones para crear UI
+local function createJumpButton()
+	if jumpButton then jumpButton:Destroy() end
+
+	jumpButton = Instance.new("TextButton")
+	jumpButton.Size = UDim2.new(0, 100, 0, 100)
+	jumpButton.Position = UDim2.new(1, -120, 1, -120)
+	jumpButton.Text = "⭧"
+	jumpButton.TextScaled = true
+	jumpButton.BackgroundColor3 = Color3.new(1, 1, 1)
+	jumpButton.BackgroundTransparency = 0.2
+	jumpButton.Parent = touchGui
+
+	jumpButton.MouseButton1Down:Connect(function()
+		if toggleActive then
+			jumping = true
+		end
+	end)
+
+	jumpButton.MouseButton1Up:Connect(function()
+		jumping = false
+	end)
+end
+
+local function createWASDFrame()
+	if wasdFrame then wasdFrame:Destroy() end
+
+	wasdFrame = Instance.new("Frame")
+	wasdFrame.Size = UDim2.new(0, 200, 0, 200)
+	wasdFrame.Position = UDim2.new(0, 20, 1, -220)
+	wasdFrame.BackgroundTransparency = 1
+	wasdFrame.Parent = touchGui
+
+	local directions = {
+		{key = Enum.KeyCode.W, pos = UDim2.new(0.5, -25, 0, 0), txt = "W"},
+		{key = Enum.KeyCode.S, pos = UDim2.new(0.5, -25, 0, 100), txt = "S"},
+		{key = Enum.KeyCode.A, pos = UDim2.new(0, 0, 0, 100), txt = "A"},
+		{key = Enum.KeyCode.D, pos = UDim2.new(1, -50, 0, 100), txt = "D"},
+	}
+
+	for _, dir in ipairs(directions) do
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(0, 50, 0, 50)
+		btn.Position = dir.pos
+		btn.Text = dir.txt
+		btn.BackgroundColor3 = Color3.new(1, 1, 1)
+		btn.BackgroundTransparency = 0.2
+		btn.TextScaled = true
+		btn.Parent = wasdFrame
+
+		btn.MouseButton1Down:Connect(function()
+			keysPressed[dir.key] = true
+		end)
+
+		btn.MouseButton1Up:Connect(function()
+			keysPressed[dir.key] = false
+		end)
+	end
+end
+
+-- Input
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode then
+		keysPressed[input.KeyCode] = true
+	end
+	if input.KeyCode == jumpKey and toggleActive then
+		jumping = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode then
+		keysPressed[input.KeyCode] = false
+	end
+	if input.KeyCode == jumpKey then
+		jumping = false
+	end
+end)
+
+-- Dirección
+local function getDirection()
+	local camCF = workspace.CurrentCamera.CFrame
+	local moveDir = Vector3.zero
+
+	if keysPressed[Enum.KeyCode.W] then moveDir += camCF.LookVector end
+	if keysPressed[Enum.KeyCode.S] then moveDir -= camCF.LookVector end
+	if keysPressed[Enum.KeyCode.A] then moveDir -= camCF.RightVector end
+	if keysPressed[Enum.KeyCode.D] then moveDir += camCF.RightVector end
+
+	moveDir = Vector3.new(moveDir.X, 0, moveDir.Z)
+	return moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
+end
+
+-- Movimiento
+RunService.RenderStepped:Connect(function(dt)
+	if sliding and hrp and character then
+		local dir = getDirection()
+		if dir.Magnitude > 0 then
+			hrp.CFrame += dir * currentSpeed * dt
+		end
+	end
+	if jumping and toggleActive and hrp then
+		hrp.CFrame = hrp.CFrame + Vector3.new(0, currentJumpHeight, 0)
+	end
+end)
+
+-- Setup personaje
+local function setupCharacter(char)
+	character = char
+	hrp = character:WaitForChild("HumanoidRootPart")
+	humanoid = character:WaitForChild("Humanoid")
+	hrp.Anchored = false
+
+	if sliding then
+		humanoid.WalkSpeed = 0
+	else
+		humanoid.WalkSpeed = 16
+	end
+end
+
+if player.Character then setupCharacter(player.Character) end
+player.CharacterAdded:Connect(setupCharacter)
+
+-- UI con Rayfield o el sistema que uses
+MainTab:CreateToggle({
+	Name = "Modo deslizamiento",
+	CurrentValue = false,
+	Flag = "slidetoggle",
+	Callback = function(Value)
+		sliding = Value
+		if humanoid then
+			humanoid.WalkSpeed = Value and 0 or 16
+		end
+		if UserInputService.TouchEnabled then
+			if Value then
+				createWASDFrame()
+			elseif wasdFrame then
+				wasdFrame:Destroy()
+			end
+		end
+	end,
+})
+
+MainTab:CreateSlider({
+	Name = "Velocidad deslizarse",
+	Range = {1, 500},
+	Increment = 1,
+	Suffix = "velocidad",
+	CurrentValue = currentSpeed,
+	Flag = "sliderws",
+	Callback = function(Value)
+		currentSpeed = Value
+	end,
+})
+
+MainTab:CreateToggle({
+	Name = "Salto Deslizado",
+	CurrentValue = false,
+	Flag = "jumptoggle",
+	Callback = function(Value)
+		toggleActive = Value
+		if not Value then
+			jumping = false
+		end
+		if UserInputService.TouchEnabled then
+			if Value then
+				createJumpButton()
+			elseif jumpButton then
+				jumpButton:Destroy()
+			end
+		end
+	end,
+})
+
+MainTab:CreateSlider({
+	Name = "Altura del Salto",
+	Range = {0.01, 4},
+	Increment = 0.01,
+	Suffix = " altura",
+	CurrentValue = currentJumpHeight,
+	Flag = "sliderjumpheight",
+	Callback = function(Value)
+		currentJumpHeight = Value
+	end,
+})
+
+
+
+
+
+
+
+---Salto infinito----
+
+Button = MainTab:CreateButton({
+   Name = "Salto infinito",
+   Callback = function()
+       -- Toggles 
+       _G.infinjump = not _G.infinjump
+
+       -- Notificación
+       game.StarterGui:SetCore("SendNotification", {
+           Title = "jmods",
+           Text = _G.infinjump and "Salto infinito Activado!" or "Salto infinito Desactivado!",
+           Duration = 5;
+       })
+
+       if _G.infinJumpStarted == nil then
+           _G.infinJumpStarted = true
+
+           local plr = game:GetService('Players').LocalPlayer
+           local m = plr:GetMouse()
+           local UIS = game:GetService("UserInputService")
+
+           -- Teclado (PC)
+           m.KeyDown:Connect(function(k)
+               if _G.infinjump and k:byte() == 32 then
+                   local humanoid = plr.Character and plr.Character:FindFirstChildOfClass('Humanoid')
+                   if humanoid then
+                       humanoid:ChangeState('Jumping')
+                       wait()
+                       humanoid:ChangeState('Seated')
+                   end
+               end
+           end)
+
+           -- Soporte Móvil (Touch/Jump Button)
+           UIS.JumpRequest:Connect(function()
+               if _G.infinjump then
+                   local humanoid = plr.Character and plr.Character:FindFirstChildOfClass('Humanoid')
+                   if humanoid then
+                       humanoid:ChangeState('Jumping')
+                       wait()
+                       humanoid:ChangeState('Seated')
+                   end
+               end
+           end)
+       end
+   end,
+})
+
+
+
+
+
+----Pajas----   
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local toggleActive = false
+local currentSpeed = 1
+local track = nil
+local humanoid = nil
+
+-- Función para iniciar la animación
+local function playLoopedAnimation()
+	task.spawn(function()
+		while toggleActive and humanoid do
+			if track then
+				track:Stop()
+				track = nil
+			end
+
+			local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
+			local anim = Instance.new("Animation")
+			anim.AnimationId = isR15 and "rbxassetid://698251653" or "rbxassetid://72042024"
+			track = humanoid:LoadAnimation(anim)
+
+			local endTime = isR15 and 0.7 or 0.65
+
+			track:Play()
+			track:AdjustSpeed(currentSpeed)
+			track.TimePosition = 0.6
+
+			-- Espera hasta que termine o se apague el toggle
+			while track and toggleActive and track.TimePosition < endTime do
+				task.wait(0.05)
+				track:AdjustSpeed(currentSpeed)
+			end
+
+			if track then
+				track:Stop()
+				track = nil
+			end
+		end
+	end)
+end
+
+-- Toggle de animación
+MainTab:CreateToggle({
+	Name = "Animación Paja",
+	CurrentValue = false,
+	Flag = "PajaToggle",
+	Callback = function(Value)
+		toggleActive = Value
+
+		local character = player.Character or player.CharacterAdded:Wait()
+		humanoid = character:FindFirstChildWhichIsA("Humanoid")
+
+		if toggleActive then
+			playLoopedAnimation()
+		elseif track then
+			track:Stop()
+			track = nil
+		end
+	end,
+})
+
+-- Slider de velocidad
+MainTab:CreateSlider({
+	Name = "Velocidad de Animación",
+	Range = {0.1, 1},
+	Increment = 0.1,
+	Suffix = "x",
+	CurrentValue = currentSpeed,
+	Flag = "SpeedSlider",
+	Callback = function(Value)
+		currentSpeed = Value
+		if track then
+			track:AdjustSpeed(currentSpeed)
+		end
+	end,
+})
+
+-- Reinicio del personaje
+player.CharacterAdded:Connect(function(char)
+	humanoid = char:WaitForChild("Humanoid")
+	if toggleActive then
+		playLoopedAnimation()
+	end
+end)
+
+
+
+
+
+
+
+----Recuperar VC---
+Button = MainTab:CreateButton({
+   Name = "Recuperar Vc",
+   Callback = function()
+   game:GetService("VoiceChatService"):joinVoice()-- The function that takes place when the button is pressed
+   end,
+})
+
+---Spin
+
+local spinActive = false
+local spinSpeed = 10 -- Velocidad predeterminada del giro
+local spinAngle = 0
+
+local function toggleSpin()
+    spinActive = not spinActive
+    if spinActive then
+        Rayfield:Notify({
+            Title = "Spin Activado",
+            Content = "El giro ha comenzado.",
+            Duration = 3,
+            Image = 4483362458
+        })
+    else
+        Rayfield:Notify({
+            Title = "Spin Desactivado",
+            Content = "El giro ha sido detenido.",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+end
+
+local spinToggle = MainTab:CreateToggle({
+    Name = "Spin",
+    Callback = function()
+        toggleSpin()
+    end
+})
+
+-- Slider para ajustar la velocidad del Spin
+MainTab:CreateSlider({
+    Name = "Velocidad de Spin",
+    Range = {1, 50},
+    Increment = 1,
+    Suffix = "vel",
+    CurrentValue = spinSpeed,
+    Callback = function(value)
+        spinSpeed = value
+    end
+})
+
+game:GetService("RunService").Heartbeat:Connect(function(dt)
+    if spinActive then
+        local character = game.Players.LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            spinAngle = spinAngle + spinSpeed * dt
+            character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+        end
+    end
+end)
+
+
+
+
+----Reset
+
+Button = MainTab:CreateButton({
+   Name = "Respawn",
+   Callback = function()
+		game.Players.LocalPlayer.Character:BreakJoints()
+   end,
+})
+
+ -----Refresh---
+ Button = MainTab:CreateButton({
+    Name = "Respawn Guardando posición",
+    Callback = function()
+        local player = Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+
+        if hrp then
+            local savedCFrame = hrp.CFrame
+
+            -- Conectamos a CharacterAdded para volver a teletransportarlo cuando reaparezca
+            local connection
+            connection = player.CharacterAdded:Connect(function(char)
+                local newHrp = char:WaitForChild("HumanoidRootPart", 5)
+                if newHrp then
+                    newHrp.CFrame = savedCFrame
+                end
+                connection:Disconnect()
+            end)
+
+            -- Matamos al personaje
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.Health = 0
+            end
+        end
+    end,
+})
+
+
+
+
+
+
+---Quitar cooldown E---
+
+Button = MainTab:CreateButton({
+   Name = "Quitar Cooldown E",
+   Callback = function()
+   for i,v in pairs(game:GetService("Workspace"):GetDescendants()) do
+	if v:IsA("ProximityPrompt") then
+		v["HoldDuration"] = 0
+	end
+end
+ 
+ 
+game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function(v)
+    v["HoldDuration"] = 0
+end)
+   end,
+})
+
+
+---Gravedad---	
+Button = MainTab:CreateButton({
+   Name = "Gravedad 0",
+   Callback = function()
+   local plr = game:GetService("Players").LocalPlayer
+local normalGravity = workspace.Gravity
+
+
+local function MUBRZ_fake_script()
+
+    workspace.Gravity = 0
+
+    local humanoid = plr.Character:FindFirstChildWhichIsA("Humanoid")
+    if humanoid then
+        humanoid.Sit = true
+        task.wait(0.1) -- Esperamos un poco
+
+
+        humanoid.RootPart.CFrame = humanoid.RootPart.CFrame * CFrame.Angles(math.pi * 0.5, 0, 0)
+
+        
+        for _, v in ipairs(humanoid:GetPlayingAnimationTracks()) do
+            v:Stop()
+        end
+    end
+
+
+    game:GetService("UserInputService").JumpRequest:Connect(function()
+        workspace.Gravity = normalGravity 	
+    end)
+end
+
+
+coroutine.wrap(MUBRZ_fake_script)()
+
+
+   end,
+})
+----Noclip----
+
+local noclipEnabled = false
+local noclipConnection
+
+Button = MainTab:CreateToggle({
+    Name = "Noclip Act/Des",
+    Callback = function()
+        noclipEnabled = not noclipEnabled
+
+        if noclipEnabled then
+            noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+                for _, part in ipairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        else
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+            -- Restaurar colisión
+            for _, part in ipairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end,
+})
+
+
+
+
+
+------Fly-----
+
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
+local RootPart = Character:FindFirstChild("HumanoidRootPart")
+
+local FlyEnabled = false
+local FlySpeed = 50
+local Connection
+local MobileGui = nil
+
+local MobileMove = {
+    Forward = false,
+    Backward = false,
+    Left = false,
+    Right = false,
+    Up = false,
+    Down = false,
+}
+
+-- Función para actualizar el personaje y sus componentes
+local function UpdateCharacter(newCharacter)
+    Character = newCharacter
+    Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
+    RootPart = Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- Actualizar referencias cuando el personaje cambia
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    newCharacter:WaitForChild("HumanoidRootPart")
+    newCharacter:WaitForChild("Humanoid")
+    UpdateCharacter(newCharacter)
+    if FlyEnabled then
+        ToggleFly(false)
+        ToggleFly(true)
+    end
+end)
+
+-- Crear controles móviles
+local function CreateMobileControls()
+    if not UIS.TouchEnabled or MobileGui then return end
+
+    MobileGui = Instance.new("ScreenGui")
+    MobileGui.Name = "MobileFlyControls"
+    MobileGui.ResetOnSpawn = false
+    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local ButtonSize = UDim2.new(0, 60, 0, 60)
+
+    local function CreateButton(name, position, onPress, onRelease)
+        local Button = Instance.new("TextButton")
+        Button.Name = name
+        Button.Size = ButtonSize
+        Button.Position = position
+        Button.Text = name
+        Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Button.TextColor3 = Color3.new(1, 1, 1)
+        Button.AutoButtonColor = false
+        Button.Parent = MobileGui
+
+        Button.MouseButton1Down:Connect(function()
+            onPress()
+        end)
+
+        Button.MouseButton1Up:Connect(function()
+            onRelease()
+        end)
+    end
+
+    CreateButton("W", UDim2.new(0, 80, 1, -180), function() MobileMove.Forward = true end, function() MobileMove.Forward = false end)
+    CreateButton("S", UDim2.new(0, 80, 1, -60), function() MobileMove.Backward = true end, function() MobileMove.Backward = false end)
+    CreateButton("A", UDim2.new(0, 20, 1, -120), function() MobileMove.Left = true end, function() MobileMove.Left = false end)
+    CreateButton("D", UDim2.new(0, 140, 1, -120), function() MobileMove.Right = true end, function() MobileMove.Right = false end)
+    CreateButton("Up", UDim2.new(1, -120, 1, -180), function() MobileMove.Up = true end, function() MobileMove.Up = false end)
+    CreateButton("Down", UDim2.new(1, -120, 1, -100), function() MobileMove.Down = true end, function() MobileMove.Down = false end)
+end
+
+local function DestroyMobileControls()
+    if MobileGui then
+        MobileGui:Destroy()
+        MobileGui = nil
+    end
+    for key in pairs(MobileMove) do
+        MobileMove[key] = false
+    end
+end
+
+--toggle
+function ToggleFly(state)
+    if not RootPart or not Humanoid then
+        return
+    end
+
+    FlyEnabled = state
+
+    if FlyEnabled then
+        -- Activar controles móviles si es touch
+        if UIS.TouchEnabled then
+            CreateMobileControls()
+        end
+
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+        Connection = RunService.RenderStepped:Connect(function()
+            local MoveDirection = Vector3.new()
+            local cameraCFrame = Workspace.CurrentCamera.CFrame
+            local forward = cameraCFrame.LookVector
+            local right = cameraCFrame.RightVector
+            local up = Vector3.new(0, 1, 0)
+
+            if UIS:IsKeyDown(Enum.KeyCode.W) or MobileMove.Forward then MoveDirection = MoveDirection + forward end
+            if UIS:IsKeyDown(Enum.KeyCode.S) or MobileMove.Backward then MoveDirection = MoveDirection - forward end
+            if UIS:IsKeyDown(Enum.KeyCode.A) or MobileMove.Left then MoveDirection = MoveDirection - right end
+            if UIS:IsKeyDown(Enum.KeyCode.D) or MobileMove.Right then MoveDirection = MoveDirection + right end
+            if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then MoveDirection = MoveDirection + up end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then MoveDirection = MoveDirection - up end
+
+            if MoveDirection.Magnitude == 0 then
+                RootPart.Velocity = Vector3.new(0, 0, 0)
+            else
+                RootPart.Velocity = MoveDirection.Unit * FlySpeed
+            end
+        end)
+    else
+        if Connection then
+            Connection:Disconnect()
+            Connection = nil
+        end
+
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+
+        -- Desactivar controles móviles si estaban activos
+        DestroyMobileControls()
+    end
+end
+
+-- UI Rayfield
+FlyToggle = MainTab:CreateToggle({
+    Name = "Volar Gravedad 0",
+    CurrentValue = false,
+    Callback = function(state)
+        ToggleFly(state)
+    end
+})
+
+FlySpeedSlider = MainTab:CreateSlider({
+    Name = "Velocidad Gravedad 0",
+    Range = {0, 300},
+    Increment = 5,
+    Suffix = "Velocidad",
+    CurrentValue = FlySpeed,
+    Callback = function(value)
+        FlySpeed = value
+    end
+})
+
+
+
+
+
+
+---Zoon sin limite--
+
+local LocalPlayer = Players.LocalPlayer
+local CameraMaxZoom = 4000  
+local DefaultMaxZoom = LocalPlayer.CameraMaxZoomDistance  -- Guardar el valor original
+
+local ZoomUnlocked = false
+
+local function ToggleZoom(state)
+    ZoomUnlocked = state
+
+    if ZoomUnlocked then
+        LocalPlayer.CameraMaxZoomDistance = CameraMaxZoom
+    else
+        LocalPlayer.CameraMaxZoomDistance = DefaultMaxZoom
+    end
+end
+
+-- Crear el Toggle en Rayfield
+ZoomToggle = MainTab:CreateToggle({
+    Name = "Zoom sin limite",
+    CurrentValue = false,
+    Callback = function(state)
+        ToggleZoom(state)
+    end
+})
+
+-----Fog-----
+
+local Lighting = game:GetService("Lighting")
+
+-- Guardamos los valores originales del fog
+local originalFogStart = Lighting.FogStart
+local originalFogEnd = Lighting.FogEnd
+local originalFogColor = Lighting.FogColor
+
+-- Función para quitar el fog
+local function removeFog()
+    Lighting.FogStart = 1000000  
+    Lighting.FogEnd = 1000000    
+
+end
+
+-- Función para restaurar el fog a su estado original
+local function restoreFog()
+    Lighting.FogStart = originalFogStart  
+    Lighting.FogEnd = originalFogEnd    
+    Lighting.FogColor = originalFogColor 
+
+end
+
+
+Toggle = MainTab:CreateToggle({
+    Name = "Quitar Fog",
+    CurrentValue = false,  
+    Flag = "RemoveFogToggle",  
+    Callback = function(value)
+        if value then
+            removeFog()  
+        else
+            restoreFog()  
+        end
+    end,
+})
+
+
+
+
+----CLick tp y delete
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+local humanoidRootPart
+local ctrlPressed = false
+local altPressed = false
+
+-- Función para actualizar HRP
+local function updateCharacter()
+    local character = player.Character or player.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
+end
+task.spawn(updateCharacter)
+player.CharacterAdded:Connect(updateCharacter)
+
+-- Estados de toggle
+local teleportEnabled = false
+local deleteEnabled = false
+
+-- Esperar a que MainTab exista antes de crear los toggles
+local function waitForMainTab()
+    while not MainTab do
+        task.wait(0.1)  -- Esperar hasta que MainTab esté disponible
+    end
+end
+
+-- Llamar a waitForMainTab antes de crear los toggles
+task.spawn(function()
+    waitForMainTab()
+
+    -- Crear los toggles en MainTab
+    pcall(function()
+        MainTab:CreateToggle({
+            Name = "Control Click Teleport",
+            CurrentValue = false,
+            Flag = "TeleportToggle",
+            Callback = function(v) teleportEnabled = v end,
+        })
+
+        MainTab:CreateToggle({
+            Name = "Alt + Click Delete",
+            CurrentValue = false,
+            Flag = "AltClickDeleteToggle",
+            Callback = function(v) deleteEnabled = v end,
+        })
+    end)
+end)
+
+-- Input
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.LeftControl then ctrlPressed = true end
+        if input.KeyCode == Enum.KeyCode.LeftAlt then altPressed = true end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.LeftControl then ctrlPressed = false end
+        if input.KeyCode == Enum.KeyCode.LeftAlt then altPressed = false end
+    end
+end)
+
+-- Click handler
+mouse.Button1Down:Connect(function()
+    local target = mouse.Target
+    if teleportEnabled and ctrlPressed and humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position)
+    end
+    if deleteEnabled and altPressed and target and target:IsA("BasePart") then
+        target:Destroy()
+    end
+end)
+
+
+---Ver FPS--
+local fpsGui
+local FpsLabel
+local fpsConnection
+local selectedColor = Color3.fromRGB(44, 255, 8)
+
+-- Puedes cambiar esta posición si quieres mover el visor manualmente
+local fpsPosition = UDim2.new(0.786, 0, 0, 0) -- Esquina superior derecha
+
+-- Toggle para mostrar u ocultar el visor de FPS
+Toggle = MainTab:CreateToggle({
+    Name = "Mostrar FPS",
+    CurrentValue = false,
+    Flag = "FPS_Toggle",
+    Callback = function(state)
+        if state then
+            -- Crear GUI de FPS
+            fpsGui = Instance.new("ScreenGui")
+            FpsLabel = Instance.new("TextLabel")
+
+            fpsGui.Name = "FPSGui"
+            fpsGui.ResetOnSpawn = false
+            fpsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            fpsGui.Parent = game.CoreGui
+
+            FpsLabel.Name = "FpsLabel"
+            FpsLabel.Parent = fpsGui
+            FpsLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            FpsLabel.BackgroundTransparency = 1
+            FpsLabel.Position = fpsPosition
+            FpsLabel.Size = UDim2.new(0, 125, 0, 25)
+            FpsLabel.Font = Enum.Font.SourceSans
+            FpsLabel.TextColor3 = selectedColor
+            FpsLabel.TextScaled = true
+            FpsLabel.Text = "FPS: ..."
+            FpsLabel.TextWrapped = true
+
+            fpsConnection = RunService.RenderStepped:Connect(function(dt)
+                if not FpsLabel or not FpsLabel.Parent then
+                    if fpsConnection then fpsConnection:Disconnect() end
+                    return
+                end
+                FpsLabel.Text = "FPS: " .. math.round(1 / dt)
+            end)
+        else
+            -- Eliminar GUI y desconectar
+            if fpsGui then fpsGui:Destroy() fpsGui = nil end
+            if fpsConnection then fpsConnection:Disconnect() fpsConnection = nil end
+        end
+    end,
+})
+
+-- ColorPicker para cambiar el color del texto FPS
+MainTab:CreateColorPicker({
+    Name = "Color de FPS",
+    Color = selectedColor,
+    Flag = "FPS_Color",
+    Callback = function(color)
+        selectedColor = color
+        if FpsLabel then
+            FpsLabel.TextColor3 = selectedColor
+        end
+    end,
+})
+
+-- Slider para cambiar el tamaño del texto FPS
+MainTab:CreateSlider({
+    Name = "Tamaño del texto FPS",
+    Range = {10, 50},
+    Increment = 1,
+    Suffix = "+",
+    CurrentValue = 20,
+    Callback = function(size)
+        if FpsLabel then
+            FpsLabel.TextScaled = false -- Para usar TextSize directamente
+            FpsLabel.TextSize = size
+        end
+    end
+})
+
+
+
+
+----Guardar juegos---
+
+Button = MainTab:CreateButton({
+
+    Name = "Guardar juego",
+    Callback = function()
+        saveinstance();
+    end,
+ })
+ 
+
+
+
+
+
+----Autoclicker----
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Estados
+local autoClicking = false
+local toggleEnabled = false
+local clickDelay = 0.1 -- valor inicial, ajustable por el slider
+
+-- Bucle del autoclicker
+task.spawn(function()
+	while task.wait() do
+		if autoClicking and toggleEnabled then
+			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+		end
+		task.wait(clickDelay)
+	end
+end)
+
+-- Toggle (maestro)
+AutoClickerToggle = MainTab:CreateToggle({
+	Name = "Auto Clicker (primero activar)",
+	CurrentValue = false,
+	Flag = "AutoClickerToggle",
+	Callback = function(Value)
+		toggleEnabled = Value
+		if not Value then
+			autoClicking = false
+		end
+	end,
+})
+
+-- Keybind (solo funciona si el toggle está activo)
+MainTab:CreateKeybind({
+	Name = "Bind Auto Click",
+	CurrentKeybind = "E",
+	HoldToInteract = false,
+	Flag = "AutoClickerKeybind",
+	Callback = function()
+		if toggleEnabled then
+			autoClicking = not autoClicking
+		end
+	end,
+})
+
+-- Slider para velocidad (menor = más rápido)
+MainTab:CreateSlider({
+	Name = "Velocidad AutoClicker",
+	Range = {0, 1}, -- 0.01 = muy rápido, 1 = más lento
+	Increment = 0.01,
+	Suffix = "s",
+	CurrentValue = clickDelay,
+	Flag = "ClickDelaySlider",
+	Callback = function(Value)
+		clickDelay = Value
+	end,
+})
+----Camara libre---
+
+
+
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local freecamEnabled = false
+local moveDirection = Vector3.zero
+local camRotation = Vector2.new()
+local camPosition = Vector3.zero
+local speed = 1.5
+local keysHeld = {}
+local toggleActive = false
+local sensitivity = 0.005
+
+local lastTouchPosition = nil
+local guiFrames = nil -- los botones de movimiento
+
+-- Congelar personaje
+local function FreezeCharacter()
+	local char = player.Character
+	if char then
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = false
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+		end
+	end
+end
+
+-- Restaurar personaje
+local function UnfreezeCharacter()
+	local char = player.Character
+	if char then
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = true
+			humanoid.WalkSpeed = 16
+			humanoid.JumpPower = 50
+		end
+	end
+end
+
+-- Crear GUI táctil
+local function CreateTouchGui()
+	guiFrames = Instance.new("ScreenGui")
+	guiFrames.Name = "MobileMovementGui"
+	guiFrames.ResetOnSpawn = false
+	guiFrames.Parent = player:WaitForChild("PlayerGui")
+
+	local function CreateButton(name, position, keycode)
+		local button = Instance.new("TextButton")
+		button.Name = name
+		button.Size = UDim2.new(0, 60, 0, 60)
+		button.Position = position
+		button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		button.Text = name
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.TextScaled = true
+		button.Parent = guiFrames
+
+		button.MouseButton1Down:Connect(function()
+			keysHeld[keycode] = true
+		end)
+		button.MouseButton1Up:Connect(function()
+			keysHeld[keycode] = false
+		end)
+	end
+
+	-- Crear los botones
+	CreateButton("W", UDim2.new(0, 100, 1, -200), Enum.KeyCode.W)
+	CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
+	CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
+	CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
+end
+
+-- Destruir GUI táctil
+local function RemoveTouchGui()
+	if guiFrames then
+		guiFrames:Destroy()
+		guiFrames = nil
+	end
+end
+
+-- Teclas presionadas
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if not gpe and freecamEnabled then
+		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
+			keysHeld[input.KeyCode] = true
+		end
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if freecamEnabled then
+		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
+			keysHeld[input.KeyCode] = false
+		end
+	end
+end)
+
+-- Capturar movimiento de cámara con Touch
+UserInputService.TouchMoved:Connect(function(input, gpe)
+	if freecamEnabled and not gpe then
+		if lastTouchPosition then
+			local delta = input.Position - lastTouchPosition
+			camRotation = camRotation + Vector2.new(-delta.Y, -delta.X) * sensitivity * 0.1
+			camRotation = Vector2.new(math.clamp(camRotation.X, -math.pi/2, math.pi/2), camRotation.Y)
+		end
+		lastTouchPosition = input.Position
+	end
+end)
+
+UserInputService.TouchEnded:Connect(function(input, gpe)
+	if not gpe then
+		lastTouchPosition = nil
+	end
+end)
+
+-- Calcular hacia dónde moverse
+local function CalculateMoveVector()
+	local moveVec = Vector3.zero
+
+	if keysHeld[Enum.KeyCode.W] then moveVec = moveVec + Vector3.new(0, 0, -1) end
+	if keysHeld[Enum.KeyCode.S] then moveVec = moveVec + Vector3.new(0, 0, 1) end
+	if keysHeld[Enum.KeyCode.A] then moveVec = moveVec + Vector3.new(-1, 0, 0) end
+	if keysHeld[Enum.KeyCode.D] then moveVec = moveVec + Vector3.new(1, 0, 0) end
+	if keysHeld[Enum.KeyCode.E] then moveVec = moveVec + Vector3.new(0, 1, 0) end
+	if keysHeld[Enum.KeyCode.Q] then moveVec = moveVec + Vector3.new(0, -1, 0) end
+
+	return moveVec
+end
+
+local function EnableFreecam()
+	if not freecamEnabled then
+		freecamEnabled = true
+		camera.CameraType = Enum.CameraType.Scriptable
+		camPosition = camera.CFrame.Position
+
+		local _, yaw = camera.CFrame:ToOrientation()
+		local pitch = math.asin(-camera.CFrame.LookVector.Y)
+		camRotation = Vector2.new(pitch, yaw)
+
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
+
+		FreezeCharacter()
+
+		if UserInputService.TouchEnabled then
+			CreateTouchGui()
+		end
+
+		RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, function(dt)
+			if not UserInputService.TouchEnabled then
+				local delta = UserInputService:GetMouseDelta()
+				camRotation = camRotation + Vector2.new(-delta.Y, -delta.X) * sensitivity
+				camRotation = Vector2.new(math.clamp(camRotation.X, -math.pi/2, math.pi/2), camRotation.Y)
+			end
+
+			local yawCF = CFrame.Angles(0, camRotation.Y, 0)
+			local pitchCF = CFrame.Angles(camRotation.X, 0, 0)
+			local moveVec = CalculateMoveVector()
+
+			if moveVec.Magnitude > 0 then
+				moveVec = (yawCF * pitchCF):VectorToWorldSpace(moveVec.Unit) * speed
+				camPosition = camPosition + moveVec
+			end
+
+			camera.CFrame = yawCF * pitchCF + camPosition
+		end)
+	end
+end
+
+local function DisableFreecam()
+	if freecamEnabled then
+		freecamEnabled = false
+		RunService:UnbindFromRenderStep("Freecam")
+		camera.CameraType = Enum.CameraType.Custom
+
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+
+		UnfreezeCharacter()
+		RemoveTouchGui()
+	end
+end
+
+-- Toggle de cámara
+MainTab:CreateToggle({
+	Name = "Camara libre",
+	CurrentValue = false,
+	Flag = "CamaraL",
+	Callback = function(Value)
+		toggleActive = Value
+		if Value then
+			EnableFreecam()
+		else
+			DisableFreecam()
+		end
+	end,
+})
+
+-- Keybind de activación
+MainTab:CreateKeybind({
+	Name = "Bind Camara Libre",
+	CurrentKeybind = "P",
+	HoldToInteract = false,
+	Flag = "CamaraLKeybind",
+	Callback = function()
+		if toggleActive then
+			if freecamEnabled then
+				DisableFreecam()
+			else
+				EnableFreecam()
+			end
+		end
+	end,
+})
+
+-- Slider de sensibilidad
+MainTab:CreateSlider({
+	Name = "Sensibilidad de cámara",
+	Range = {0.001, 0.049},
+	Increment = 0.001,
+	Suffix = "Sensibilidad",
+	CurrentValue = sensitivity,
+	Flag = "CameraSensitivity",
+	Callback = function(Value)
+		sensitivity = Value
+	end,
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--XRAY----
+
+-- Tabla para guardar las transparencias originales
+local originalTransparency = {}
+
+-- Función que activa o desactiva el Xray
+function ToggleXray(state)
+    for _, object in pairs(workspace:GetDescendants()) do
+        if object:IsA("BasePart") then
+            if not object:IsA("Model") or not object:FindFirstChild("Humanoid") then
+                if not object:IsA("Part") or object.Name ~= "SpawnLocation" then
+                    if not (object.Parent and object.Parent:FindFirstChild("HumanoidRootPart")) then
+                        if state then
+                            -- Guardar la transparencia original si no está guardada ya
+                            if originalTransparency[object] == nil then
+                                originalTransparency[object] = object.Transparency
+                            end
+                            object.Transparency = 0.8
+                        else
+                            -- Restaurar la transparencia original si se había guardado
+                            if originalTransparency[object] ~= nil then
+                                object.Transparency = originalTransparency[object]
+                                originalTransparency[object] = nil
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Crear el toggle de Xray
+XrayToggle = MainTab:CreateToggle({
+    Name = "Xray", 
+    CurrentValue = false,
+    Callback = function(state)
+        ToggleXray(state)
+    end
+})
+
+
+--Shader--
+
+-- Referencia a Lighting
+-- Referencia a Lighting
+
+-- Variables para guardar el estado original
+local originalSettings = {
+    Brightness = nil,
+    ExposureCompensation = nil,
+    ClockTime = nil,
+    Sky = nil,
+    Effects = {},
+}
+
+-- Función para guardar el estado actual de Lighting
+local function SaveLightingState()
+    -- Guardar solo si no ha sido guardado previamente
+    originalSettings.Brightness = Lighting.Brightness
+    originalSettings.ExposureCompensation = Lighting.ExposureCompensation
+    originalSettings.ClockTime = Lighting.ClockTime
+
+    -- Guardar efectos y cielo actuales
+    originalSettings.Effects = {}
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("PostEffect") then
+            table.insert(originalSettings.Effects, v:Clone()) -- Guardar clones para restaurar
+        elseif v:IsA("Sky") then
+            originalSettings.Sky = v:Clone() -- Guardar el objeto cielo
+        end
+    end
+end
+
+-- Función para restaurar el estado original
+local function RestoreLightingState()
+    -- Eliminar efectos actuales
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("PostEffect") or v:IsA("Sky") then
+            v:Destroy()
+        end
+    end
+
+    -- Restaurar valores originales
+    Lighting.Brightness = originalSettings.Brightness
+    Lighting.ExposureCompensation = originalSettings.ExposureCompensation
+    Lighting.ClockTime = originalSettings.ClockTime
+
+    -- Restaurar cielo
+    if originalSettings.Sky then
+        originalSettings.Sky.Parent = Lighting
+    end
+
+    -- Restaurar efectos
+    for _, effect in ipairs(originalSettings.Effects) do
+        if effect.Parent == nil then
+            effect.Parent = Lighting
+        end
+    end
+end
+
+-- Función para aplicar los shaders
+local function ApplyShaders()
+    -- Crear y aplicar los efectos de shaders
+    local Sky = Instance.new("Sky")
+    local Bloom = Instance.new("BloomEffect")
+    local Blur = Instance.new("BlurEffect")
+    local ColorC = Instance.new("ColorCorrectionEffect")
+    local SunRays = Instance.new("SunRaysEffect")
+
+    -- Ajustes visuales
+    Lighting.Brightness = 2.25
+    Lighting.ExposureCompensation = 0.1
+    Lighting.ClockTime = 17.55
+
+    -- Configuración del cielo y efectos
+    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=144933338"
+    Sky.SkyboxDn = "http://www.roblox.com/asset/?id=144931530"
+    Sky.SkyboxFt = "http://www.roblox.com/asset/?id=144933262"
+    Sky.SkyboxLf = "http://www.roblox.com/asset/?id=144933244"
+    Sky.SkyboxRt = "http://www.roblox.com/asset/?id=144933299"
+    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=144931564"
+    Sky.StarCount = 5000
+    Sky.SunAngularSize = 5
+    Sky.Parent = Lighting
+
+    Bloom.Intensity = 0.3
+    Bloom.Size = 10
+    Bloom.Threshold = 0.8
+    Bloom.Parent = Lighting
+
+    Blur.Size = 5
+    Blur.Parent = Lighting
+
+    ColorC.Brightness = 0
+    ColorC.Contrast = 0.1
+    ColorC.Saturation = 0.25
+    ColorC.TintColor = Color3.fromRGB(255, 255, 255)
+    ColorC.Parent = Lighting
+
+    SunRays.Intensity = 0.1
+    SunRays.Spread = 0.8
+    SunRays.Parent = Lighting
+end
+
+-- Estado del shader
+local shadersEnabled = false
+
+-- Toggle para activar/desactivar shaders
+toggleShader = MainTab:CreateToggle({
+    Name = "Shader",
+    Callback = function()
+        shadersEnabled = not shadersEnabled
+        if shadersEnabled then
+            SaveLightingState()  -- Guardamos el estado antes de aplicar los shaders
+            ApplyShaders()       -- Activamos los shaders
+        else
+            RestoreLightingState()  -- Restauramos el estado anterior
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----JUGADORES---
+JugadoresTab = Window:CreateTab("Jugadores")
+JugadoresTab:CreateSection("Acciones")
+
+
+-- Variables globales necesarias
+local selectedPlayer = nil
+local aimlockEnabled = false
+local aimlockConnection
+local orbitConnection
+local sitConnection
+local followConnection
+local isSitting = false
+local orbitSpeed = 20
+local orbitDistance = 10
+local followOffsetZ = 5
+local orbitEnabled = false
+local followEnabled = false
+local doggyEnabled = false
+local doggyConnection
+local doggyAnimId = 13694096724
+local doggyAnimTime = 2.6
+local doggySpeed = 1 -- Velocidad fija para el movimiento doggy
+local doggyDirection = 1
+local doggyCurrentDistance = 2.7
+local doggyTargetDistance = 4
+
+-- Variables globales necesarias
+local selectedPlayer = nil
+local pataEnabled = false
+local pataConnection
+local pataAnimId = 18526288497
+local pataAnimTime = 2.44
+local pataSpeed = 1 -- Velocidad fija para el movimiento pata
+local pataDirection = 1
+local pataCurrentDistance = 3
+local pataTargetDistance = 4
+
+-- Variables globales necesarias
+local selectedPlayer = nil
+local cariEnabled = false
+local cariConnection
+local cariAnimId = 15679624464
+local cariAnimTime = 2.6
+local cariSpeed = 5-- Velocidad fija para el movimiento cari
+local cariDirection = 1
+local cariCurrentDistance = 2.7
+local cariTargetDistance = 4
+
+-- Variables globales necesarias
+local selectedPlayer = nil
+local wataEnabled = false
+local wataConnection
+local wataAnimId = 12992262118
+local wataAnimTime = 5.6
+local wataSpeed = 5 -- Velocidad fija para el movimiento Wata
+local wataDirection = 1
+local wataCurrentDistance = 2
+local wataTargetDistance = 3
+
+
+-- Función para controlar la colisión
+local function SetNoCollision(char, state)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state
+        end
+    end
+end
+
+-- Función para ejecutar el Wata
+local function PlayWata(target)
+    if not target or not target.Character then return end
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    -- Animación Wata
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. wataAnimId
+    local track = humanoid:LoadAnimation(anim)
+    track:Play()
+    track.TimePosition = wataAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    -- Ciclo de movimiento hacia adelante y atrás
+    wataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        -- Ajustar distancia
+        wataCurrentDistance = wataCurrentDistance + (wataSpeed * wataDirection * game:GetService("RunService").Heartbeat:Wait())
+
+        -- Cambiar dirección si se alcanza la distancia máxima o mínima
+        if wataCurrentDistance >= wataTargetDistance then
+            wataDirection = -1
+        elseif wataCurrentDistance <= 1.2 then
+            wataDirection = 1
+        end
+
+        -- Posicionar al jugador enfrente del objetivo y mirando hacia él
+        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * wataCurrentDistance + Vector3.new(0, 0.23, 0)
+        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
+    end)
+end
+
+-- Función para detener el Wata
+local function StopWata()
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if wataConnection then
+        wataConnection:Disconnect()
+        wataConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(wataAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    if char then
+        SetNoCollision(char, false)
+    end
+end
+
+
+-- Función para controlar la colisión
+local function SetNoCollision(char, state)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state
+        end
+    end
+end
+
+
+-- Función para ejecutar el Cari
+local function PlayCari(target)
+    if not target or not target.Character then return end
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    -- Animación Cari
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. cariAnimId
+    local track = humanoid:LoadAnimation(anim)
+    track:Play()
+    track.TimePosition = cariAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    -- Ciclo de movimiento hacia adelante y atrás
+    cariConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        -- Ajustar distancia
+        cariCurrentDistance = cariCurrentDistance + (cariSpeed * cariDirection * game:GetService("RunService").Heartbeat:Wait())
+
+        -- Cambiar dirección si se alcanza la distancia máxima o mínima
+        if cariCurrentDistance >= cariTargetDistance then
+            cariDirection = -1
+        elseif cariCurrentDistance <= 1.2 then
+            cariDirection = 1
+        end
+
+        -- Posicionar al jugador detrás del objetivo y mirando hacia él
+        local offsetPosition = targetRoot.Position - targetRoot.CFrame.LookVector * cariCurrentDistance + Vector3.new(0, 0.23, 0)
+        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
+    end)
+end
+
+-- Función para detener el Cari
+local function StopCari()
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if cariConnection then
+        cariConnection:Disconnect()
+        cariConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(cariAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    if char then
+        SetNoCollision(char, false)
+    end
+end
+
+
+-- Función para encontrar jugador por nombre parcial o DisplayName
+local function findPlayerByPartialName(name)
+    name = name:lower()
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        local usernameMatch = player.Name:lower():sub(1, #name) == name
+        local displaynameMatch = player.DisplayName:lower():sub(1, #name) == name
+        if usernameMatch or displaynameMatch then
+            return player
+        end
+    end
+end
+
+-- Función para encontrar jugador por nombre parcial o DisplayName
+local function findPlayerByPartialName(name)
+    name = name:lower()
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        local usernameMatch = player.Name:lower():sub(1, #name) == name
+        local displaynameMatch = player.DisplayName:lower():sub(1, #name) == name
+        if usernameMatch or displaynameMatch then
+            return player
+        end
+    end
+end
+
+-- Función para controlar la colisión
+local function SetNoCollision(char, state)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state
+        end
+    end
+end
+
+-- Función para ejecutar el Pata
+local function PlayPata(target)
+    if not target or not target.Character then return end
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    -- Animación Pata
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. pataAnimId
+    local track = humanoid:LoadAnimation(anim)
+    track:Play()
+    track.TimePosition = pataAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    -- Ciclo de movimiento hacia adelante y atrás
+    pataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        -- Ajustar distancia
+        pataCurrentDistance = pataCurrentDistance + (pataSpeed * pataDirection * game:GetService("RunService").Heartbeat:Wait())
+
+        -- Cambiar dirección si se alcanza la distancia máxima o mínima
+        if pataCurrentDistance >= pataTargetDistance then
+            pataDirection = -1
+        elseif pataCurrentDistance <= 2.7 then
+            pataDirection = 1
+        end
+
+        -- Posicionar al jugador
+        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * pataCurrentDistance + Vector3.new(0, 0.23, 0)
+        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
+    end)
+end
+
+-- Función para detener el Pata
+local function StopPata()
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if pataConnection then
+        pataConnection:Disconnect()
+        pataConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(pataAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    if char then
+        SetNoCollision(char, false)
+    end
+end
+
+
+-- Función para controlar la colisión
+local function SetNoCollision(char, state)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state
+        end
+    end
+end
+
+-- Función para ejecutar el Doggy
+local function PlayDoggy(target)
+    if not target or not target.Character then return end
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    -- Animación Doggy
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. doggyAnimId
+    local track = humanoid:LoadAnimation(anim)
+    track:Play()
+    track.TimePosition = doggyAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    -- Ciclo de movimiento hacia adelante y atrás
+    doggyConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        -- Ajustar distancia
+        doggyCurrentDistance = doggyCurrentDistance + (doggySpeed * doggyDirection * game:GetService("RunService").Heartbeat:Wait())
+
+        -- Cambiar dirección si se alcanza la distancia máxima o mínima
+        if doggyCurrentDistance >= doggyTargetDistance then
+            doggyDirection = -1
+        elseif doggyCurrentDistance <= 2.7 then
+            doggyDirection = 1
+        end
+
+        -- Posicionar al jugador
+        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * doggyCurrentDistance + Vector3.new(0, 0.23, 0)
+        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
+    end)
+end
+
+-- Función para detener el Doggy
+local function StopDoggy()
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if doggyConnection then
+        doggyConnection:Disconnect()
+        doggyConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(doggyAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    if char then
+        SetNoCollision(char, false)
+    end
+end
+
+-- Input de nombre de jugador
+JugadoresTab:CreateInput({
+    Name = "Nombre del Jugador",
+    PlaceholderText = "Ej. juan, maria...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        local player = findPlayerByPartialName(text)
+        if player then
+            selectedPlayer = player
+            Rayfield:Notify({
+                Title = "Jugador Seleccionado",
+                Content = player.Name .. " ha sido seleccionado.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "No se encontró el jugador.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+
+-- Espectar
+JugadoresTab:CreateButton({
+    Name = "Espectar",
+    Callback = function()
+        if selectedPlayer then
+            game.Workspace.CurrentCamera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+        end
+    end
+})
+
+-- Restaurar vista
+JugadoresTab:CreateButton({
+    Name = "Restaurar Vista",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        if player and player.Character then
+            workspace.CurrentCamera.CameraSubject = player.Character:FindFirstChildWhichIsA("Humanoid")
+            Rayfield:Notify({
+                Title = "Vista Restaurada",
+                Content = "Has vuelto a la vista normal.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Teleportarse
+JugadoresTab:CreateButton({
+    Name = "Teleportarse",
+    Callback = function()
+        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = selectedPlayer.Character.HumanoidRootPart.Position
+            game.Players.LocalPlayer.Character:MoveTo(targetPos)
+        end
+    end
+})
+
+-- Sliders para órbita (ya existentes)
+JugadoresTab:CreateSlider({
+    Name = "Velocidad de Órbita",
+    Range = {1, 200},
+    Increment = 1,
+    Suffix = "vel",
+    CurrentValue = orbitSpeed,
+    Callback = function(value)
+        orbitSpeed = value
+    end
+})
+
+JugadoresTab:CreateSlider({
+    Name = "Distancia de Órbita",
+    Range = {1, 40},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = orbitDistance,
+    Callback = function(value)
+        orbitDistance = value
+    end
+})
+
+-- Toggle para activar/desactivar órbita (ya existente)
+JugadoresTab:CreateToggle({
+    Name = "Órbita (girar alrededor del jugador)",
+    CurrentValue = false,
+    Callback = function(value)
+        orbitEnabled = value
+        if orbitConnection then
+            orbitConnection:Disconnect()
+            orbitConnection = nil
+        end
+
+        if orbitEnabled and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetHRP = selectedPlayer.Character.HumanoidRootPart
+            local localChar = game.Players.LocalPlayer.Character
+            local angle = 0
+
+            orbitConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+                if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+                    angle = angle + orbitSpeed * dt
+                    local offset = Vector3.new(math.cos(angle) * orbitDistance, 0, math.sin(angle) * orbitDistance)
+                    local newPos = targetHRP.Position + offset
+                    local hrp = localChar.HumanoidRootPart
+                    hrp.CFrame = CFrame.new(newPos, targetHRP.Position)
+                end
+            end)
+
+            Rayfield:Notify({
+                Title = "Órbita Activada",
+                Content = "Orbitando a " .. selectedPlayer.Name,
+                Duration = 3,
+                Image = 4483362458
+            })
+        elseif not orbitEnabled then
+            local localChar = game.Players.LocalPlayer.Character
+            if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+                local safePos = localChar.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
+                localChar.HumanoidRootPart.CFrame = CFrame.new(safePos)
+                for _, part in pairs(localChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+            Rayfield:Notify({
+                Title = "Órbita Desactivada",
+                Content = "Has dejado de orbitar.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Botón para Sentarse de manera segura
+JugadoresTab:CreateButton({
+    Name = "Sentarse en la cabesa(puedes salir volando)",
+    Callback = function()
+        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
+            local localChar = game.Players.LocalPlayer.Character
+            local head = selectedPlayer.Character.Head
+
+            if not isSitting then
+                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
+                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                    humanoid.Sit = true
+
+                    -- Posicionar al personaje en la cabeza del jugador seleccionado
+                    local sitPosition = head.Position + Vector3.new(0, 1, 0)
+                    localChar.HumanoidRootPart.CFrame = CFrame.new(sitPosition)
+
+                    -- Anclar al personaje brevemente para evitar que se mueva o vuele
+                    localChar.HumanoidRootPart.Anchored = true
+                    wait(0.01)  -- Anclar por un pequeño tiempo
+                    localChar.HumanoidRootPart.Anchored = false
+
+                    -- Conectar un Heartbeat para mantener al personaje sentado en la cabeza del jugador
+                    sitConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
+                            local headPos = selectedPlayer.Character.Head.Position
+                            localChar.HumanoidRootPart.CFrame = CFrame.new(headPos + Vector3.new(0, 1, 0))
+                        end
+                    end)
+
+                    isSitting = true
+                    Rayfield:Notify({
+                        Title = "Headsit Activado",
+                        Content = "Sentado sobre " .. selectedPlayer.Name,
+                        Duration = 3,
+                        Image = 4483362458
+                    })
+                end
+            else
+                -- Anclar al jugador por 0.01 segundos antes de levantarse
+                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
+                    local originalPosition = localChar.HumanoidRootPart.Position
+                    -- Anclar durante 0.01 segundos
+                    localChar.HumanoidRootPart.Anchored = true
+                    wait(0.01)
+                    localChar.HumanoidRootPart.Anchored = false
+                    localChar.HumanoidRootPart.CFrame = CFrame.new(originalPosition)
+                    
+                    localChar:FindFirstChildOfClass("Humanoid").Sit = false
+                end
+                if sitConnection then
+                    sitConnection:Disconnect()
+                    sitConnection = nil
+                end
+                isSitting = false
+                Rayfield:Notify({
+                    Title = "Headsit Desactivado",
+                    Content = "Te has levantado y la posición ha sido restaurada.",
+                    Duration = 3,
+                    Image = 4483362458
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Jugador no válido o sin cabeza.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+
+
+-- Toggle para activar/desactivar Doggy
+JugadoresTab:CreateToggle({
+    Name = "Movimiento de boca",
+    CurrentValue = false,
+    Callback = function(value)
+        doggyEnabled = value
+
+        if doggyEnabled and selectedPlayer then
+            PlayDoggy(selectedPlayer)
+        else
+            StopDoggy()
+
+            -- Hacer que el jugador salte al desactivar
+            local player = game:GetService("Players").LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+
+-- Slider para ajustar la velocidad del movimiento Doggy
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = doggySpeed,
+    Callback = function(value)
+        doggySpeed = value
+        if doggyEnabled and selectedPlayer then
+            -- Reiniciar el movimiento de Doggy para aplicar la nueva velocidad
+            StopDoggy()
+            PlayDoggy(selectedPlayer)
+        end
+    end
+})
+
+
+
+-- Toggle para activar/desactivar Pata
+JugadoresTab:CreateToggle({
+    Name = "Movimiento de pata",
+    CurrentValue = false,
+    Callback = function(value)
+        pataEnabled = value
+
+        if pataEnabled and selectedPlayer then
+            PlayPata(selectedPlayer)
+        else
+            StopPata()
+
+            -- Hacer que el jugador salte al desactivar
+            local player = game:GetService("Players").LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+
+-- Slider para ajustar la velocidad del movimiento Pata
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = pataSpeed,
+    Callback = function(value)
+        pataSpeed = value
+        if pataEnabled and selectedPlayer then
+            -- Reiniciar el movimiento de Pata para aplicar la nueva velocidad
+            StopPata()
+            PlayPata(selectedPlayer)
+        end
+    end
+})
+
+-- Toggle para activar/desactivar Cari
+JugadoresTab:CreateToggle({
+    Name = "Dar Cariño",
+    CurrentValue = false,
+    Callback = function(value)
+        cariEnabled = value
+
+        if cariEnabled and selectedPlayer then
+            PlayCari(selectedPlayer)
+        else
+            StopCari()
+
+            -- Hacer que el jugador salte al desactivar
+            local player = game:GetService("Players").LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+-- Slider para ajustar la velocidad del movimiento Cari
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = cariSpeed,
+    Callback = function(value)
+        cariSpeed = value
+        if cariEnabled and selectedPlayer then
+            -- Reiniciar el movimiento de Cari para aplicar la nueva velocidad
+            StopCari()
+            PlayCari(selectedPlayer)
+        end
+    end
+})
+
+
+-- Toggle para activar/desactivar Wata
+JugadoresTab:CreateToggle({
+    Name = "Dar Wata",
+    CurrentValue = false,
+    Callback = function(value)
+        wataEnabled = value
+
+        if wataEnabled and selectedPlayer then
+            PlayWata(selectedPlayer)
+        else
+            StopWata()
+
+            -- Hacer que el jugador salte al desactivar
+            local player = game:GetService("Players").LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+-- Slider para ajustar la velocidad del movimiento Wata
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = wataSpeed,
+    Callback = function(value)
+        wataSpeed = value
+        if wataEnabled and selectedPlayer then
+            -- Reiniciar el movimiento de Wata para aplicar la nueva velocidad
+            StopWata()
+            PlayWata(selectedPlayer)
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---Scripts pre hechos
+
+TPTab = Window:CreateTab("Scripts", nil) -- Title, Image
+
+Button1 = TPTab:CreateButton({
+   Name = "Infinite Yield",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+
+   end,
+})
+ Button2 = TPTab:CreateButton({
+   Name = "Dex",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+   end,
+})
+
+ Button2 = TPTab:CreateButton({
+   Name = "Fe Invicible G para activar",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
+   end,
+})
+
+ Button3 = TPTab:CreateButton({
+   Name = "AFEM (Animaciones R15)",
+   Callback = function()
+loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
+   end,
+})
+
+ Button4 = TPTab:CreateButton({
+   Name = "Fly universal",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
+   end,
+})
+
+ Button5 = TPTab:CreateButton({
+    Name = "Teclado (Movil)",
+    Callback = function()
+        loadstring(game:HttpGet("https://gist.githubusercontent.com/RedZenXYZ/4d80bfd70ee27000660e4bfa7509c667/raw/da903c570249ab3c0c1a74f3467260972c3d87e6/KeyBoard%2520From%2520Ohio%2520Fr%2520Fr"))()
+    end,
+ })
+ 
+
+ Button5 = TPTab:CreateButton({
+   Name = "GhostHub",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "venox (Necesita key)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/venoxcc/venoxV1/main/main.lua'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "Latin hub(Muchas cosas no funcionan)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/YYQyEvZm'))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Emotes R15",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "c00lkidd Gui (solo lo ves tu)",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "HitBox Expander Gui",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "WISL hub",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
+   end,
+})
+
+
+ Button6 = TPTab:CreateButton({
+   Name = "Alquimia hub",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Subir FPS",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/8YZ2cc6V"))()
+   end,
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+---Scripts de juegos---
+
+Juegostab= Window:CreateTab("Juegos", nil) -- Title, Image
+
+boton= Juegostab:CreateButton({
+   Name = "Dress to impres",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/DTI-GUI-V2/main/dti_gui_v2.lua",true))()
+end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fuit Super OP",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "TRP(no universal pude ocacionar lag)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/therapy-gui/main/therapy-gui.lua", true))()
+   end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Piggy (ESP y TP a items)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Arsenal thunder client",
+   Callback = function()
+loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e41f4a030044b055add.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Breaking Point",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Natural disaster",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
+
+   end,
+})
+
+
+
+ boton= Juegostab:CreateButton({
+   Name = "Telekinesis (Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fruit (necesita key)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/3345-c-a-t-s-u-s/Kncrypt/refs/heads/main/sources/BloxFruit.lua"))()
+
+   end,
+})
+boton= Juegostab:CreateButton({
+   Name = "Be an NPC or DIE",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/main/BeNpcOrDie"))("t.me/arceusxscripts")
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blade Ball(EminenceXLua)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/EminenceXLua/Blade-your-Balls/main/BladeBallLoader.lua"))()
+
+
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(auto parry)",
+   Callback = function()
+loadstring(game:HttpGet("https://scriptblox.com/raw/UPD-Blade-Ball-op-autoparry-with-visualizer-8652"))()
+
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+    Name = "Blade Ball(necesita key)",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/FFJ1/Roblox-Exploits/main/scripts/Loader.lua"))()
+ 
+ 
+    end,
+ })
+
+
+
+boton= Juegostab:CreateButton({
+   Name = "Nebula hub (Booga booga)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Yousuck780/Nebula-Hub/refs/heads/main/boogaboogareborn'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Break in 2",
+   Callback = function()
+loadstring(game:HttpGet(("https://pastebin.com/raw/365H7AMr")))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Redz Hub (Blox fruit)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"))(Settings)
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "build a boat for treasure",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/TheRealAsu/BABFT/refs/heads/main/Jan25_Source.lua'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Thunder Cliend(Arsenal)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/thunderclient/main/main.lua'))();
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring v6 mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
+   end,
+})
+
+
+
+------Animaciones------
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local AnimacionesTab = Window:CreateTab("Animaciones", nil)
+AnimacionesTab:CreateSection("Animaciones R15")
+
+local selectedSpeed = 1
+local currentTrack = nil
+local buttonsCreated = false
+
+-- Devuelve el Humanoid actual
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	if char then
+		return char:FindFirstChildWhichIsA("Humanoid")
+	end
+	return nil
+end
+
+-- Asegura que el Animator esté disponible
+local function getAnimator(Humanoid)
+	for i = 1, 10 do
+		local animator = Humanoid:FindFirstChildOfClass("Animator")
+		if animator then return animator end
+		animator = Instance.new("Animator")
+		animator.Parent = Humanoid
+		task.wait(0.1)
+	end
+	return nil
+end
+
+-- Carga animación con seguridad
+local function safePlayAnim(animId)
+	local humanoid = getHumanoid()
+	if not humanoid then return end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animId
+
+	local success, track
+	for attempt = 1, 10 do
+		local animator = getAnimator(humanoid)
+		if not animator then
+			warn("❌ No se pudo obtener Animator.")
+			return
+		end
+		success, track = pcall(function()
+			return animator:LoadAnimation(anim)
+		end)
+		if success and track then
+			track:Play()
+			track:AdjustSpeed(selectedSpeed)
+			currentTrack = track
+			return
+		end
+		task.wait(0.2)
+	end
+	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
+end
+
+-- Crear los botones una sola vez
+local function setupUI()
+	if buttonsCreated then return end
+
+	-- Botón para quitar animación
+	AnimacionesTab:CreateButton({
+		Name = "❌ Quitar Animación",
+		Callback = function()
+			local humanoid = getHumanoid()
+			if humanoid then
+				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+					track:Stop()
+				end
+			end
+			currentTrack = nil
+		end
+	})
+
+	-- Slider de velocidad
+	AnimacionesTab:CreateSlider({
+		Name = "Velocidad de animación",
+		Range = {0, 5},
+		Increment = 0.1,
+		Suffix = "x",
+		CurrentValue = 1,
+		Callback = function(value)
+			selectedSpeed = value
+			if currentTrack then
+				currentTrack:AdjustSpeed(value)
+			end
+		end
+	})
+
+	-- Botones de emotes
+	local success, emotes = pcall(function()
+		local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+		return HttpService:JSONDecode(raw)
+	end)
+
+	if success then
+		for _, emote in ipairs(emotes) do
+			if emote.name and emote.animationid then
+				AnimacionesTab:CreateButton({
+					Name = emote.name,
+					Callback = function()
+						local humanoid = getHumanoid()
+						if humanoid then
+							for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+								track:Stop()
+							end
+							safePlayAnim(emote.animationid)
+						end
+					end
+				})
+			end
+		end
+	else
+		warn("❌ Error al cargar emotes:", emotes)
+	end
+
+	buttonsCreated = true
+end
+
+-- Inicializar UI y escuchar reinicios
+setupUI()
+LocalPlayer.CharacterAdded:Connect(function()
+	currentTrack = nil
+end)
+
+
+
+
+
+
+----Aniamciones R6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----AIMBOT---
+AimbotTab = Window:CreateTab("Aimbot", nil)
+
+-- Configuración
+local AimbotSettings = {
+    Enabled = false,
+    ESPEnabled = false,
+    FOVRadius = 350,
+    FOVColor = Color3.fromRGB(0, 0, 255),
+    ESPColor = Color3.fromRGB(0, 0, 255),
+    ESPSizeMultiplier = 5,
+    Sensitivity = 0,
+    AimPart = "Head",
+    TeamCheckEnabled = false,
+    TracersEnabled = false,
+    TracerColor = Color3.fromRGB(0, 0, 255),
+    AutoAimEnabled = false,
+    OnlyClosePlayers = false, -- 🔥 NUEVO: solo apuntar a cercanos
+    CloseDistanceThreshold = 100 -- 🔥 NUEVO: distancia en studs para considerar "cercano"
+}
+
+local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Holding = false
+
+-- FOV circle
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Filled = false
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 64
+FOVCircle.Transparency = 0.7
+FOVCircle.Visible = false
+
+-- Obtener el jugador más cercano
+local function GetClosestPlayer()
+    local closestPlayer
+    local shortestDistance = AimbotSettings.FOVRadius
+
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+           and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+
+            if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local screenPoint, onScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+
+                local distFromPlayer = (v.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then
+                    continue
+                end
+
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = v
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+-- Input para apuntar
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = false
+    end
+end)
+
+-- Aimbot + FOV Circle
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y - 36)
+    FOVCircle.Radius = AimbotSettings.FOVRadius
+    FOVCircle.Color = AimbotSettings.FOVColor
+    FOVCircle.Visible = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
+
+    if AimbotSettings.Enabled and (Holding or AimbotSettings.AutoAimEnabled) then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild(AimbotSettings.AimPart) then
+            local aimPos = target.Character[AimbotSettings.AimPart].Position
+            local camPos = Camera.CFrame.Position
+            local tween = TweenService:Create(Camera, TweenInfo.new(AimbotSettings.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(camPos, aimPos)})
+            tween:Play()
+        end
+    end
+end)
+
+
+
+-- BOX ESP
+
+local ESPBoxes = {}
+
+RunService.RenderStepped:Connect(function()
+    for _, box in pairs(ESPBoxes) do
+        if box and box.Remove then
+            box:Remove()
+        end
+    end
+    ESPBoxes = {}
+
+    if not AimbotSettings.ESPEnabled then return end
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+            and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+
+            if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local hrp = v.Character.HumanoidRootPart
+            local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen then
+                local distFromPlayer = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                local scaleFactor = 1 / (hrp.Position - Camera.CFrame.Position).Magnitude * 100
+                local boxHeight = math.clamp(6 * scaleFactor * AimbotSettings.ESPSizeMultiplier, 2, 500)
+                local boxWidth = boxHeight / 1.5
+
+                local box = Drawing.new("Square")
+                box.Color = (AimbotSettings.OnlyClosePlayers and distFromPlayer <= AimbotSettings.CloseDistanceThreshold)
+    and Color3.fromRGB(255, 0, 0)
+    or AimbotSettings.ESPColor
+                box.Thickness = 1
+                box.Filled = false
+                box.Transparency = 1
+                box.Size = Vector2.new(boxWidth, boxHeight)
+                box.Position = Vector2.new(rootPos.X - boxWidth / 2, rootPos.Y - boxHeight / 2)
+                box.Visible = true
+
+                table.insert(ESPBoxes, box)
+            end
+        end
+    end
+end)
+
+
+-- Tracers
+local Lines = {}
+
+RunService.RenderStepped:Connect(function()
+    for _, line in pairs(Lines) do
+        if line and line.Remove then
+            line:Remove()
+        end
+    end
+    Lines = {}
+
+    if AimbotSettings.TracersEnabled then
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+               and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+
+                if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                    continue
+                end
+
+                local hrp = v.Character.HumanoidRootPart
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    local distFromPlayer = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+
+                    local line = Drawing.new("Line")
+                    line.Thickness = 1.5
+                    line.Transparency = 0.9
+                    line.Color = (AimbotSettings.OnlyClosePlayers and distFromPlayer <= AimbotSettings.CloseDistanceThreshold)
+    and Color3.fromRGB(255, 0, 0)
+    or AimbotSettings.TracerColor
+
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(screenPos.X, screenPos.Y)
+                    line.Visible = true
+
+                    table.insert(Lines, line)
+                end
+            end
+        end
+    end
+end)
+
+-- UI Rayfield
+AimbotTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.Enabled = state
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Auto Apuntar",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.AutoAimEnabled = state
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Tamaño del FOV",
+    Range = {10, 1000},
+    Increment = 1,
+    CurrentValue = AimbotSettings.FOVRadius,
+    Callback = function(val)
+        AimbotSettings.FOVRadius = val
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color del FOV",
+    Color = AimbotSettings.FOVColor,
+    Callback = function(val)
+        AimbotSettings.FOVColor = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.ESPEnabled = state
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color del ESP",
+    Color = AimbotSettings.ESPColor,
+    Callback = function(val)
+        AimbotSettings.ESPColor = val
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Tamaño del ESP",
+    Range = {1, 10},
+    Increment = 0.1,
+    CurrentValue = AimbotSettings.ESPSizeMultiplier,
+    Callback = function(val)
+        AimbotSettings.ESPSizeMultiplier = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "No apuntar al Team",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.TeamCheckEnabled = state
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Mostrar Líneas (Tracers)",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.TracersEnabled = state
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color de las Líneas (Tracers)",
+    Color = AimbotSettings.TracerColor,
+    Callback = function(val)
+        AimbotSettings.TracerColor = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Apuntar a jugadores cercanos",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.OnlyClosePlayers = state
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Distancia",
+    Range = {1, 300},
+    Increment = 1,
+    CurrentValue = AimbotSettings.CloseDistanceThreshold,
+    Callback = function(val)
+        if AimbotSettings.OnlyClosePlayers then
+            AimbotSettings.CloseDistanceThreshold = val
+        end
+    end
+})
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+----Temas---
+themesTab = Window:CreateTab("temas", nil)
+Section = themesTab:CreateSection("Cambia el tema")
+
+-- Función para crear botones rápido
+ function CreateThemeButton(name, theme)
+    themesTab:CreateButton({
+        Name = name,
+        Callback = function()
+            Window.ModifyTheme(theme)
+            SaveTheme(theme)
+        end
+    })
+end
+
+CreateThemeButton("Black", "Default")
+CreateThemeButton("AmberGlow", "AmberGlow")
+CreateThemeButton("Amethyst", "Amethyst")
+CreateThemeButton("Bloom", "Bloom")
+CreateThemeButton("DarkBlue", "DarkBlue")
+CreateThemeButton("Green", "Green")
+CreateThemeButton("Light", "Light")
+CreateThemeButton("Ocean", "Ocean")
+CreateThemeButton("Serenity", "Serenity")
+
+-- ColorPicker
+ColorPicker = themesTab:CreateColorPicker({
+    Name = "Color de fondo perzonalizado",
+    Color = Color3.fromRGB(0, 0, 0),
+    Callback = function(color)
+        Window.ModifyTheme({
+            Background = color,
+            Topbar = color,
+            Border = color,
+        })
+        -- Opcionalmente podrías guardar colores también, pero sería más complicado
+    end
+})
+
+
+
+
+
+
+----Creditos-----
+
+
+CreditosTab = Window:CreateTab("Creditos", nil)
+Section = CreditosTab:CreateSection("Creador")
+
+ DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
+
+ParagraphFake = CreditosTab:CreateButton({
+    Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
+    Callback = function()
+        setclipboard(DiscordInvite)
+ Rayfield:Notify({
+           Title = "Discord!",
+       Content = "Se copio el link de invitacion, no olvides ver su canal",
+       Duration = 5,
+       Image = 13458017478,
+             Callback = function()
+          end
+ 
+    })
+    end,
+})
+
+ Section = CreditosTab:CreateSection("Testers")
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "erjazzy",
+    Content = "chupen pico"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Andr3ssf",
+    Content = "Top 1 de torreon coahuila"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "santiago64226",
+    Content = "No asi esta bien"
+})
+
+ Section = CreditosTab:CreateSection("Colaboradores")
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "HolaCapo_94",
+    Content = "Siganme en roblox xD"
+})  
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "El Cazador",
+    Content = "jmods es el mejor xd"
+})  
+
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Masha💀🔥",
+    Content = "me comi al oso"
+})  
+
+
+   
+
+
+
+
+
+
+-----When haces tus momos en video
