@@ -1,16 +1,6 @@
 --- Intento 1 de hub con las weas q necesito
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-
-local ChatEvent = ReplicatedStorage:FindFirstChild("JmodsChatEvent")
-if not ChatEvent then
-    ChatEvent = Instance.new("RemoteEvent")
-    ChatEvent.Name = "JmodsChatEvent"
-    ChatEvent.Parent = ReplicatedStorage
-end
 
 -- Crear ventana
 local Window = Rayfield:CreateWindow({
@@ -42,12 +32,6 @@ local Window = Rayfield:CreateWindow({
         Key = {"keyjoao"}
     }
 })
-
---Chat---
-
-
-
----
 
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
@@ -3541,58 +3525,3 @@ ParagraphFake = CreditosTab:CreateButton({
 -----When haces tus momos en video
 
 
-
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "ChatGui"
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0.35, 0, 0.3, 0)
-Frame.Position = UDim2.new(0.03, 0, 0.65, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Frame.Visible = false
-
-local Msgs = Instance.new("TextLabel", Frame)
-Msgs.Size = UDim2.new(1, -10, 1, -40)
-Msgs.Position = UDim2.new(0, 5, 0, 5)
-Msgs.BackgroundTransparency = 1
-Msgs.TextColor3 = Color3.new(1, 1, 1)
-Msgs.Font = Enum.Font.SourceSans
-Msgs.TextSize = 16
-Msgs.TextWrapped = true
-Msgs.TextYAlignment = Enum.TextYAlignment.Top
-Msgs.TextXAlignment = Enum.TextXAlignment.Left
-Msgs.Text = "[Sistema]: Chat local cargado."
-
-local Input = Instance.new("TextBox", Frame)
-Input.Size = UDim2.new(1, -10, 0, 30)
-Input.Position = UDim2.new(0, 5, 1, -35)
-Input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Input.TextColor3 = Color3.new(1, 1, 1)
-Input.Font = Enum.Font.SourceSans
-Input.TextSize = 16
-Input.PlaceholderText = "Escribe un mensaje..."
-Input.ClearTextOnFocus = true
-
--- Enviar mensaje
-Input.FocusLost:Connect(function(enterPressed)
-	if enterPressed and Input.Text ~= "" then
-		local msg = "[" .. LocalPlayer.Name .. "]: " .. Input.Text
-		ChatEvent:FireServer(msg)
-		Msgs.Text = Msgs.Text .. "\n" .. msg
-		Input.Text = ""
-	end
-end)
-
--- Recibir mensaje de otros
-ChatEvent.OnClientEvent:Connect(function(msg)
-	Msgs.Text = Msgs.Text .. "\n" .. msg
-end)
-
--- Toggle para mostrar/ocultar
-MainTab:CreateToggle({
-	Name = "CHAT PRIVADO",
-	CurrentValue = false,
-	Flag = "ChatToggle",
-	Callback = function(val)
-		Frame.Visible = val
-	end,
-})
