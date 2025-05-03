@@ -1041,6 +1041,38 @@ Toggle = MainTab:CreateToggle({
     end,
 })
 
+---Fov---
+
+local FOVEnabled = false
+
+-- Toggle para activar/desactivar el FOV personalizado
+MainTab:CreateToggle({
+    Name = "Activar FOV Personalizado",
+    CurrentValue = false,
+    Flag = "FOVEnabledToggle",
+    Callback = function(state)
+        FOVEnabled = state
+        if not state then
+            -- Restaurar el FOV por defecto al desactivar
+            workspace.CurrentCamera.FieldOfView = 70
+        end
+    end,
+})
+
+-- Slider para el FOV (solo funciona si está activado)
+MainTab:CreateSlider({
+    Name = "Campo de Visión (FOV)",
+    Range = {40, 120},
+    Increment = 1,
+    Suffix = "°",
+    CurrentValue = workspace.CurrentCamera.FieldOfView,
+    Flag = "FOVSlider",
+    Callback = function(val)
+        if FOVEnabled then
+            workspace.CurrentCamera.FieldOfView = val
+        end
+    end,
+})
 
 
 
@@ -3088,13 +3120,6 @@ end)
 
 
 
-
-
-
-
-
-
-
 ----AIMBOT---
 AimbotTab = Window:CreateTab("Aimbot", nil)
 
@@ -3394,7 +3419,102 @@ AimbotTab:CreateSlider({
     end
 })
 
-    
+
+----Hitbox Espander---- 
+
+local HitboxTab = Window:CreateTab("Hitbox", )
+
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
+
+local function updateHitboxes()
+    for _,v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            if not getgenv().TeamCheck or (v.Team ~= game.Players.LocalPlayer.Team) then
+                pcall(function()
+                    local hrp = v.Character.HumanoidRootPart
+                    hrp.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                    hrp.Transparency = HitboxTransparency
+                    hrp.BrickColor = BrickColor.new("Really black")
+                    hrp.Material = Enum.Material.Neon
+                    hrp.CanCollide = false
+                end)
+            end
+        end
+    end
+end
+
+local function resetHitboxes()
+    for _,v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            pcall(function()
+                local hrp = v.Character.HumanoidRootPart
+                hrp.Size = Vector3.new(2,2,1)
+                hrp.Transparency = 1
+                hrp.BrickColor = BrickColor.new("Medium stone grey")
+                hrp.Material = Enum.Material.Plastic
+                hrp.CanCollide = false
+            end)
+        end
+    end
+end
+
+local hitboxConnection
+HitboxTab:CreateToggle({
+    Name = "Activar Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxToggle",
+    Callback = function(state)
+        getgenv().HitboxStatus = state
+        if state then
+            hitboxConnection = game:GetService("RunService").RenderStepped:Connect(function()
+                if getgenv().HitboxStatus then
+                    updateHitboxes()
+                end
+            end)
+        else
+            if hitboxConnection then hitboxConnection:Disconnect() end
+            resetHitboxes()
+        end
+    end,
+})
+
+HitboxTab:CreateToggle({
+    Name = "Ignorar Compañeros (Team Check)",
+    CurrentValue = false,
+    Flag = "TeamCheckToggle",
+    Callback = function(state)
+        getgenv().TeamCheck = state
+    end,
+})
+
+HitboxTab:CreateSlider({
+    Name = "Tamaño del Hitbox",
+    Range = {2, 30},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = getgenv().HitboxSize,
+    Flag = "HitboxSizeSlider",
+    Callback = function(val)
+        getgenv().HitboxSize = val
+    end,
+})
+
+HitboxTab:CreateSlider({
+    Name = "Transparencia del Hitbox",
+    Range = {0, 1},
+    Increment = 0.05,
+    Suffix = "",
+    CurrentValue = getgenv().HitboxTransparency,
+    Flag = "HitboxTransparencySlider",
+    Callback = function(val)
+        getgenv().HitboxTransparency = val
+    end,
+})
+
+ 
 
 
 
@@ -3523,5 +3643,4 @@ ParagraphFake = CreditosTab:CreateButton({
 
 
 -----When haces tus momos en video
-
 
