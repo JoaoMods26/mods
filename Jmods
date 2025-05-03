@@ -1047,7 +1047,7 @@ local FOVEnabled = false
 
 -- Toggle para activar/desactivar el FOV personalizado
 MainTab:CreateToggle({
-    Name = "Activar FOV Personalizado",
+    Name = "Activar FOV",
     CurrentValue = false,
     Flag = "FOVEnabledToggle",
     Callback = function(state)
@@ -1055,6 +1055,12 @@ MainTab:CreateToggle({
         if not state then
             -- Restaurar el FOV por defecto al desactivar
             workspace.CurrentCamera.FieldOfView = 70
+        else
+            -- Aplicar el valor actual del slider si ya fue movido
+            local val = library.flags["FOVSlider"]
+            if val then
+                workspace.CurrentCamera.FieldOfView = val
+            end
         end
     end,
 })
@@ -1073,6 +1079,7 @@ MainTab:CreateSlider({
         end
     end,
 })
+
 
 
 
@@ -3422,7 +3429,7 @@ AimbotTab:CreateSlider({
 
 ----Hitbox Espander---- 
 
-local HitboxTab = Window:CreateTab("Hitbox", )
+local HitboxTab = Window:CreateTab("Hitbox", 4483362458)
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
@@ -3430,13 +3437,13 @@ getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
 
 local function updateHitboxes()
-    for _,v in pairs(game:GetService("Players"):GetPlayers()) do
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
         if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             if not getgenv().TeamCheck or (v.Team ~= game.Players.LocalPlayer.Team) then
                 pcall(function()
                     local hrp = v.Character.HumanoidRootPart
-                    hrp.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-                    hrp.Transparency = HitboxTransparency
+                    hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                    hrp.Transparency = getgenv().HitboxTransparency
                     hrp.BrickColor = BrickColor.new("Really black")
                     hrp.Material = Enum.Material.Neon
                     hrp.CanCollide = false
@@ -3447,11 +3454,11 @@ local function updateHitboxes()
 end
 
 local function resetHitboxes()
-    for _,v in pairs(game:GetService("Players"):GetPlayers()) do
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
         if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             pcall(function()
                 local hrp = v.Character.HumanoidRootPart
-                hrp.Size = Vector3.new(2,2,1)
+                hrp.Size = Vector3.new(2, 2, 1)
                 hrp.Transparency = 1
                 hrp.BrickColor = BrickColor.new("Medium stone grey")
                 hrp.Material = Enum.Material.Plastic
@@ -3475,7 +3482,10 @@ HitboxTab:CreateToggle({
                 end
             end)
         else
-            if hitboxConnection then hitboxConnection:Disconnect() end
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
             resetHitboxes()
         end
     end,
@@ -3506,13 +3516,13 @@ HitboxTab:CreateSlider({
     Name = "Transparencia",
     Range = {0, 1},
     Increment = 0.05,
-    Suffix = "",
     CurrentValue = getgenv().HitboxTransparency,
     Flag = "HitboxTransparencySlider",
     Callback = function(val)
         getgenv().HitboxTransparency = val
     end,
 })
+
 
  
 
