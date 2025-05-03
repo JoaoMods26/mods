@@ -3533,7 +3533,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Crear un RemoteEvent para enviar mensajes entre clientes
+-- Crear un RemoteEvent para enviar mensajes entre el servidor y los clientes
 local chatEvent = Instance.new("RemoteEvent")
 chatEvent.Name = "ChatEvent"
 chatEvent.Parent = ReplicatedStorage
@@ -3579,7 +3579,7 @@ end
 
 -- Crear un Toggle en Rayfield
 local Toggle = MainTab:CreateToggle({
-    Name = "Chat privado",
+    Name = "Mostrar",
     CurrentValue = false,
     Flag = "LocalChatToggle",
     Callback = function(value)
@@ -3587,7 +3587,7 @@ local Toggle = MainTab:CreateToggle({
     end,
 })
 
--- Enviar mensaje localmente
+-- Enviar mensaje localmente y al servidor
 input.FocusLost:Connect(function(enterPressed)
     if enterPressed and input.Text ~= "" then
         local msg = input.Text
@@ -3595,13 +3595,20 @@ input.FocusLost:Connect(function(enterPressed)
         messages.Text = messages.Text .. "\n[" .. player.Name .. "]: " .. msg
         input.Text = ""
         
-        -- Enviar el mensaje a todos los clientes
+        -- Enviar el mensaje al servidor para que los demás jugadores lo reciban
         chatEvent:FireServer(msg)
     end
 end)
 
--- Recibir mensajes de otros jugadores
+-- Recibir mensajes de otros jugadores desde el servidor
 chatEvent.OnClientEvent:Connect(function(message)
     -- Mostrar el mensaje recibido en la interfaz de usuario
     messages.Text = messages.Text .. "\n" .. message
 end)
+
+-- Enviar mensaje a todos los jugadores desde el servidor
+chatEvent.OnServerEvent:Connect(function(player, message)
+    -- Enviar el mensaje a todos los clientes conectados
+    chatEvent:FireAllClients("[" .. player.Name .. "]: " .. message)
+end)
+
