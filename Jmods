@@ -3426,6 +3426,9 @@ AimbotTab:CreateSlider({
 
 ----Hitbox Espander---- 
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
 local HitboxTab = Window:CreateTab("Hitbox", nil)
 
 getgenv().HitboxSize = 15
@@ -3433,16 +3436,26 @@ getgenv().HitboxTransparency = 0.9
 getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
 
+-- Función para actualizar hitboxes
 local function updateHitboxes()
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            if not getgenv().TeamCheck or (v.Team ~= game.Players.LocalPlayer.Team) then
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            if not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team) then
                 pcall(function()
-                    local hrp = v.Character.HumanoidRootPart
                     hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
                     hrp.Transparency = getgenv().HitboxTransparency
                     hrp.BrickColor = BrickColor.new("Really black")
                     hrp.Material = Enum.Material.Neon
+                    hrp.CanCollide = false
+                end)
+            else
+                -- Restaurar hitbox de aliados si TeamCheck está activado
+                pcall(function()
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
+                    hrp.BrickColor = BrickColor.new("Medium stone grey")
+                    hrp.Material = Enum.Material.Plastic
                     hrp.CanCollide = false
                 end)
             end
@@ -3450,9 +3463,10 @@ local function updateHitboxes()
     end
 end
 
+-- Función para resetear todos los hitboxes
 local function resetHitboxes()
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             pcall(function()
                 local hrp = v.Character.HumanoidRootPart
                 hrp.Size = Vector3.new(2, 2, 1)
@@ -3465,6 +3479,7 @@ local function resetHitboxes()
     end
 end
 
+-- Toggle principal de hitbox
 local hitboxConnection
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
@@ -3473,7 +3488,8 @@ HitboxTab:CreateToggle({
     Callback = function(state)
         getgenv().HitboxStatus = state
         if state then
-            hitboxConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            updateHitboxes()
+            hitboxConnection = RunService.RenderStepped:Connect(function()
                 if getgenv().HitboxStatus then
                     updateHitboxes()
                 end
@@ -3488,15 +3504,20 @@ HitboxTab:CreateToggle({
     end,
 })
 
+-- Toggle de Team Checker
 HitboxTab:CreateToggle({
     Name = "Team Checker",
     CurrentValue = false,
     Flag = "TeamCheckToggle",
     Callback = function(state)
         getgenv().TeamCheck = state
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
     end,
 })
 
+-- Slider para tamaño del hitbox
 HitboxTab:CreateSlider({
     Name = "Tamaño del Hitbox",
     Range = {2, 250},
@@ -3509,6 +3530,7 @@ HitboxTab:CreateSlider({
     end,
 })
 
+-- Slider para transparencia
 HitboxTab:CreateSlider({
     Name = "Transparencia",
     Range = {0, 1},
@@ -3519,6 +3541,7 @@ HitboxTab:CreateSlider({
         getgenv().HitboxTransparency = val
     end,
 })
+
 
 
  
