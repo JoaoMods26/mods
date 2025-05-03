@@ -1044,36 +1044,33 @@ Toggle = MainTab:CreateToggle({
 ---Fov---
 
 local FOVEnabled = false
+local LastFOVValue = workspace.CurrentCamera.FieldOfView
 
 -- Toggle para activar/desactivar el FOV personalizado
 MainTab:CreateToggle({
-    Name = "Activar FOV",
+    Name = "FOV",
     CurrentValue = false,
     Flag = "FOVEnabledToggle",
     Callback = function(state)
         FOVEnabled = state
         if not state then
-            -- Restaurar el FOV por defecto al desactivar
             workspace.CurrentCamera.FieldOfView = 70
         else
-            -- Aplicar el valor actual del slider si ya fue movido
-            local val = library.flags["FOVSlider"]
-            if val then
-                workspace.CurrentCamera.FieldOfView = val
-            end
+            workspace.CurrentCamera.FieldOfView = LastFOVValue
         end
     end,
 })
 
--- Slider para el FOV (solo funciona si está activado)
+-- Slider para el FOV
 MainTab:CreateSlider({
-    Name = "Campo de Visión (FOV)",
+    Name = "Cambiar Fov",
     Range = {40, 120},
     Increment = 1,
     Suffix = "°",
-    CurrentValue = workspace.CurrentCamera.FieldOfView,
+    CurrentValue = LastFOVValue,
     Flag = "FOVSlider",
     Callback = function(val)
+        LastFOVValue = val
         if FOVEnabled then
             workspace.CurrentCamera.FieldOfView = val
         end
@@ -3653,4 +3650,3 @@ ParagraphFake = CreditosTab:CreateButton({
 
 
 -----When haces tus momos en video
-
