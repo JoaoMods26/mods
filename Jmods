@@ -3407,7 +3407,7 @@ ParagraphFake = CreditosTab:CreateButton({
 
  Paragraph = CreditosTab:CreateParagraph({
     Title = "Masha💀🔥",
-    Content = "me comi al oso"
+    Content = "me comi al osoooooooooo"
 })  
 
 
