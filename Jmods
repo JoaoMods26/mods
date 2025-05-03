@@ -3523,3 +3523,85 @@ ParagraphFake = CreditosTab:CreateButton({
 
 
 -----When haces tus momos en video
+
+
+
+---Chat privado---
+
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Crear un RemoteEvent para enviar mensajes entre clientes
+local chatEvent = Instance.new("RemoteEvent")
+chatEvent.Name = "ChatEvent"
+chatEvent.Parent = ReplicatedStorage
+
+-- Crear GUI para el chat personalizado
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "LocalChatGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0.35, 0, 0.3, 0)
+frame.Position = UDim2.new(0.03, 0, 0.65, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
+frame.Visible = false  -- Inicialmente oculto
+
+local messages = Instance.new("TextLabel", frame)
+messages.Size = UDim2.new(1, -10, 1, -40)
+messages.Position = UDim2.new(0, 5, 0, 5)
+messages.BackgroundTransparency = 1
+messages.TextColor3 = Color3.new(1, 1, 1)
+messages.Font = Enum.Font.SourceSans
+messages.TextSize = 16
+messages.TextWrapped = true
+messages.TextYAlignment = Enum.TextYAlignment.Top
+messages.TextXAlignment = Enum.TextXAlignment.Left
+messages.Text = "[Sistema]: Chat local iniciado."
+
+local input = Instance.new("TextBox", frame)
+input.Size = UDim2.new(1, -10, 0, 30)
+input.Position = UDim2.new(0, 5, 1, -35)
+input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+input.TextColor3 = Color3.new(1, 1, 1)
+input.Font = Enum.Font.SourceSans
+input.TextSize = 16
+input.PlaceholderText = "Escribe un mensaje..."
+input.ClearTextOnFocus = true
+
+-- Función para alternar la visibilidad del chat
+local function toggleChat()
+    frame.Visible = not frame.Visible
+end
+
+-- Crear un Toggle en Rayfield
+local Toggle = MainTab:CreateToggle({
+    Name = "Chat privado",
+    CurrentValue = false,
+    Flag = "LocalChatToggle",
+    Callback = function(value)
+        toggleChat()
+    end,
+})
+
+-- Enviar mensaje localmente
+input.FocusLost:Connect(function(enterPressed)
+    if enterPressed and input.Text ~= "" then
+        local msg = input.Text
+        -- Mostrar el mensaje en la interfaz de usuario local
+        messages.Text = messages.Text .. "\n[" .. player.Name .. "]: " .. msg
+        input.Text = ""
+        
+        -- Enviar el mensaje a todos los clientes
+        chatEvent:FireServer(msg)
+    end
+end)
+
+-- Recibir mensajes de otros jugadores
+chatEvent.OnClientEvent:Connect(function(message)
+    -- Mostrar el mensaje recibido en la interfaz de usuario
+    messages.Text = messages.Text .. "\n" .. message
+end)
