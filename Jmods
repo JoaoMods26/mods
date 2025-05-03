@@ -3463,7 +3463,7 @@ end
 
 local hitboxConnection
 HitboxTab:CreateToggle({
-    Name = "Activar Hitbox Expander",
+    Name = "Hitbox Expander",
     CurrentValue = false,
     Flag = "HitboxToggle",
     Callback = function(state)
@@ -3482,7 +3482,7 @@ HitboxTab:CreateToggle({
 })
 
 HitboxTab:CreateToggle({
-    Name = "Ignorar Compañeros (Team Check)",
+    Name = "Team Checker",
     CurrentValue = false,
     Flag = "TeamCheckToggle",
     Callback = function(state)
@@ -3492,7 +3492,7 @@ HitboxTab:CreateToggle({
 
 HitboxTab:CreateSlider({
     Name = "Tamaño del Hitbox",
-    Range = {2, 30},
+    Range = {2, 250},
     Increment = 1,
     Suffix = "studs",
     CurrentValue = getgenv().HitboxSize,
@@ -3503,7 +3503,7 @@ HitboxTab:CreateSlider({
 })
 
 HitboxTab:CreateSlider({
-    Name = "Transparencia del Hitbox",
+    Name = "Transparencia",
     Range = {0, 1},
     Increment = 0.05,
     Suffix = "",
