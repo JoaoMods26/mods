@@ -3426,7 +3426,7 @@ AimbotTab:CreateSlider({
 
 ----Hitbox Espander---- 
 
-local HitboxTab = Window:CreateTab("Hitbox", 4483362458)
+local HitboxTab = Window:CreateTab("Hitbox", nil)
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
