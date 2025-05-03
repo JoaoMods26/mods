@@ -3589,7 +3589,7 @@ end)
 
 -- Toggle para mostrar/ocultar
 MainTab:CreateToggle({
-	Name = "Mostrar chat local",
+	Name = "CHAT PRIVADO",
 	CurrentValue = false,
 	Flag = "ChatToggle",
 	Callback = function(val)
