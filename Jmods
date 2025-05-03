@@ -3512,7 +3512,7 @@ ParagraphFake = CreditosTab:CreateButton({
 
  Paragraph = CreditosTab:CreateParagraph({
     Title = "TuTioPeruan0",
-    Content = "-"
+    Content = "xD"
 })  
 
    
