@@ -765,16 +765,26 @@ coroutine.wrap(MUBRZ_fake_script)()
 
 local noclipEnabled = false
 local noclipConnection
+local originalCollisions = {}
 
 Button = MainTab:CreateToggle({
     Name = "Noclip Act/Des",
     Callback = function()
         noclipEnabled = not noclipEnabled
+        local character = game.Players.LocalPlayer.Character
 
         if noclipEnabled then
+            -- Guardar estado original
+            originalCollisions = {}
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    originalCollisions[part] = part.CanCollide
+                end
+            end
+
             noclipConnection = game:GetService("RunService").Stepped:Connect(function()
-                for _, part in ipairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
+                for part, _ in pairs(originalCollisions) do
+                    if part and part:IsA("BasePart") then
                         part.CanCollide = false
                     end
                 end
@@ -784,12 +794,13 @@ Button = MainTab:CreateToggle({
                 noclipConnection:Disconnect()
                 noclipConnection = nil
             end
-            -- Restaurar colisión
-            for _, part in ipairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
+            -- Restaurar el estado original
+            for part, originalState in pairs(originalCollisions) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = originalState
                 end
             end
+            originalCollisions = {}
         end
     end,
 })
@@ -1782,13 +1793,28 @@ local wataSpeed = 5 -- Velocidad fija para el movimiento Wata
 local wataDirection = 1
 local wataCurrentDistance = 2
 local wataTargetDistance = 3
-
+local savedCollisions = {}
 
 -- Función para controlar la colisión
 local function SetNoCollision(char, state)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not state
+    if state then
+        -- Guardar estado original
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        -- Restaurar el estado original
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
         end
     end
 end
@@ -1865,13 +1891,27 @@ end
 
 -- Función para controlar la colisión
 local function SetNoCollision(char, state)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not state
+    if state then
+        -- Guardar estado original
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        -- Restaurar el estado original
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
         end
     end
 end
-
 
 -- Función para ejecutar el Cari
 local function PlayCari(target)
@@ -1969,9 +2009,24 @@ end
 
 -- Función para controlar la colisión
 local function SetNoCollision(char, state)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not state
+    if state then
+        -- Guardar estado original
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        -- Restaurar el estado original
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
         end
     end
 end
@@ -2048,13 +2103,27 @@ end
 
 -- Función para controlar la colisión
 local function SetNoCollision(char, state)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not state
+    if state then
+        -- Guardar estado original
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        -- Restaurar el estado original
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
         end
     end
 end
-
 -- Función para ejecutar el Doggy
 local function PlayDoggy(target)
     if not target or not target.Character then return end
@@ -2189,6 +2258,29 @@ JugadoresTab:CreateButton({
     end
 })
 
+
+
+-- Función para guardar y restaurar colisiones
+local function SaveCollisions(char)
+    savedCollisions[char] = {}
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            savedCollisions[char][part] = part.CanCollide
+        end
+    end
+end
+
+local function RestoreCollisions(char)
+    if savedCollisions[char] then
+        for part, original in pairs(savedCollisions[char]) do
+            if part and part:IsA("BasePart") then
+                part.CanCollide = original
+            end
+        end
+        savedCollisions[char] = nil
+    end
+end
+
 -- Sliders para órbita (ya existentes)
 JugadoresTab:CreateSlider({
     Name = "Velocidad de Órbita",
@@ -2228,6 +2320,9 @@ JugadoresTab:CreateToggle({
             local localChar = game.Players.LocalPlayer.Character
             local angle = 0
 
+            -- Guardar colisiones antes de activar la órbita
+            SaveCollisions(localChar)
+            
             orbitConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
                 if localChar and localChar:FindFirstChild("HumanoidRootPart") then
                     angle = angle + orbitSpeed * dt
@@ -2237,6 +2332,13 @@ JugadoresTab:CreateToggle({
                     hrp.CFrame = CFrame.new(newPos, targetHRP.Position)
                 end
             end)
+
+            -- Desactivar colisiones para la órbita
+            for _, part in pairs(localChar:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
 
             Rayfield:Notify({
                 Title = "Órbita Activada",
@@ -2249,12 +2351,11 @@ JugadoresTab:CreateToggle({
             if localChar and localChar:FindFirstChild("HumanoidRootPart") then
                 local safePos = localChar.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
                 localChar.HumanoidRootPart.CFrame = CFrame.new(safePos)
-                for _, part in pairs(localChar:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
-                end
+
+                -- Restaurar las colisiones originales
+                RestoreCollisions(localChar)
             end
+
             Rayfield:Notify({
                 Title = "Órbita Desactivada",
                 Content = "Has dejado de orbitar.",
@@ -2264,7 +2365,6 @@ JugadoresTab:CreateToggle({
         end
     end
 })
-
 -- Botón para Sentarse de manera segura
 JugadoresTab:CreateButton({
     Name = "Sentarse en la cabesa(puedes salir volando)",
@@ -3407,9 +3507,13 @@ ParagraphFake = CreditosTab:CreateButton({
 
  Paragraph = CreditosTab:CreateParagraph({
     Title = "Masha💀🔥",
-    Content = "me comi al osoooooooooo"
+    Content = "me comi al osoo"
 })  
 
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "TuTioPeruan0",
+    Content = "-"
+})  
 
    
 
