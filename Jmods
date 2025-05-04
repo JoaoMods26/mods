@@ -1,5 +1,3 @@
---- Intento 1 de hub con las weas q necesito
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Crear ventana
@@ -8,7 +6,7 @@ local Window = Rayfield:CreateWindow({
     Icon = 13458017478,
     LoadingTitle = "Jmods Universal",
     LoadingSubtitle = "joao_mods",
-    Theme = "Bloom", -- Temporalmente Bloom hasta cargar el guardado
+    Theme = "Bloom",
     DisableRayfieldPrompts = true,
     DisableBuildWarnings = false,
     ConfigurationSaving = {
@@ -36,9 +34,9 @@ local Window = Rayfield:CreateWindow({
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
-    -- Comandos Owner
+    -- Variables globales
     local LocalPlayer = game.Players.LocalPlayer
-    local ownerId = 4591285210 -- Tu UserId
+    local ownerId = 4591285210
     local Orbiting = false
     local RunService = game:GetService("RunService")
 
@@ -55,12 +53,15 @@ task.spawn(function()
 
     -- Función para iniciar la rotación alrededor del Owner
     local function StartOrbit()
-        if LocalPlayer.UserId == ownerId then return end -- El owner no debe orbitarse a sí mismo
+        if LocalPlayer.UserId == ownerId or Orbiting then return end
 
         Orbiting = true
 
         RunService:BindToRenderStep("OrbitAroundOwner", Enum.RenderPriority.Character.Value, function()
-            if not Orbiting then return end
+            if not Orbiting then
+                RunService:UnbindFromRenderStep("OrbitAroundOwner")
+                return
+            end
             local owner = game.Players:GetPlayerByUserId(ownerId)
             if owner and owner.Character and owner.Character:FindFirstChild("HumanoidRootPart") and
                LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -135,28 +136,21 @@ task.spawn(function()
 
     -- Conectar al entrar jugadores
     game.Players.PlayerAdded:Connect(function(player)
-        task.wait(1)
-        CheckAndConnectPlayers()
-    end)
-
-    -- Chequeo inicial y periódico
-    task.wait(1)
-    CheckAndConnectPlayers()
-
-    task.spawn(function()
-        while task.wait(5) do
+        task.wait(0.5)  -- Menor espera para reducir impacto
+        if player.UserId == ownerId then
             CheckAndConnectPlayers()
         end
     end)
+
+    -- Chequeo inicial
+    CheckAndConnectPlayers()
 end)
 
-
-
---  FUNCIONES 
+-- FUNCIONES DE TEMA
 local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
 
 local function SaveTheme(themeName)
-    if isfile(themeSavePath) == false then
+    if not isfile(themeSavePath) then
         makefolder("JmodsUniversal")
     end
     writefile(themeSavePath, themeName)
@@ -174,19 +168,11 @@ end
 -- Cargar tema guardado
 LoadSavedTheme()
 
----se acabo las cosas de temas--
-
-
-
-
-
-
-
-    ------- Scripts desde aca --------------------------------------
-    
+-- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
 MainSection = MainTab:CreateSection("Main")
-    
+
+
     Rayfield:Notify({
            Title = "Bienvenido",
        Content = "joao_mods te espera en youtube",
@@ -3142,7 +3128,8 @@ local AimbotSettings = {
     TracerColor = Color3.fromRGB(0, 0, 255),
     AutoAimEnabled = false,
     OnlyClosePlayers = false, -- 🔥 NUEVO: solo apuntar a cercanos
-    CloseDistanceThreshold = 100 -- 🔥 NUEVO: distancia en studs para considerar "cercano"
+    CloseDistanceThreshold = 100,
+    WallCheck = false, -- 🔥 NUEVO: distancia en studs para considerar "cercano"
 }
 
 local Camera = workspace.CurrentCamera
@@ -3160,28 +3147,43 @@ FOVCircle.Visible = false
 
 -- Obtener el jugador más cercano
 local function GetClosestPlayer()
-    local closestPlayer
-    local shortestDistance = AimbotSettings.FOVRadius
+    local closestPlayer = nil
+    local shortestDistance = math.huge
 
-    for _, v in ipairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
-           and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            -- Verificar si no es del mismo equipo
             if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
                 continue
             end
+            
+            local targetPos = v.Character.HumanoidRootPart.Position
 
-            local screenPoint, onScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
-            if onScreen then
-                local mousePos = UserInputService:GetMouseLocation()
-                local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-
-                local distFromPlayer = (v.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then
-                    continue
+            -- WallCheck
+            if AimbotSettings.WallCheck then
+                local origin = Camera.CFrame.Position
+                local direction = targetPos - origin
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                
+                local result = workspace:Raycast(origin, direction, rayParams)
+                if result and result.Instance and not v.Character:IsAncestorOf(result.Instance) then
+                    continue -- Algo bloquea la visión
                 end
+            end
 
-                if distance < shortestDistance then
+            local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPos)
+            if onScreen then
+                local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - UserInputService:GetMouseLocation()).Magnitude
+                -- Verificar si está dentro del FOV y si el jugador está cerca (si la opción está activada)
+                if distance < shortestDistance and distance < AimbotSettings.FOVRadius then
+                    -- Verificar si solo queremos apuntar a jugadores cercanos
+                    local distFromPlayer = (targetPos - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then
+                        continue
+                    end
+
                     shortestDistance = distance
                     closestPlayer = v
                 end
@@ -3191,6 +3193,7 @@ local function GetClosestPlayer()
 
     return closestPlayer
 end
+
 
 -- Input para apuntar
 UserInputService.InputBegan:Connect(function(input)
@@ -3223,10 +3226,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-
-
 -- BOX ESP
-
 local ESPBoxes = {}
 
 RunService.RenderStepped:Connect(function()
@@ -3272,7 +3272,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
 
 -- Tracers
 local Lines = {}
@@ -3342,6 +3341,14 @@ AimbotTab:CreateSlider({
     CurrentValue = AimbotSettings.FOVRadius,
     Callback = function(val)
         AimbotSettings.FOVRadius = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = AimbotSettings.WallCheck,
+    Callback = function(value)
+        AimbotSettings.WallCheck = value
     end
 })
 
@@ -3424,6 +3431,50 @@ AimbotTab:CreateSlider({
 })
 
 
+local rainbowEnabled = false  -- Controlar el toggle único
+local rainbowSpeed = 5  -- Velocidad del cambio de colores
+
+local function GetRainbowColor()
+    local time = tick() * rainbowSpeed
+    return Color3.fromHSV(time % 1, 1, 1)
+end
+
+
+AimbotTab:CreateToggle({
+    Name = "Rainbow",
+    CurrentValue = false,
+    Flag = "RainbowEffects",
+    Callback = function(Value)
+        rainbowEnabled = Value
+    end
+})
+
+-- Crear un slider para la velocidad de cambio de color
+AimbotTab:CreateSlider({
+    Name = "Rainbow",
+    Range = {0, 20},  -- Rango de velocidad
+    Increment = 0.1,  -- Incremento de 1
+    CurrentValue = rainbowSpeed,
+    Callback = function(Value)
+        rainbowSpeed = Value
+    end
+})
+
+-- Cambiar colores en cada paso del RenderStepped
+RunService.RenderStepped:Connect(function()
+    if rainbowEnabled then
+        -- FOV Rainbow
+        AimbotSettings.FOVColor = GetRainbowColor()
+
+        -- ESP Rainbow
+        AimbotSettings.ESPColor = GetRainbowColor()
+
+        -- Tracers Rainbow
+        AimbotSettings.TracerColor = GetRainbowColor()
+    end
+end)
+
+
 ----Hitbox Espander---- 
 
 local Players = game:GetService("Players")
@@ -3443,12 +3494,21 @@ pcall(function()
     PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
 end)
 
--- Función para aplicar grupo de colisión sin colisión
+-- Función para aplicar grupo de colisión sin colisión a una parte
 local function applyNoCollision(part)
     if part and part:IsA("BasePart") then
         pcall(function()
             PhysicsService:SetPartCollisionGroup(part, "NoCollision")
         end)
+    end
+end
+
+-- Aplica el grupo sin colisión a todo el personaje
+local function applyNoCollisionToCharacter(character)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            applyNoCollision(part)
+        end
     end
 end
 
@@ -3464,7 +3524,7 @@ local function updateHitboxes()
                     hrp.BrickColor = BrickColor.new("Really black")
                     hrp.Material = Enum.Material.Neon
                     hrp.CanCollide = false
-                    applyNoCollision(hrp)
+                    applyNoCollisionToCharacter(v.Character)
                 end)
             else
                 -- Restaurar hitbox de aliados si TeamCheck está activado
@@ -3474,7 +3534,7 @@ local function updateHitboxes()
                     hrp.BrickColor = BrickColor.new("Medium stone grey")
                     hrp.Material = Enum.Material.Plastic
                     hrp.CanCollide = false
-                    applyNoCollision(hrp)
+                    applyNoCollisionToCharacter(v.Character)
                 end)
             end
         end
@@ -3485,14 +3545,14 @@ end
 local function resetHitboxes()
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
             pcall(function()
-                local hrp = v.Character.HumanoidRootPart
                 hrp.Size = Vector3.new(2, 2, 1)
                 hrp.Transparency = 1
                 hrp.BrickColor = BrickColor.new("Medium stone grey")
                 hrp.Material = Enum.Material.Plastic
                 hrp.CanCollide = false
-                applyNoCollision(hrp)
+                applyNoCollisionToCharacter(v.Character)
             end)
         end
     end
