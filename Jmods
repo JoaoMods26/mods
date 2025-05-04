@@ -753,10 +753,12 @@ local noclipEnabled = false
 local noclipConnection
 local originalCollisions = {}
 
-Button = MainTab:CreateToggle({
+MainTab:CreateToggle({
     Name = "Noclip Act/Des",
-    Callback = function()
-        noclipEnabled = not noclipEnabled
+    Flag = "NoclipToggle", -- <--- Añadido Flag
+    CurrentValue = false,
+    Callback = function(state)
+        noclipEnabled = state
         local character = game.Players.LocalPlayer.Character
 
         if noclipEnabled then
@@ -790,6 +792,7 @@ Button = MainTab:CreateToggle({
         end
     end,
 })
+
 
 
 
@@ -3476,7 +3479,6 @@ end)
 
 
 ----Hitbox Espander---- 
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -3490,7 +3492,7 @@ getgenv().TeamCheck = false
 
 -- Crear grupo de colisión sin colisiones
 pcall(function()
-    PhysicsService:CreateCollisionGroup("NoCollision")
+    PhysicsService:RegisterCollisionGroup("NoCollision")
     PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
 end)
 
@@ -3503,30 +3505,13 @@ local function applyNoCollision(part)
     end
 end
 
--- Función para evitar que el personaje sea empujado
-local function applyNoPushForce(character)
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        -- Añadir un BodyVelocity para evitar movimientos no deseados
-        local bodyVelocity = humanoidRootPart:FindFirstChild("NoPushBodyVelocity")
-        if not bodyVelocity then
-            bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)  -- Fuerza máxima para evitar movimientos
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)  -- Velocidad inicial nula
-            bodyVelocity.Name = "NoPushBodyVelocity"
-            bodyVelocity.Parent = humanoidRootPart
-        end
-    end
-end
-
--- Aplica el grupo sin colisión y evita empuje a todo el personaje
+-- Aplica el grupo sin colisión a todo el personaje
 local function applyNoCollisionToCharacter(character)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
             applyNoCollision(part)
         end
     end
-    applyNoPushForce(character)
 end
 
 -- Función para actualizar hitboxes
@@ -3576,6 +3561,7 @@ local function resetHitboxes()
 end
 
 -- Toggle principal de hitbox
+-- Toggle principal de hitbox
 local hitboxConnection
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
@@ -3583,6 +3569,13 @@ HitboxTab:CreateToggle({
     Flag = "HitboxToggle",
     Callback = function(state)
         getgenv().HitboxStatus = state
+
+        -- Activar/desactivar el toggle del Noclip en MainTab
+        local noclipToggle = Rayfield.Flags["NoclipToggle"]
+        if noclipToggle then
+            noclipToggle:Set(state)
+        end
+
         if state then
             updateHitboxes()
             hitboxConnection = RunService.RenderStepped:Connect(function()
@@ -3616,7 +3609,7 @@ HitboxTab:CreateToggle({
 -- Slider para tamaño del hitbox
 HitboxTab:CreateSlider({
     Name = "Tamaño del Hitbox",
-    Range = {2, 250},
+    Range = {2, 500},
     Increment = 1,
     Suffix = "studs",
     CurrentValue = getgenv().HitboxSize,
@@ -3637,6 +3630,16 @@ HitboxTab:CreateSlider({
         getgenv().HitboxTransparency = val
     end,
 })
+
+
+
+
+
+
+
+
+
+
 
 
 
