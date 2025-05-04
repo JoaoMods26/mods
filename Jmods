@@ -3428,6 +3428,7 @@ AimbotTab:CreateSlider({
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
 
 local HitboxTab = Window:CreateTab("Hitbox", nil)
 
@@ -3435,6 +3436,21 @@ getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
 getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
+
+-- Crear grupo de colisión sin colisiones
+pcall(function()
+    PhysicsService:CreateCollisionGroup("NoCollision")
+    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
+end)
+
+-- Función para aplicar grupo de colisión sin colisión
+local function applyNoCollision(part)
+    if part and part:IsA("BasePart") then
+        pcall(function()
+            PhysicsService:SetPartCollisionGroup(part, "NoCollision")
+        end)
+    end
+end
 
 -- Función para actualizar hitboxes
 local function updateHitboxes()
@@ -3448,6 +3464,7 @@ local function updateHitboxes()
                     hrp.BrickColor = BrickColor.new("Really black")
                     hrp.Material = Enum.Material.Neon
                     hrp.CanCollide = false
+                    applyNoCollision(hrp)
                 end)
             else
                 -- Restaurar hitbox de aliados si TeamCheck está activado
@@ -3457,6 +3474,7 @@ local function updateHitboxes()
                     hrp.BrickColor = BrickColor.new("Medium stone grey")
                     hrp.Material = Enum.Material.Plastic
                     hrp.CanCollide = false
+                    applyNoCollision(hrp)
                 end)
             end
         end
@@ -3474,6 +3492,7 @@ local function resetHitboxes()
                 hrp.BrickColor = BrickColor.new("Medium stone grey")
                 hrp.Material = Enum.Material.Plastic
                 hrp.CanCollide = false
+                applyNoCollision(hrp)
             end)
         end
     end
