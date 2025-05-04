@@ -3503,13 +3503,30 @@ local function applyNoCollision(part)
     end
 end
 
--- Aplica el grupo sin colisión a todo el personaje
+-- Función para evitar que el personaje sea empujado
+local function applyNoPushForce(character)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        -- Añadir un BodyVelocity para evitar movimientos no deseados
+        local bodyVelocity = humanoidRootPart:FindFirstChild("NoPushBodyVelocity")
+        if not bodyVelocity then
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)  -- Fuerza máxima para evitar movimientos
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)  -- Velocidad inicial nula
+            bodyVelocity.Name = "NoPushBodyVelocity"
+            bodyVelocity.Parent = humanoidRootPart
+        end
+    end
+end
+
+-- Aplica el grupo sin colisión y evita empuje a todo el personaje
 local function applyNoCollisionToCharacter(character)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
             applyNoCollision(part)
         end
     end
+    applyNoPushForce(character)
 end
 
 -- Función para actualizar hitboxes
