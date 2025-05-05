@@ -1608,9 +1608,60 @@ XrayToggle = MainTab:CreateToggle({
 })
 
 
+
+----Anclar----
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+
+
+getgenv().AnchoredStatus = false
+local anchorConnection
+
+-- Función para anclar o desanclar todas las partes del personaje
+local function setAnchored(state)
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = state
+            end
+        end
+    end
+end
+
+-- Toggle de Rayfield para activar o desactivar el anclaje
+MainTab:CreateToggle({
+    Name = "Anclar Personaje",
+    CurrentValue = false,
+    Flag = "AnchorToggle",
+    Callback = function(state)
+        getgenv().AnchoredStatus = state
+        if state then
+            setAnchored(true)
+            -- Opcional: mantener anclado por si muere o respawnea
+            anchorConnection = RunService.Heartbeat:Connect(function()
+                if getgenv().AnchoredStatus then
+                    setAnchored(true)
+                end
+            end)
+        else
+            setAnchored(false)
+            if anchorConnection then
+                anchorConnection:Disconnect()
+                anchorConnection = nil
+            end
+        end
+    end,
+})
+
+
+
 --Shader--
 
--- Referencia a Lighting
+
 -- Referencia a Lighting
 
 -- Variables para guardar el estado original
