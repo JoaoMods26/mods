@@ -41,7 +41,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -67,10 +66,6 @@ local function UpdateAutoRotate(state)
 	end
 end
 
-local function IsThirdPerson()
-	return (camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom
-end
-
 local function AnimateButtonPress()
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
@@ -82,7 +77,9 @@ local function AnimateButtonPress()
 end
 
 local function ShiftLockToggle()
-	if not IsThirdPerson() then return end
+	if not ((camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom) then
+		return
+	end
 
 	AnimateButtonPress()
 
@@ -92,18 +89,29 @@ local function ShiftLockToggle()
 		UpdateImage("ON")
 		Crosshair.Visible = true
 		UserInputService.MouseIconEnabled = false
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 
-		-- Simula mantener click derecho
-		ContextActionService:BindAction("FakeMouseLock", function() return Enum.ContextActionResult.Sink end, false, Enum.UserInputType.MouseButton2)
-
+		cameraConnection = RunService.RenderStepped:Connect(function()
+			if character and root and camera then
+				local direction = camera.CFrame.LookVector
+				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
+				if flatDirection.Magnitude > 0 then
+					root.CFrame = CFrame.new(root.Position, root.Position + flatDirection)
+				end
+			end
+		end)
 	else
 		isActive = false
 		UpdateAutoRotate(true)
 		UpdateImage("OFF")
 		Crosshair.Visible = false
 		UserInputService.MouseIconEnabled = true
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 
-		ContextActionService:UnbindAction("FakeMouseLock")
+		if cameraConnection then
+			cameraConnection:Disconnect()
+			cameraConnection = nil
+		end
 	end
 end
 
@@ -143,20 +151,5 @@ ShiftlockTab:CreateToggle({
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
 		shiftlockEnabled = Value
-	end
-})
-
-ShiftlockTab:CreateKeybind({
-	Name = "Tecla Shiftlock",
-	CurrentKeybind = shiftlockKeybind,
-	HoldToInteract = false,
-	Flag = "ShiftlockKey",
-	Callback = function(Key)
-		local success, result = pcall(function()
-			return Enum.KeyCode[string.upper(Key)]
-		end)
-		if success and result then
-			shiftlockKeybind = result
-		end
 	end
 })
