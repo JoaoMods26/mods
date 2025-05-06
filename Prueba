@@ -92,7 +92,13 @@ local function ShiftLockToggle()
 		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 
 		cameraConnection = RunService.RenderStepped:Connect(function()
-			-- No shake aquí, solo control natural del mouse
+			if character and root and camera then
+				local direction = camera.CFrame.LookVector
+				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
+				if flatDirection.Magnitude > 0 then
+					root.CFrame = CFrame.new(root.Position, root.Position + flatDirection)
+				end
+			end
 		end)
 	else
 		isActive = false
@@ -154,6 +160,6 @@ ShiftlockTab:CreateKeybind({
 	HoldToInteract = false,
 	Flag = "ShiftlockKey",
 	Callback = function(Key)
-		shiftlockKeybind = Key
+		shiftlockKeybind = Key -- ✅ ahora sí se actualiza globalmente
 	end
 })
