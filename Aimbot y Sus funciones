@@ -1,5 +1,5 @@
 ----AIMBOT---
-AimbotTab = Window:CreateTab("Aimbot", nil)
+AimbotTab = _G.Window:CreateTab("Aimbot", nil)
 
 -- Configuración
 local AimbotSettings = {
