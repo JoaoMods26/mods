@@ -1,0 +1,138 @@
+------Animaciones------
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
+AnimacionesTab:CreateSection("Animaciones R15")
+
+local selectedSpeed = 1
+local currentTrack = nil
+local buttonsCreated = false
+
+-- Devuelve el Humanoid actual
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	if char then
+		return char:FindFirstChildWhichIsA("Humanoid")
+	end
+	return nil
+end
+
+-- Asegura que el Animator esté disponible
+local function getAnimator(Humanoid)
+	for i = 1, 10 do
+		local animator = Humanoid:FindFirstChildOfClass("Animator")
+		if animator then return animator end
+		animator = Instance.new("Animator")
+		animator.Parent = Humanoid
+		task.wait(0.1)
+	end
+	return nil
+end
+
+-- Carga animación con seguridad
+local function safePlayAnim(animId)
+	local humanoid = getHumanoid()
+	if not humanoid then return end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animId
+
+	local success, track
+	for attempt = 1, 10 do
+		local animator = getAnimator(humanoid)
+		if not animator then
+			warn("❌ No se pudo obtener Animator.")
+			return
+		end
+		success, track = pcall(function()
+			return animator:LoadAnimation(anim)
+		end)
+		if success and track then
+			track:Play()
+			track:AdjustSpeed(selectedSpeed)
+			currentTrack = track
+			return
+		end
+		task.wait(0.2)
+	end
+	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
+end
+
+-- Crear los botones una sola vez
+local function setupUI()
+	if buttonsCreated then return end
+
+	-- Botón para quitar animación
+	AnimacionesTab:CreateButton({
+		Name = "❌ Quitar Animación",
+		Callback = function()
+			local humanoid = getHumanoid()
+			if humanoid then
+				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+					track:Stop()
+				end
+			end
+			currentTrack = nil
+		end
+	})
+
+	-- Slider de velocidad
+	AnimacionesTab:CreateSlider({
+		Name = "Velocidad de animación",
+		Range = {0, 5},
+		Increment = 0.1,
+		Suffix = "x",
+		CurrentValue = 1,
+		Callback = function(value)
+			selectedSpeed = value
+			if currentTrack then
+				currentTrack:AdjustSpeed(value)
+			end
+		end
+	})
+
+	-- Botones de emotes
+	local success, emotes = pcall(function()
+		local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+		return HttpService:JSONDecode(raw)
+	end)
+
+	if success then
+		for _, emote in ipairs(emotes) do
+			if emote.name and emote.animationid then
+				AnimacionesTab:CreateButton({
+					Name = emote.name,
+					Callback = function()
+						local humanoid = getHumanoid()
+						if humanoid then
+							for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+								track:Stop()
+							end
+							safePlayAnim(emote.animationid)
+						end
+					end
+				})
+			end
+		end
+	else
+		warn("❌ Error al cargar emotes:", emotes)
+	end
+
+	buttonsCreated = true
+end
+
+-- Inicializar UI y escuchar reinicios
+setupUI()
+LocalPlayer.CharacterAdded:Connect(function()
+	currentTrack = nil
+end)
+
+
+
+
+
+
+----Aniamciones R6
