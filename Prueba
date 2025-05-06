@@ -179,4 +179,18 @@ UpdateImage("OFF")
 ShiftlockTab:CreateToggle({
 	Name = "Shiftlock",
 	CurrentValue = false,
-	Flag = "ShiftlockToggl
+	Flag = "ShiftlockToggle",
+	Callback = function(Value)
+		shiftlockEnabled = Value
+	end
+})
+
+ShiftlockTab:CreateKeybind({
+	Name = "Tecla Shiftlock",
+	CurrentKeybind = shiftlockKeybind,
+	HoldToInteract = false,
+	Flag = "ShiftlockKey",
+	Callback = function(Key)
+		shiftlockKeybind = Key
+	end
+})
