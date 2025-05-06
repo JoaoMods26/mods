@@ -1,16 +1,13 @@
 ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
-
-
-
-
-
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
 
 -- GUI elements
 local ShiftlockGui = Instance.new("ScreenGui")
 local Button = Instance.new("ImageButton")
+local StateLabelFrame = Instance.new("Frame")
+local StateLabel = Instance.new("TextLabel")
 local Crosshair = Instance.new("TextLabel")
 
 ShiftlockGui.Name = "ShiftlockGUI"
@@ -24,8 +21,20 @@ Button.BackgroundTransparency = 1
 Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Image = "rbxassetid://182223762"
 Button.Visible = game:GetService("UserInputService").TouchEnabled
+
+StateLabelFrame.Parent = Button
+StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
+StateLabelFrame.BackgroundTransparency = 0.5
+StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+
+StateLabel.Parent = StateLabelFrame
+StateLabel.Size = UDim2.new(1, 0, 1, 0)
+StateLabel.BackgroundTransparency = 1
+StateLabel.Text = "OFF"
+StateLabel.TextColor3 = Color3.new(1, 1, 1)
+StateLabel.TextScaled = true
+StateLabel.Font = Enum.Font.SourceSansBold
 
 Crosshair.Parent = ShiftlockGui
 Crosshair.Size = UDim2.new(0, 30, 0, 30)
@@ -51,13 +60,8 @@ local humanoid = character:WaitForChild("Humanoid")
 local isActive = false
 local cameraConnection = nil
 
-local states = {
-	ON = "rbxasset://textures/ui/mouseLock_on@2x.png",
-	OFF = "rbxasset://textures/ui/mouseLock_off@2x.png"
-}
-
 local function UpdateImage(state)
-	Button.Image = states[state]
+	StateLabel.Text = state
 end
 
 local function UpdateAutoRotate(state)
