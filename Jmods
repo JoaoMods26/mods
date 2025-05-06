@@ -1820,8 +1820,20 @@ MainTab:CreateSlider({
 --- jugadores
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Jugadores"))()
 
+---- Scripts y juegos
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Script%20y%20de%20juegos"))()
 
+---Animaciones
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Animaciones"))()
 
+--- Aimbot 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Aimbot%20y%20Sus%20funciones"))()
+
+----Hitbox
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Hitbox"))()
+
+----Temas y creditos
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Temas%20y%20creditos"))()
 
 
 
