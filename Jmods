@@ -1841,7 +1841,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Animaciones"))()
 
 --- Aimbot 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Aimbot%20y%20Sus%20funciones"))()
+---loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Aimbot%20y%20Sus%20funciones"))()
 
 ----Hitbox
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Hitbox"))()
