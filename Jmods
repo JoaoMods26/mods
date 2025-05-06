@@ -1779,6 +1779,42 @@ toggleShader = MainTab:CreateToggle({
     end
 })
 
+local Lighting = game:GetService("Lighting")
+
+-- Guardar configuración original
+local originalClockTime = Lighting.ClockTime
+local userSelectedTime = originalClockTime
+local isCustomTimeEnabled = false
+
+-- Toggle para activar/desactivar la hora personalizada
+MainTab:CreateToggle({
+   Name = "Activar hora personalizada",
+   CurrentValue = false,
+   Callback = function(state)
+       isCustomTimeEnabled = state
+       if state then
+           Lighting.ClockTime = userSelectedTime
+       else
+           Lighting.ClockTime = originalClockTime
+       end
+   end,
+})
+
+-- Slider para cambiar el tiempo del juego
+MainTab:CreateSlider({
+   Name = "Hora del juego",
+   Range = {0, 24},
+   Increment = 0.1,
+   Suffix = "h",
+   CurrentValue = originalClockTime,
+   Callback = function(value)
+       userSelectedTime = value
+       if isCustomTimeEnabled then
+           Lighting.ClockTime = value
+       end
+   end,
+})
+
 
 
 
@@ -3823,3 +3859,4 @@ ParagraphFake = CreditosTab:CreateButton({
 
 
 -----When haces tus momos en video
+
