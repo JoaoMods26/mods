@@ -3,6 +3,8 @@ ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
 
 
+local ShiftlockTab = Window:CreateTab("Shiftlock", 4483362458)
+
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
 
@@ -101,11 +103,12 @@ local function ShiftLockToggle()
 		Crosshair.Visible = true
 		UserInputService.MouseIconEnabled = false
 
-		cameraConnection = RunService.RenderStepped:Connect(function()
-			if root then
-				root.CFrame = GetUpdatedCameraCFrame()
-			end
-			camera.CFrame = camera.CFrame * ENABLED_OFFSET
+		-- Conectar el movimiento de la cámara con el mouse
+		RunService.RenderStepped:Connect(function()
+			local delta = UserInputService:GetMouseDelta()
+			camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(-delta.X), 0)
+			local rootPos = root.Position
+			camera.CFrame = CFrame.new(rootPos + Vector3.new(ENABLED_OFFSET.X, 0, ENABLED_OFFSET.Z), rootPos)
 		end)
 	else
 		isActive = false
@@ -113,6 +116,7 @@ local function ShiftLockToggle()
 		UpdateImage("OFF")
 		Crosshair.Visible = false
 		UserInputService.MouseIconEnabled = true
+		camera.CFrame = CFrame.new(camera.CFrame.Position)  -- Reset camera to normal
 
 		if cameraConnection then
 			cameraConnection:Disconnect()
@@ -169,3 +173,4 @@ ShiftlockTab:CreateKeybind({
 		shiftlockKeybind = Key
 	end
 })
+
