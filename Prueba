@@ -4,9 +4,8 @@ ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
 
 
--- Variables
 local shiftlockEnabled = false
-local shiftlockKeybind = Enum.KeyCode.LeftShift
+local shiftlockKeybind = Enum.KeyCode.Q 
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
