@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Crear ventana
-local Window = Rayfield:CreateWindow({
+local _G.Window = Rayfield:CreateWindow({
     Name = "Jmods Universal",
     Icon = 13458017478,
     LoadingTitle = "Jmods Universal",
