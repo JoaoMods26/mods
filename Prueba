@@ -1,0 +1,14 @@
+PruebaTab = Window:CreateTab("Prueba", nil) 
+
+Slider = PruebaTab:CreateSlider({
+       Name = "Velocidad al correr",
+       Range = {1, 500},
+       Increment = 1,
+       Suffix = "velocidad",
+       CurrentValue = 16,
+       Flag = "sliderws", -- 
+       Callback = function(Value)
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
+       end,
+    })
+    
