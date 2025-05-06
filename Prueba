@@ -6,6 +6,7 @@ ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
 
 local shiftlockEnabled = false
+local shiftlockKeybind = Enum.KeyCode.Q
 
 -- GUI elements
 local ShiftlockGui = Instance.new("ScreenGui")
@@ -50,9 +51,6 @@ local humanoid = character:WaitForChild("Humanoid")
 local isActive = false
 local cameraConnection = nil
 
-local ENABLED_OFFSET = CFrame.new(1.7, 0, 0)
-local MAX_LENGTH = 900000
-
 local states = {
 	ON = "rbxasset://textures/ui/mouseLock_on@2x.png",
 	OFF = "rbxasset://textures/ui/mouseLock_off@2x.png"
@@ -68,18 +66,6 @@ local function UpdateAutoRotate(state)
 	end
 end
 
-local function GetUpdatedCameraCFrame()
-	if root then
-		return CFrame.new(root.Position, Vector3.new(camera.CFrame.LookVector.X * MAX_LENGTH, root.Position.Y, camera.CFrame.LookVector.Z * MAX_LENGTH))
-	else
-		return camera.CFrame
-	end
-end
-
-local function IsThirdPerson()
-	return (camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom
-end
-
 local function AnimateButtonPress()
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
@@ -91,7 +77,9 @@ local function AnimateButtonPress()
 end
 
 local function ShiftLockToggle()
-	if not IsThirdPerson() then return end
+	if not ((camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom) then
+		return
+	end
 
 	AnimateButtonPress()
 
@@ -101,13 +89,10 @@ local function ShiftLockToggle()
 		UpdateImage("ON")
 		Crosshair.Visible = true
 		UserInputService.MouseIconEnabled = false
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter  -- Simula clic derecho presionado
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 
 		cameraConnection = RunService.RenderStepped:Connect(function()
-			if root then
-				root.CFrame = GetUpdatedCameraCFrame()
-			end
-			camera.CFrame = camera.CFrame * ENABLED_OFFSET
+			-- No shake aquí, solo control natural del mouse
 		end)
 	else
 		isActive = false
@@ -115,7 +100,7 @@ local function ShiftLockToggle()
 		UpdateImage("OFF")
 		Crosshair.Visible = false
 		UserInputService.MouseIconEnabled = true
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default  -- Restablece el comportamiento normal del mouse
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 
 		if cameraConnection then
 			cameraConnection:Disconnect()
@@ -141,6 +126,16 @@ Button.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- Tecla en PC
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if not UserInputService.TouchEnabled and shiftlockEnabled then
+		if input.KeyCode == shiftlockKeybind then
+			ShiftLockToggle()
+		end
+	end
+end)
+
 UpdateImage("OFF")
 
 -- Rayfield UI
@@ -150,5 +145,15 @@ ShiftlockTab:CreateToggle({
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
 		shiftlockEnabled = Value
+	end
+})
+
+ShiftlockTab:CreateKeybind({
+	Name = "Tecla Shiftlock",
+	CurrentKeybind = shiftlockKeybind,
+	HoldToInteract = false,
+	Flag = "ShiftlockKey",
+	Callback = function(Key)
+		shiftlockKeybind = Key
 	end
 })
