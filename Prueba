@@ -3,37 +3,24 @@ ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
 
 
--- Crear el tab "Shiftlock" en Rayfield
 local ShiftlockTab = Window:CreateTab("Shiftlock", 4483362458)
 
--- Servicios
+-- Variables
+local shiftlockEnabled = false
+local shiftlockKeybind = Enum.KeyCode.LeftShift
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
--- Variables principales
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local character = player.Character or player.CharacterAdded:Wait()
 local root = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
-local shiftlockEnabled = false
-local shiftlockKeybind = Enum.KeyCode.LeftShift
-local isActive = false
-local cameraConnection = nil
-local rotationAngle = 0
-local shakeConnection = nil
-
--- Constantes
-local ENABLED_OFFSET = CFrame.new(1.7, 0, 0)
-local MAX_LENGTH = 900000
-local shakeMagnitude = 2
-local shakeSpeed = 5
-local shakeTime = 0
-
--- GUI
+-- GUI Elements
 local ShiftlockGui = Instance.new("ScreenGui")
 ShiftlockGui.Name = "ShiftlockGUI"
 ShiftlockGui.ResetOnSpawn = false
@@ -60,12 +47,23 @@ Crosshair.TextScaled = true
 Crosshair.TextColor3 = Color3.new(1, 1, 1)
 Crosshair.Visible = false
 
+-- Funciones internas
+local isActive = false
+local cameraConnection = nil
+local rotationAngle = 0
+local shakeConnection = nil
+local shakeTime = 0
+
+local ENABLED_OFFSET = CFrame.new(1.7, 0, 0)
+local MAX_LENGTH = 900000
+local shakeMagnitude = 2
+local shakeSpeed = 5
+
 local states = {
 	ON = "rbxasset://textures/ui/mouseLock_on@2x.png",
 	OFF = "rbxasset://textures/ui/mouseLock_off@2x.png"
 }
 
--- Funciones auxiliares
 local function StartCrosshairShake()
 	Crosshair.Visible = true
 	shakeTime = 0
@@ -119,6 +117,7 @@ end
 
 local function ShiftLockToggle()
 	if not IsThirdPerson() then return end
+
 	AnimateButtonPress()
 
 	if not isActive then
@@ -148,7 +147,7 @@ local function ShiftLockToggle()
 	end
 end
 
--- Evento cuando reaparece el personaje
+-- Personaje nuevo
 player.CharacterAdded:Connect(function(char)
 	character = char
 	root = character:WaitForChild("HumanoidRootPart")
@@ -158,14 +157,14 @@ player.CharacterAdded:Connect(function(char)
 	end
 end)
 
--- Click táctil
+-- Botón móvil
 Button.MouseButton1Click:Connect(function()
 	if shiftlockEnabled then
 		ShiftLockToggle()
 	end
 end)
 
--- Presionar tecla
+-- Tecla PC
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if not UserInputService.TouchEnabled and shiftlockEnabled then
@@ -177,9 +176,9 @@ end)
 
 UpdateImage("OFF")
 
--- Rayfield UI - Toggle y Keybind
+-- Toggle y Keybind en el ShiftlockTab
 ShiftlockTab:CreateToggle({
-	Name = "Habilitar Shiftlock",
+	Name = "Activar Shiftlock",
 	CurrentValue = false,
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
@@ -188,11 +187,14 @@ ShiftlockTab:CreateToggle({
 })
 
 ShiftlockTab:CreateKeybind({
-	Name = "Tecla de Shiftlock",
+	Name = "Tecla Shiftlock",
 	CurrentKeybind = shiftlockKeybind,
 	HoldToInteract = false,
-	Flag = "ShiftlockBind",
+	Flag = "ShiftlockKey",
 	Callback = function(Key)
 		shiftlockKeybind = Key
 	end
 })
+
+-- Cargar config guardada (opcional)
+Rayfield:LoadConfiguration()
