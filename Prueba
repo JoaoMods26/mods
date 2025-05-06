@@ -1,4 +1,4 @@
-PruebaTab = Window:CreateTab("Prueba", nil) 
+PruebaTab = _G.Window:CreateTab("Prueba", nil) 
 
 Slider = PruebaTab:CreateSlider({
        Name = "Velocidad al correr",
