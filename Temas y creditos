@@ -1,1 +1,106 @@
+----Temas---
+themesTab = _G.Window:CreateTab("temas", nil)
+Section = themesTab:CreateSection("Cambia el tema")
 
+-- Función para crear botones rápido
+ function CreateThemeButton(name, theme)
+    themesTab:CreateButton({
+        Name = name,
+        Callback = function()
+            Window.ModifyTheme(theme)
+            SaveTheme(theme)
+        end
+    })
+end
+
+CreateThemeButton("Black", "Default")
+CreateThemeButton("AmberGlow", "AmberGlow")
+CreateThemeButton("Amethyst", "Amethyst")
+CreateThemeButton("Bloom", "Bloom")
+CreateThemeButton("DarkBlue", "DarkBlue")
+CreateThemeButton("Green", "Green")
+CreateThemeButton("Light", "Light")
+CreateThemeButton("Ocean", "Ocean")
+CreateThemeButton("Serenity", "Serenity")
+
+-- ColorPicker
+ColorPicker = themesTab:CreateColorPicker({
+    Name = "Color de fondo perzonalizado",
+    Color = Color3.fromRGB(0, 0, 0),
+    Callback = function(color)
+        Window.ModifyTheme({
+            Background = color,
+            Topbar = color,
+            Border = color,
+        })
+        -- Opcionalmente podrías guardar colores también, pero sería más complicado
+    end
+})
+
+
+
+
+
+
+----Creditos-----
+
+
+CreditosTab = _G.Window:CreateTab("Creditos", nil)
+Section = CreditosTab:CreateSection("Creador")
+
+ DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
+
+ParagraphFake = CreditosTab:CreateButton({
+    Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
+    Callback = function()
+        setclipboard(DiscordInvite)
+ Rayfield:Notify({
+           Title = "Discord!",
+       Content = "Se copio el link de invitacion, no olvides ver su canal",
+       Duration = 5,
+       Image = 13458017478,
+             Callback = function()
+          end
+ 
+    })
+    end,
+})
+
+ Section = CreditosTab:CreateSection("Testers")
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "erjazzy",
+    Content = "chupen pico"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Andr3ssf",
+    Content = "Top 1 de torreon coahuila"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "santiago64226",
+    Content = "No asi esta bien"
+})
+
+ Section = CreditosTab:CreateSection("Colaboradores")
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "HolaCapo_94",
+    Content = "Siganme en roblox xD"
+})  
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "El Cazador",
+    Content = "jmods es el mejor xd"
+})  
+
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Masha💀🔥",
+    Content = "me comi al osoo"
+})  
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "TuTioPeruan0",
+    Content = "xD"
+})  
