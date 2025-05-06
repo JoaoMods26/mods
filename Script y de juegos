@@ -1,0 +1,289 @@
+---Scripts pre hechos
+
+TPTab = _G.Window:CreateTab("Scripts", nil) -- Title, Image
+
+Button1 = TPTab:CreateButton({
+   Name = "Infinite Yield",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+
+   end,
+})
+ Button2 = TPTab:CreateButton({
+   Name = "Dex",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+   end,
+})
+
+ Button2 = TPTab:CreateButton({
+   Name = "Fe Invicible G para activar",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
+   end,
+})
+
+ Button3 = TPTab:CreateButton({
+   Name = "AFEM (Animaciones R15)",
+   Callback = function()
+loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
+   end,
+})
+
+ Button4 = TPTab:CreateButton({
+   Name = "Fly universal",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
+   end,
+})
+
+ Button5 = TPTab:CreateButton({
+    Name = "Teclado (Movil)",
+    Callback = function()
+        loadstring(game:HttpGet("https://gist.githubusercontent.com/RedZenXYZ/4d80bfd70ee27000660e4bfa7509c667/raw/da903c570249ab3c0c1a74f3467260972c3d87e6/KeyBoard%2520From%2520Ohio%2520Fr%2520Fr"))()
+    end,
+ })
+ 
+
+ Button5 = TPTab:CreateButton({
+   Name = "GhostHub",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "venox (Necesita key)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/venoxcc/venoxV1/main/main.lua'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "Latin hub(Muchas cosas no funcionan)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/YYQyEvZm'))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Emotes R15",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "c00lkidd Gui (solo lo ves tu)",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "HitBox Expander Gui",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "WISL hub",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
+   end,
+})
+
+
+ Button6 = TPTab:CreateButton({
+   Name = "Alquimia hub",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Subir FPS",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/8YZ2cc6V"))()
+   end,
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+---Scripts de juegos---
+
+Juegostab= _G.Window:CreateTab("Juegos", nil) -- Title, Image
+
+boton= Juegostab:CreateButton({
+   Name = "Dress to impres",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/DTI-GUI-V2/main/dti_gui_v2.lua",true))()
+end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fuit Super OP",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "TRP(no universal pude ocacionar lag)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/therapy-gui/main/therapy-gui.lua", true))()
+   end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Piggy (ESP y TP a items)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Arsenal thunder client",
+   Callback = function()
+loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e41f4a030044b055add.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Breaking Point",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Natural disaster",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
+
+   end,
+})
+
+
+
+ boton= Juegostab:CreateButton({
+   Name = "Telekinesis (Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fruit (necesita key)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/3345-c-a-t-s-u-s/Kncrypt/refs/heads/main/sources/BloxFruit.lua"))()
+
+   end,
+})
+boton= Juegostab:CreateButton({
+   Name = "Be an NPC or DIE",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/main/BeNpcOrDie"))("t.me/arceusxscripts")
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blade Ball(EminenceXLua)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/EminenceXLua/Blade-your-Balls/main/BladeBallLoader.lua"))()
+
+
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(auto parry)",
+   Callback = function()
+loadstring(game:HttpGet("https://scriptblox.com/raw/UPD-Blade-Ball-op-autoparry-with-visualizer-8652"))()
+
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+    Name = "Blade Ball(necesita key)",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/FFJ1/Roblox-Exploits/main/scripts/Loader.lua"))()
+ 
+ 
+    end,
+ })
+
+
+
+boton= Juegostab:CreateButton({
+   Name = "Nebula hub (Booga booga)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Yousuck780/Nebula-Hub/refs/heads/main/boogaboogareborn'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Break in 2",
+   Callback = function()
+loadstring(game:HttpGet(("https://pastebin.com/raw/365H7AMr")))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Redz Hub (Blox fruit)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"))(Settings)
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "build a boat for treasure",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/TheRealAsu/BABFT/refs/heads/main/Jan25_Source.lua'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Thunder Cliend(Arsenal)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/thunderclient/main/main.lua'))();
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring v6 mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
+   end,
+})
