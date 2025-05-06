@@ -3,7 +3,7 @@ ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
 
 
 
-local ShiftlockTab = Window:CreateTab("Shiftlock", 4483362458)
+
 
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
