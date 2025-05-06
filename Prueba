@@ -1,14 +1,182 @@
-PruebaTab = _G.Window:CreateTab("Prueba", nil) 
 
-Slider = PruebaTab:CreateSlider({
-       Name = "Velocidad al correr",
-       Range = {1, 500},
-       Increment = 1,
-       Suffix = "velocidad",
-       CurrentValue = 16,
-       Flag = "sliderws", -- 
-       Callback = function(Value)
-            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
-       end,
-    })
-    
+
+ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
+
+local shiftlockEnabled = false
+local shiftlockKeybind = Enum.KeyCode.LeftShift
+
+-- GUI elements
+local ShiftlockGui = Instance.new("ScreenGui")
+local Button = Instance.new("ImageButton")
+local Crosshair = Instance.new("TextLabel")
+
+ShiftlockGui.Name = "ShiftlockGUI"
+ShiftlockGui.ResetOnSpawn = false
+ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ShiftlockGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+Button.Name = "ShiftlockButton"
+Button.Parent = ShiftlockGui
+Button.BackgroundTransparency = 1
+Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
+Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
+Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
+Button.Image = "rbxassetid://182223762"
+Button.Visible = game:GetService("UserInputService").TouchEnabled
+
+Crosshair.Parent = ShiftlockGui
+Crosshair.Size = UDim2.new(0, 30, 0, 30)
+Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
+Crosshair.BackgroundTransparency = 1
+Crosshair.Text = "+"
+Crosshair.TextScaled = true
+Crosshair.TextColor3 = Color3.new(1, 1, 1)
+Crosshair.Visible = false
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Player references
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Shiftlock internals
+local isActive = false
+local cameraConnection = nil
+local rotationAngle = 0
+local shakeConnection = nil
+
+local ENABLED_OFFSET = CFrame.new(1.7, 0, 0)
+local MAX_LENGTH = 900000
+local shakeMagnitude = 2
+local shakeSpeed = 5
+local shakeTime = 0
+
+local states = {
+	ON = "rbxasset://textures/ui/mouseLock_on@2x.png",
+	OFF = "rbxasset://textures/ui/mouseLock_off@2x.png"
+}
+
+local function StartCrosshairShake()
+	Crosshair.Visible = true
+	shakeTime = 0
+	shakeConnection = RunService.RenderStepped:Connect(function(deltaTime)
+		shakeTime += deltaTime * shakeSpeed
+		local offsetX = math.sin(shakeTime * 2) * shakeMagnitude
+		local offsetY = math.cos(shakeTime * 2) * shakeMagnitude
+		Crosshair.Position = UDim2.new(0.5, -15 + offsetX, 0.5, -15 + offsetY)
+	end)
+end
+
+local function StopCrosshairShake()
+	Crosshair.Visible = false
+	if shakeConnection then
+		shakeConnection:Disconnect()
+		shakeConnection = nil
+	end
+end
+
+local function UpdateImage(state)
+	Button.Image = states[state]
+end
+
+local function UpdateAutoRotate(state)
+	if humanoid then
+		humanoid.AutoRotate = state
+	end
+end
+
+local function GetUpdatedCameraCFrame()
+	if root then
+		return CFrame.new(root.Position, Vector3.new(camera.CFrame.LookVector.X * MAX_LENGTH, root.Position.Y, camera.CFrame.LookVector.Z * MAX_LENGTH))
+	else
+		return camera.CFrame
+	end
+end
+
+local function IsThirdPerson()
+	return (camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom
+end
+
+local function AnimateButtonPress()
+	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
+	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = Button.Size })
+	tweenShrink:Play()
+	tweenShrink.Completed:Connect(function()
+		tweenGrow:Play()
+	end)
+end
+
+local function ShiftLockToggle()
+	if not IsThirdPerson() then return end
+
+	AnimateButtonPress()
+
+	if not isActive then
+		isActive = true
+		UpdateAutoRotate(false)
+		UpdateImage("ON")
+		rotationAngle = 0
+		StartCrosshairShake()
+		cameraConnection = RunService.RenderStepped:Connect(function(deltaTime)
+			rotationAngle += deltaTime * 2
+			local radius = 0.3
+			local offset = Vector3.new(math.cos(rotationAngle) * radius, math.sin(rotationAngle) * radius, 0)
+			if root then
+				root.CFrame = GetUpdatedCameraCFrame()
+			end
+			camera.CFrame = camera.CFrame * ENABLED_OFFSET * CFrame.new(offset)
+		end)
+	else
+		isActive = false
+		UpdateAutoRotate(true)
+		UpdateImage("OFF")
+		StopCrosshairShake()
+		if cameraConnection then
+			cameraConnection:Disconnect()
+			cameraConnection = nil
+		end
+	end
+end
+
+-- Reaparece personaje
+player.CharacterAdded:Connect(function(char)
+	character = char
+	root = character:WaitForChild("HumanoidRootPart")
+	humanoid = character:WaitForChild("Humanoid")
+	if isActive then
+		UpdateAutoRotate(false)
+	end
+end)
+
+-- Botón táctil
+Button.MouseButton1Click:Connect(function()
+	if shiftlockEnabled then
+		ShiftLockToggle()
+	end
+end)
+
+-- Tecla en PC
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if not UserInputService.TouchEnabled and shiftlockEnabled then
+		if input.KeyCode == shiftlockKeybind then
+			ShiftLockToggle()
+		end
+	end
+end)
+
+UpdateImage("OFF")
+
+-- Rayfield UI
+ShiftlockTab:CreateToggle({
+	Name = "Shiftlock",
+	CurrentValue = false,
+	Flag = "ShiftlockToggl
