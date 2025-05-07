@@ -3277,7 +3277,7 @@ ColorPicker = themesTab:CreateColorPicker({
 ----creditos
 
 _G.Window = Window
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Temas%20y%20creditos"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/creditos"))()
 
 
 
