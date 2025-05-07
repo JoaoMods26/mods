@@ -7,8 +7,8 @@ Section = themesTab:CreateSection("Cambia el tema")
     themesTab:CreateButton({
         Name = name,
         Callback = function()
-            Window.ModifyTheme(theme)
-            SaveTheme(theme)
+            _G.Window.ModifyTheme(theme)
+            _G-SaveTheme(theme)
         end
     })
 end
