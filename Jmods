@@ -1543,29 +1543,6 @@ MainTab:CreateSlider({
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 --XRAY----
 
 -- Tabla para guardar las transparencias originales
@@ -1814,6 +1791,173 @@ MainTab:CreateSlider({
        end
    end,
 })
+
+
+
+
+
+
+
+
+
+local shiftlockEnabled = false
+local shiftlockKeybind = Enum.KeyCode.Q
+
+-- GUI elements
+local ShiftlockGui = Instance.new("ScreenGui")
+local Button = Instance.new("ImageButton")
+local StateLabelFrame = Instance.new("Frame")
+local StateLabel = Instance.new("TextLabel")
+local Crosshair = Instance.new("TextLabel")
+
+ShiftlockGui.Name = "ShiftlockGUI"
+ShiftlockGui.ResetOnSpawn = false
+ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ShiftlockGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+Button.Name = "ShiftlockButton"
+Button.Parent = ShiftlockGui
+Button.BackgroundTransparency = 1
+Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
+Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
+Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
+Button.Visible = game:GetService("UserInputService").TouchEnabled
+
+StateLabelFrame.Parent = Button
+StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
+StateLabelFrame.BackgroundTransparency = 0.5
+StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+
+StateLabel.Parent = StateLabelFrame
+StateLabel.Size = UDim2.new(1, 0, 1, 0)
+StateLabel.BackgroundTransparency = 1
+StateLabel.Text = "OFF"
+StateLabel.TextColor3 = Color3.new(1, 1, 1)
+StateLabel.TextScaled = true
+StateLabel.Font = Enum.Font.SourceSansBold
+
+Crosshair.Parent = ShiftlockGui
+Crosshair.Size = UDim2.new(0, 30, 0, 30)
+Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
+Crosshair.BackgroundTransparency = 1
+Crosshair.Text = "O"
+Crosshair.TextScaled = true
+Crosshair.TextColor3 = Color3.new(1, 1, 1)
+Crosshair.Visible = false
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local isActive = false
+local cameraConnection = nil
+
+local function UpdateImage(state)
+	StateLabel.Text = state
+end
+
+local function UpdateAutoRotate(state)
+	if humanoid then
+		humanoid.AutoRotate = state
+	end
+end
+
+local function AnimateButtonPress()
+	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
+	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = Button.Size })
+	tweenShrink:Play()
+	tweenShrink.Completed:Connect(function()
+		tweenGrow:Play()
+	end)
+end
+
+local function ShiftLockToggle()
+	if not ((camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom) then
+		return
+	end
+
+	AnimateButtonPress()
+
+	if not isActive then
+		isActive = true
+		UpdateAutoRotate(false)
+		UpdateImage("ON")
+		Crosshair.Visible = true
+		UserInputService.MouseIconEnabled = false
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+
+		cameraConnection = RunService.RenderStepped:Connect(function()
+			if character and root and camera then
+				local direction = camera.CFrame.LookVector
+				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
+				if flatDirection.Magnitude > 0 then
+					root.CFrame = CFrame.new(root.Position, root.Position + flatDirection)
+				end
+			end
+		end)
+	else
+		isActive = false
+		UpdateAutoRotate(true)
+		UpdateImage("OFF")
+		Crosshair.Visible = false
+		UserInputService.MouseIconEnabled = true
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+		if cameraConnection then
+			cameraConnection:Disconnect()
+			cameraConnection = nil
+		end
+	end
+end
+
+-- Reaparece personaje
+player.CharacterAdded:Connect(function(char)
+	character = char
+	root = character:WaitForChild("HumanoidRootPart")
+	humanoid = character:WaitForChild("Humanoid")
+	if isActive then
+		UpdateAutoRotate(false)
+	end
+end)
+
+-- Botón táctil
+Button.MouseButton1Click:Connect(function()
+	if shiftlockEnabled then
+		ShiftLockToggle()
+	end
+end)
+
+-- Tecla en PC
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if not UserInputService.TouchEnabled and shiftlockEnabled then
+		if input.KeyCode == shiftlockKeybind then
+			ShiftLockToggle()
+		end
+	end
+end)
+
+UpdateImage("OFF")
+
+-- Rayfield UI
+MainTab:CreateToggle({
+	Name = "Shiftlock Pc: Q",
+	CurrentValue = false,
+	Flag = "ShiftlockToggle",
+	Callback = function(Value)
+		shiftlockEnabled = Value
+	end
+})
+
 
 
 
