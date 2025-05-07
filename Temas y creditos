@@ -1,18 +1,16 @@
 ----Temas---
-themesTab = _G.Window:CreateTab("temas", nil)
-Section = themesTab:CreateSection("Cambia el tema")
+local themesTab = _G.Window:CreateTab("temas", nil)
+local Section = themesTab:CreateSection("Cambia el tema")
 
--- Función para crear botones rápido
- function CreateThemeButton(name, theme)
+local function CreateThemeButton(name, theme)
     themesTab:CreateButton({
         Name = name,
         Callback = function()
-            _G.Window.ModifyTheme(theme)
-            _G-SaveTheme(theme)
+            _G.Window:ModifyTheme(theme)
+            _G.SaveTheme(theme)
         end
     })
 end
-
 CreateThemeButton("Black", "Default")
 CreateThemeButton("AmberGlow", "AmberGlow")
 CreateThemeButton("Amethyst", "Amethyst")
