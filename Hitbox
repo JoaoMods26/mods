@@ -1,9 +1,9 @@
-----Hitbox Espander---- 
+---- Hitbox Expander Optimizado sin Noclip ----
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
 
-local HitboxTab = _G.Window:CreateTab("Hitbox", nil)
+local HitboxTab = Window:CreateTab("Hitbox", nil)
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
@@ -16,16 +16,12 @@ pcall(function()
     PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
 end)
 
--- Función para aplicar grupo de colisión sin colisión a una parte
 local function applyNoCollision(part)
     if part and part:IsA("BasePart") then
-        pcall(function()
-            PhysicsService:SetPartCollisionGroup(part, "NoCollision")
-        end)
+        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
     end
 end
 
--- Aplica el grupo sin colisión a todo el personaje
 local function applyNoCollisionToCharacter(character)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -34,54 +30,45 @@ local function applyNoCollisionToCharacter(character)
     end
 end
 
--- Función para actualizar hitboxes
 local function updateHitboxes()
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = v.Character.HumanoidRootPart
-            if not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team) then
-                pcall(function()
-                    hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
-                    hrp.Transparency = getgenv().HitboxTransparency
-                    hrp.BrickColor = BrickColor.new("Really black")
-                    hrp.Material = Enum.Material.Neon
-                    hrp.CanCollide = false
-                    applyNoCollisionToCharacter(v.Character)
-                end)
-            else
-                -- Restaurar hitbox de aliados si TeamCheck está activado
-                pcall(function()
-                    hrp.Size = Vector3.new(2, 2, 1)
-                    hrp.Transparency = 1
-                    hrp.BrickColor = BrickColor.new("Medium stone grey")
-                    hrp.Material = Enum.Material.Plastic
-                    hrp.CanCollide = false
-                    applyNoCollisionToCharacter(v.Character)
-                end)
-            end
+            local isEnemy = not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team)
+
+            local size = isEnemy and Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or Vector3.new(2, 2, 1)
+            local transparency = isEnemy and getgenv().HitboxTransparency or 1
+            local color = isEnemy and BrickColor.new("Really black") or BrickColor.new("Medium stone grey")
+            local material = isEnemy and Enum.Material.Neon or Enum.Material.Plastic
+
+            -- Solo cambia si es necesario
+            if hrp.Size ~= size then hrp.Size = size end
+            if hrp.Transparency ~= transparency then hrp.Transparency = transparency end
+            if hrp.BrickColor ~= color then hrp.BrickColor = color end
+            if hrp.Material ~= material then hrp.Material = material end
+            if hrp.CanCollide then hrp.CanCollide = false end
+
+            applyNoCollisionToCharacter(v.Character)
         end
     end
 end
 
--- Función para resetear todos los hitboxes
 local function resetHitboxes()
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = v.Character.HumanoidRootPart
-            pcall(function()
-                hrp.Size = Vector3.new(2, 2, 1)
-                hrp.Transparency = 1
-                hrp.BrickColor = BrickColor.new("Medium stone grey")
-                hrp.Material = Enum.Material.Plastic
-                hrp.CanCollide = false
-                applyNoCollisionToCharacter(v.Character)
-            end)
+            if hrp.Size ~= Vector3.new(2, 2, 1) then hrp.Size = Vector3.new(2, 2, 1) end
+            if hrp.Transparency ~= 1 then hrp.Transparency = 1 end
+            if hrp.BrickColor ~= BrickColor.new("Medium stone grey") then hrp.BrickColor = BrickColor.new("Medium stone grey") end
+            if hrp.Material ~= Enum.Material.Plastic then hrp.Material = Enum.Material.Plastic end
+            if hrp.CanCollide then hrp.CanCollide = false end
+
+            applyNoCollisionToCharacter(v.Character)
         end
     end
 end
 
--- Toggle principal de hitbox
--- Toggle principal de hitbox
+-- Toggle principal de Hitbox
 local hitboxConnection
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
@@ -90,17 +77,12 @@ HitboxTab:CreateToggle({
     Callback = function(state)
         getgenv().HitboxStatus = state
 
-        -- Activar/desactivar el toggle del Noclip en MainTab
-        local noclipToggle = Rayfield.Flags["NoclipToggle"]
-        if noclipToggle then
-            noclipToggle:Set(state)
-        end
-
         if state then
             updateHitboxes()
-            hitboxConnection = RunService.RenderStepped:Connect(function()
+            hitboxConnection = RunService.Heartbeat:Connect(function()
                 if getgenv().HitboxStatus then
                     updateHitboxes()
+                    task.wait(0.2) -- Ajusta la frecuencia según necesidad
                 end
             end)
         else
@@ -113,7 +95,7 @@ HitboxTab:CreateToggle({
     end,
 })
 
--- Toggle de Team Checker
+-- Toggle de Team Check
 HitboxTab:CreateToggle({
     Name = "Team Checker",
     CurrentValue = false,
@@ -126,7 +108,7 @@ HitboxTab:CreateToggle({
     end,
 })
 
--- Slider para tamaño del hitbox
+-- Slider de tamaño del Hitbox
 HitboxTab:CreateSlider({
     Name = "Tamaño del Hitbox",
     Range = {2, 500},
@@ -139,7 +121,7 @@ HitboxTab:CreateSlider({
     end,
 })
 
--- Slider para transparencia
+-- Slider de transparencia del Hitbox
 HitboxTab:CreateSlider({
     Name = "Transparencia",
     Range = {0, 1},
