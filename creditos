@@ -1,38 +1,4 @@
-----Temas---
-local themesTab = _G.Window:CreateTab("temas", nil)
-local Section = themesTab:CreateSection("Cambia el tema")
 
-local function CreateThemeButton(name, theme)
-    themesTab:CreateButton({
-        Name = name,
-        Callback = function()
-            _G.Window:ModifyTheme(theme)
-            _G.SaveTheme(theme)
-        end
-    })
-end
-CreateThemeButton("Black", "Default")
-CreateThemeButton("AmberGlow", "AmberGlow")
-CreateThemeButton("Amethyst", "Amethyst")
-CreateThemeButton("Bloom", "Bloom")
-CreateThemeButton("DarkBlue", "DarkBlue")
-CreateThemeButton("Green", "Green")
-CreateThemeButton("Light", "Light")
-CreateThemeButton("Ocean", "Ocean")
-CreateThemeButton("Serenity", "Serenity")
-
--- ColorPicker
-themesTab:CreateColorPicker({
-    Name = "Color de fondo personalizado",
-    Color = Color3.fromRGB(0, 0, 0),
-    Callback = function(color)
-        _G.Window:ModifyTheme({
-            Background = color,
-            Topbar = color,
-            Border = color,
-        })
-    end
-})
 
 
 
