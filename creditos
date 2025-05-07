@@ -11,23 +11,22 @@
 CreditosTab = _G.Window:CreateTab("Creditos", nil)
 Section = CreditosTab:CreateSection("Creador")
 
- DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
+local DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
 
-ParagraphFake = CreditosTab:CreateButton({
+CreditosTab:CreateButton({
     Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
     Callback = function()
         setclipboard(DiscordInvite)
- Rayfield:Notify({
-           Title = "Discord!",
-       Content = "Se copio el link de invitacion, no olvides ver su canal",
-       Duration = 5,
-       Image = 13458017478,
-             Callback = function()
-          end
- 
-    })
+        Rayfield:Notify({
+            Title = "Discord!",
+            Content = "Se copió el link de invitación, no olvides ver su canal",
+            Duration = 5,
+            Image = 13458017478,
+            Callback = function() end -- función vacía si no necesitas hacer nada
+        })
     end,
 })
+
 
  Section = CreditosTab:CreateSection("Testers")
  Paragraph = CreditosTab:CreateParagraph({
