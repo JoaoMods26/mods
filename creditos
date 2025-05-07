@@ -1,15 +1,7 @@
-
-
-
-
-
-
-
-----Creditos-----
-
+---- Creditos ----
 
 CreditosTab = _G.Window:CreateTab("Creditos", nil)
-Section = CreditosTab:CreateSection("Creador")
+CreditosTab:CreateSection("Creador")
 
 local DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
 
@@ -17,52 +9,53 @@ CreditosTab:CreateButton({
     Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
     Callback = function()
         setclipboard(DiscordInvite)
-        Rayfield:Notify({
+        _G.Rayfield:Notify({
             Title = "Discord!",
             Content = "Se copió el link de invitación, no olvides ver su canal",
             Duration = 5,
             Image = 13458017478,
-            Callback = function() end -- función vacía si no necesitas hacer nada
+            Callback = function() end
         })
     end,
 })
 
+-- Testers
+CreditosTab:CreateSection("Testers")
 
- Section = CreditosTab:CreateSection("Testers")
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "erjazzy",
     Content = "chupen pico"
 })
 
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "Andr3ssf",
     Content = "Top 1 de torreon coahuila"
 })
 
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "santiago64226",
     Content = "No asi esta bien"
 })
 
- Section = CreditosTab:CreateSection("Colaboradores")
+-- Colaboradores
+CreditosTab:CreateSection("Colaboradores")
 
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "HolaCapo_94",
     Content = "Siganme en roblox xD"
 })  
 
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "El Cazador",
     Content = "jmods es el mejor xd"
 })  
 
-
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "Masha💀🔥",
     Content = "me comi al osoo"
 })  
 
- Paragraph = CreditosTab:CreateParagraph({
+CreditosTab:CreateParagraph({
     Title = "TuTioPeruan0",
     Content = "xD"
 })  
