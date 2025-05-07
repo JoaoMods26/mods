@@ -22,16 +22,15 @@ CreateThemeButton("Ocean", "Ocean")
 CreateThemeButton("Serenity", "Serenity")
 
 -- ColorPicker
-ColorPicker = themesTab:CreateColorPicker({
-    Name = "Color de fondo perzonalizado",
+themesTab:CreateColorPicker({
+    Name = "Color de fondo personalizado",
     Color = Color3.fromRGB(0, 0, 0),
     Callback = function(color)
-        Window.ModifyTheme({
+        _G.Window:ModifyTheme({
             Background = color,
             Topbar = color,
             Border = color,
         })
-        -- Opcionalmente podrías guardar colores también, pero sería más complicado
     end
 })
 
