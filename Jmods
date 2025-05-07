@@ -3231,7 +3231,146 @@ end)
 _G.Window = Window
 
 ----Hitbox
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Hitbox"))()
+---- Hitbox Expander Optimizado ----
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
+
+local HitboxTab = Window:CreateTab("Hitbox", nil)
+
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
+
+-- Crear grupo de colisión sin colisiones
+pcall(function()
+    PhysicsService:RegisterCollisionGroup("NoCollision")
+    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
+end)
+
+local function applyNoCollision(part)
+    if part and part:IsA("BasePart") then
+        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
+    end
+end
+
+local function applyNoCollisionToCharacter(character)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            applyNoCollision(part)
+        end
+    end
+end
+
+local function updateHitboxes()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            local isEnemy = not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team)
+
+            local size = isEnemy and Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or Vector3.new(2, 2, 1)
+            local transparency = isEnemy and getgenv().HitboxTransparency or 1
+            local color = isEnemy and BrickColor.new("Really black") or BrickColor.new("Medium stone grey")
+            local material = isEnemy and Enum.Material.Neon or Enum.Material.Plastic
+
+            -- Solo cambia si es necesario
+            if hrp.Size ~= size then hrp.Size = size end
+            if hrp.Transparency ~= transparency then hrp.Transparency = transparency end
+            if hrp.BrickColor ~= color then hrp.BrickColor = color end
+            if hrp.Material ~= material then hrp.Material = material end
+            if hrp.CanCollide then hrp.CanCollide = false end
+
+            applyNoCollisionToCharacter(v.Character)
+        end
+    end
+end
+
+local function resetHitboxes()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            if hrp.Size ~= Vector3.new(2, 2, 1) then hrp.Size = Vector3.new(2, 2, 1) end
+            if hrp.Transparency ~= 1 then hrp.Transparency = 1 end
+            if hrp.BrickColor ~= BrickColor.new("Medium stone grey") then hrp.BrickColor = BrickColor.new("Medium stone grey") end
+            if hrp.Material ~= Enum.Material.Plastic then hrp.Material = Enum.Material.Plastic end
+            if hrp.CanCollide then hrp.CanCollide = false end
+
+            applyNoCollisionToCharacter(v.Character)
+        end
+    end
+end
+
+-- Toggle principal de Hitbox
+local hitboxConnection
+HitboxTab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxToggle",
+    Callback = function(state)
+        getgenv().HitboxStatus = state
+
+        -- Sincronizar con Noclip si existe
+        local noclipToggle = Rayfield.Flags["NoclipToggle"]
+        if noclipToggle then
+            noclipToggle:Set(state)
+        end
+
+        if state then
+            updateHitboxes()
+            hitboxConnection = RunService.Heartbeat:Connect(function()
+                if getgenv().HitboxStatus then
+                    updateHitboxes()
+                    task.wait(0.2) -- Ajusta la frecuencia según necesidad
+                end
+            end)
+        else
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
+            resetHitboxes()
+        end
+    end,
+})
+
+-- Toggle de Team Check
+HitboxTab:CreateToggle({
+    Name = "Team Checker",
+    CurrentValue = false,
+    Flag = "TeamCheckToggle",
+    Callback = function(state)
+        getgenv().TeamCheck = state
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
+    end,
+})
+
+-- Slider de tamaño del Hitbox
+HitboxTab:CreateSlider({
+    Name = "Tamaño del Hitbox",
+    Range = {2, 500},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = getgenv().HitboxSize,
+    Flag = "HitboxSizeSlider",
+    Callback = function(val)
+        getgenv().HitboxSize = val
+    end,
+})
+
+-- Slider de transparencia del Hitbox
+HitboxTab:CreateSlider({
+    Name = "Transparencia",
+    Range = {0, 1},
+    Increment = 0.05,
+    CurrentValue = getgenv().HitboxTransparency,
+    Flag = "HitboxTransparencySlider",
+    Callback = function(val)
+        getgenv().HitboxTransparency = val
+    end,
+})
 
 
 ---Temas
