@@ -1543,6 +1543,29 @@ MainTab:CreateSlider({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 --XRAY----
 
 -- Tabla para guardar las transparencias originales
@@ -1800,163 +1823,18 @@ MainTab:CreateSlider({
 
 
 
-local shiftlockEnabled = false
-local shiftlockKeybind = Enum.KeyCode.Q
 
--- GUI elements
-local ShiftlockGui = Instance.new("ScreenGui")
-local Button = Instance.new("ImageButton")
-local StateLabelFrame = Instance.new("Frame")
-local StateLabel = Instance.new("TextLabel")
-local Crosshair = Instance.new("TextLabel")
 
-ShiftlockGui.Name = "ShiftlockGUI"
-ShiftlockGui.ResetOnSpawn = false
-ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ShiftlockGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
-Button.Name = "ShiftlockButton"
-Button.Parent = ShiftlockGui
-Button.BackgroundTransparency = 1
-Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
-Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
-Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Visible = game:GetService("UserInputService").TouchEnabled
 
-StateLabelFrame.Parent = Button
-StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
-StateLabelFrame.BackgroundTransparency = 0.5
-StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 
-StateLabel.Parent = StateLabelFrame
-StateLabel.Size = UDim2.new(1, 0, 1, 0)
-StateLabel.BackgroundTransparency = 1
-StateLabel.Text = "OFF"
-StateLabel.TextColor3 = Color3.new(1, 1, 1)
-StateLabel.TextScaled = true
-StateLabel.Font = Enum.Font.SourceSansBold
 
-Crosshair.Parent = ShiftlockGui
-Crosshair.Size = UDim2.new(0, 30, 0, 30)
-Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
-Crosshair.BackgroundTransparency = 1
-Crosshair.Text = "O"
-Crosshair.TextScaled = true
-Crosshair.TextColor3 = Color3.new(1, 1, 1)
-Crosshair.Visible = false
 
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local character = player.Character or player.CharacterAdded:Wait()
-local root = character:WaitForChild("HumanoidRootPart")
-local humanoid = character:WaitForChild("Humanoid")
 
-local isActive = false
-local cameraConnection = nil
 
-local function UpdateImage(state)
-	StateLabel.Text = state
-end
 
-local function UpdateAutoRotate(state)
-	if humanoid then
-		humanoid.AutoRotate = state
-	end
-end
 
-local function AnimateButtonPress()
-	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
-	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = Button.Size })
-	tweenShrink:Play()
-	tweenShrink.Completed:Connect(function()
-		tweenGrow:Play()
-	end)
-end
-
-local function ShiftLockToggle()
-	if not ((camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom) then
-		return
-	end
-
-	AnimateButtonPress()
-
-	if not isActive then
-		isActive = true
-		UpdateAutoRotate(false)
-		UpdateImage("ON")
-		Crosshair.Visible = true
-		UserInputService.MouseIconEnabled = false
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-
-		cameraConnection = RunService.RenderStepped:Connect(function()
-			if character and root and camera then
-				local direction = camera.CFrame.LookVector
-				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
-				if flatDirection.Magnitude > 0 then
-					root.CFrame = CFrame.new(root.Position, root.Position + flatDirection)
-				end
-			end
-		end)
-	else
-		isActive = false
-		UpdateAutoRotate(true)
-		UpdateImage("OFF")
-		Crosshair.Visible = false
-		UserInputService.MouseIconEnabled = true
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-
-		if cameraConnection then
-			cameraConnection:Disconnect()
-			cameraConnection = nil
-		end
-	end
-end
-
--- Reaparece personaje
-player.CharacterAdded:Connect(function(char)
-	character = char
-	root = character:WaitForChild("HumanoidRootPart")
-	humanoid = character:WaitForChild("Humanoid")
-	if isActive then
-		UpdateAutoRotate(false)
-	end
-end)
-
--- Botón táctil
-Button.MouseButton1Click:Connect(function()
-	if shiftlockEnabled then
-		ShiftLockToggle()
-	end
-end)
-
--- Tecla en PC
-UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if not UserInputService.TouchEnabled and shiftlockEnabled then
-		if input.KeyCode == shiftlockKeybind then
-			ShiftLockToggle()
-		end
-	end
-end)
-
-UpdateImage("OFF")
-
--- Rayfield UI
-MainTab:CreateToggle({
-	Name = "Shiftlock Pc: Q",
-	CurrentValue = false,
-	Flag = "ShiftlockToggle",
-	Callback = function(Value)
-		shiftlockEnabled = Value
-	end
-})
 
 
 
@@ -2849,18 +2727,478 @@ JugadoresTab:CreateSlider({
 
 
 
-_G.Window = Window
-
-
----- Scripts y juegos
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Script%20y%20de%20juegos"))()
-
----Animaciones
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Animacionesc
 
 
 
---- Aimbot 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---Scripts pre hechos
+
+TPTab = Window:CreateTab("Scripts", nil) -- Title, Image
+
+Button1 = TPTab:CreateButton({
+   Name = "Infinite Yield",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+
+   end,
+})
+ Button2 = TPTab:CreateButton({
+   Name = "Dex",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+   end,
+})
+
+ Button2 = TPTab:CreateButton({
+   Name = "Fe Invicible G para activar",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
+   end,
+})
+
+ Button3 = TPTab:CreateButton({
+   Name = "AFEM (Animaciones R15)",
+   Callback = function()
+loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
+   end,
+})
+
+ Button4 = TPTab:CreateButton({
+   Name = "Fly universal",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
+   end,
+})
+
+ Button5 = TPTab:CreateButton({
+    Name = "Teclado (Movil)",
+    Callback = function()
+        loadstring(game:HttpGet("https://gist.githubusercontent.com/RedZenXYZ/4d80bfd70ee27000660e4bfa7509c667/raw/da903c570249ab3c0c1a74f3467260972c3d87e6/KeyBoard%2520From%2520Ohio%2520Fr%2520Fr"))()
+    end,
+ })
+ 
+
+ Button5 = TPTab:CreateButton({
+   Name = "GhostHub",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "venox (Necesita key)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/venoxcc/venoxV1/main/main.lua'))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "Latin hub(Muchas cosas no funcionan)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/YYQyEvZm'))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Emotes R15",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "c00lkidd Gui (solo lo ves tu)",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
+   end,
+})
+
+ Button6 = TPTab:CreateButton({
+   Name = "HitBox Expander Gui",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "WISL hub",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
+   end,
+})
+
+
+ Button6 = TPTab:CreateButton({
+   Name = "Alquimia hub",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
+   end,
+})
+
+Button6 = TPTab:CreateButton({
+   Name = "Subir FPS",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/8YZ2cc6V"))()
+   end,
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+---Scripts de juegos---
+
+Juegostab= Window:CreateTab("Juegos", nil) -- Title, Image
+
+boton= Juegostab:CreateButton({
+   Name = "Dress to impres",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/DTI-GUI-V2/main/dti_gui_v2.lua",true))()
+end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fuit Super OP",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "TRP(no universal pude ocacionar lag)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/therapy-gui/main/therapy-gui.lua", true))()
+   end)
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Piggy (ESP y TP a items)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Arsenal thunder client",
+   Callback = function()
+loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e41f4a030044b055add.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Breaking Point",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Natural disaster",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
+
+   end,
+})
+
+
+
+ boton= Juegostab:CreateButton({
+   Name = "Telekinesis (Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blox Fruit (necesita key)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/3345-c-a-t-s-u-s/Kncrypt/refs/heads/main/sources/BloxFruit.lua"))()
+
+   end,
+})
+boton= Juegostab:CreateButton({
+   Name = "Be an NPC or DIE",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/main/BeNpcOrDie"))("t.me/arceusxscripts")
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Blade Ball(EminenceXLua)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/EminenceXLua/Blade-your-Balls/main/BladeBallLoader.lua"))()
+
+
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(auto parry)",
+   Callback = function()
+loadstring(game:HttpGet("https://scriptblox.com/raw/UPD-Blade-Ball-op-autoparry-with-visualizer-8652"))()
+
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+    Name = "Blade Ball(necesita key)",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/FFJ1/Roblox-Exploits/main/scripts/Loader.lua"))()
+ 
+ 
+    end,
+ })
+
+
+
+boton= Juegostab:CreateButton({
+   Name = "Nebula hub (Booga booga)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Yousuck780/Nebula-Hub/refs/heads/main/boogaboogareborn'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Break in 2",
+   Callback = function()
+loadstring(game:HttpGet(("https://pastebin.com/raw/365H7AMr")))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Redz Hub (Blox fruit)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"))(Settings)
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "build a boat for treasure",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/TheRealAsu/BABFT/refs/heads/main/Jan25_Source.lua'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Thunder Cliend(Arsenal)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/thunderclient/main/main.lua'))();
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "Super ring v6 mod(Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
+   end,
+})
+
+
+
+------Animaciones------
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local AnimacionesTab = Window:CreateTab("Animaciones", nil)
+AnimacionesTab:CreateSection("Animaciones R15")
+
+local selectedSpeed = 1
+local currentTrack = nil
+local buttonsCreated = false
+
+-- Devuelve el Humanoid actual
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	if char then
+		return char:FindFirstChildWhichIsA("Humanoid")
+	end
+	return nil
+end
+
+-- Asegura que el Animator esté disponible
+local function getAnimator(Humanoid)
+	for i = 1, 10 do
+		local animator = Humanoid:FindFirstChildOfClass("Animator")
+		if animator then return animator end
+		animator = Instance.new("Animator")
+		animator.Parent = Humanoid
+		task.wait(0.1)
+	end
+	return nil
+end
+
+-- Carga animación con seguridad
+local function safePlayAnim(animId)
+	local humanoid = getHumanoid()
+	if not humanoid then return end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animId
+
+	local success, track
+	for attempt = 1, 10 do
+		local animator = getAnimator(humanoid)
+		if not animator then
+			warn("❌ No se pudo obtener Animator.")
+			return
+		end
+		success, track = pcall(function()
+			return animator:LoadAnimation(anim)
+		end)
+		if success and track then
+			track:Play()
+			track:AdjustSpeed(selectedSpeed)
+			currentTrack = track
+			return
+		end
+		task.wait(0.2)
+	end
+	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
+end
+
+-- Crear los botones una sola vez
+local function setupUI()
+	if buttonsCreated then return end
+
+	-- Botón para quitar animación
+	AnimacionesTab:CreateButton({
+		Name = "❌ Quitar Animación",
+		Callback = function()
+			local humanoid = getHumanoid()
+			if humanoid then
+				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+					track:Stop()
+				end
+			end
+			currentTrack = nil
+		end
+	})
+
+	-- Slider de velocidad
+	AnimacionesTab:CreateSlider({
+		Name = "Velocidad de animación",
+		Range = {0, 5},
+		Increment = 0.1,
+		Suffix = "x",
+		CurrentValue = 1,
+		Callback = function(value)
+			selectedSpeed = value
+			if currentTrack then
+				currentTrack:AdjustSpeed(value)
+			end
+		end
+	})
+
+	-- Botones de emotes
+	local success, emotes = pcall(function()
+		local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+		return HttpService:JSONDecode(raw)
+	end)
+
+	if success then
+		for _, emote in ipairs(emotes) do
+			if emote.name and emote.animationid then
+				AnimacionesTab:CreateButton({
+					Name = emote.name,
+					Callback = function()
+						local humanoid = getHumanoid()
+						if humanoid then
+							for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+								track:Stop()
+							end
+							safePlayAnim(emote.animationid)
+						end
+					end
+				})
+			end
+		end
+	else
+		warn("❌ Error al cargar emotes:", emotes)
+	end
+
+	buttonsCreated = true
+end
+
+-- Inicializar UI y escuchar reinicios
+setupUI()
+LocalPlayer.CharacterAdded:Connect(function()
+	currentTrack = nil
+end)
+
+
+
+
+
+
+----Aniamciones R6
+
+
+
+
+
+
 
 ----AIMBOT---
 AimbotTab = Window:CreateTab("Aimbot", nil)
@@ -3227,13 +3565,186 @@ RunService.RenderStepped:Connect(function()
 end)
 
 
+----Hitbox Espander---- 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
 
-_G.Window = Window
+local HitboxTab = Window:CreateTab("Hitbox", nil)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Hitbox"))()
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
 
----Temas
+-- Crear grupo de colisión sin colisiones
+pcall(function()
+    PhysicsService:RegisterCollisionGroup("NoCollision")
+    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
+end)
 
+-- Función para aplicar grupo de colisión sin colisión a una parte
+local function applyNoCollision(part)
+    if part and part:IsA("BasePart") then
+        pcall(function()
+            PhysicsService:SetPartCollisionGroup(part, "NoCollision")
+        end)
+    end
+end
+
+-- Aplica el grupo sin colisión a todo el personaje
+local function applyNoCollisionToCharacter(character)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            applyNoCollision(part)
+        end
+    end
+end
+
+-- Función para actualizar hitboxes
+local function updateHitboxes()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            if not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team) then
+                pcall(function()
+                    hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                    hrp.Transparency = getgenv().HitboxTransparency
+                    hrp.BrickColor = BrickColor.new("Really black")
+                    hrp.Material = Enum.Material.Neon
+                    hrp.CanCollide = false
+                    applyNoCollisionToCharacter(v.Character)
+                end)
+            else
+                -- Restaurar hitbox de aliados si TeamCheck está activado
+                pcall(function()
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
+                    hrp.BrickColor = BrickColor.new("Medium stone grey")
+                    hrp.Material = Enum.Material.Plastic
+                    hrp.CanCollide = false
+                    applyNoCollisionToCharacter(v.Character)
+                end)
+            end
+        end
+    end
+end
+
+-- Función para resetear todos los hitboxes
+local function resetHitboxes()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            pcall(function()
+                hrp.Size = Vector3.new(2, 2, 1)
+                hrp.Transparency = 1
+                hrp.BrickColor = BrickColor.new("Medium stone grey")
+                hrp.Material = Enum.Material.Plastic
+                hrp.CanCollide = false
+                applyNoCollisionToCharacter(v.Character)
+            end)
+        end
+    end
+end
+
+-- Toggle principal de hitbox
+-- Toggle principal de hitbox
+local hitboxConnection
+HitboxTab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxToggle",
+    Callback = function(state)
+        getgenv().HitboxStatus = state
+
+        -- Activar/desactivar el toggle del Noclip en MainTab
+        local noclipToggle = Rayfield.Flags["NoclipToggle"]
+        if noclipToggle then
+            noclipToggle:Set(state)
+        end
+
+        if state then
+            updateHitboxes()
+            hitboxConnection = RunService.RenderStepped:Connect(function()
+                if getgenv().HitboxStatus then
+                    updateHitboxes()
+                end
+            end)
+        else
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
+            resetHitboxes()
+        end
+    end,
+})
+
+-- Toggle de Team Checker
+HitboxTab:CreateToggle({
+    Name = "Team Checker",
+    CurrentValue = false,
+    Flag = "TeamCheckToggle",
+    Callback = function(state)
+        getgenv().TeamCheck = state
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
+    end,
+})
+
+-- Slider para tamaño del hitbox
+HitboxTab:CreateSlider({
+    Name = "Tamaño del Hitbox",
+    Range = {2, 500},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = getgenv().HitboxSize,
+    Flag = "HitboxSizeSlider",
+    Callback = function(val)
+        getgenv().HitboxSize = val
+    end,
+})
+
+-- Slider para transparencia
+HitboxTab:CreateSlider({
+    Name = "Transparencia",
+    Range = {0, 1},
+    Increment = 0.05,
+    CurrentValue = getgenv().HitboxTransparency,
+    Flag = "HitboxTransparencySlider",
+    Callback = function(val)
+        getgenv().HitboxTransparency = val
+    end,
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+----Temas---
 themesTab = Window:CreateTab("temas", nil)
 Section = themesTab:CreateSection("Cambia el tema")
 
@@ -3272,32 +3783,79 @@ ColorPicker = themesTab:CreateColorPicker({
     end
 })
 
-----creditos
-
-_G.Window = Window
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/creditos"))()
 
 
 
 
 
+----Creditos-----
+
+
+CreditosTab = Window:CreateTab("Creditos", nil)
+Section = CreditosTab:CreateSection("Creador")
+
+ DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
+
+ParagraphFake = CreditosTab:CreateButton({
+    Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
+    Callback = function()
+        setclipboard(DiscordInvite)
+ Rayfield:Notify({
+           Title = "Discord!",
+       Content = "Se copio el link de invitacion, no olvides ver su canal",
+       Duration = 5,
+       Image = 13458017478,
+             Callback = function()
+          end
+ 
+    })
+    end,
+})
+
+ Section = CreditosTab:CreateSection("Testers")
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "erjazzy",
+    Content = "chupen pico"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Andr3ssf",
+    Content = "Top 1 de torreon coahuila"
+})
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "santiago64226",
+    Content = "No asi esta bien"
+})
+
+ Section = CreditosTab:CreateSection("Colaboradores")
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "HolaCapo_94",
+    Content = "Siganme en roblox xD"
+})  
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "El Cazador",
+    Content = "jmods es el mejor xd"
+})  
+
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "Masha💀🔥",
+    Content = "me comi al osoo"
+})  
+
+ Paragraph = CreditosTab:CreateParagraph({
+    Title = "TuTioPeruan0",
+    Content = "xD"
+})  
+
+   
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+-----When haces tus momos en video
