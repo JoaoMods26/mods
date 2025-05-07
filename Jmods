@@ -147,31 +147,26 @@ task.spawn(function()
 end)
 
 -- FUNCIONES DE TEMA
--- Supongamos que ya creaste la ventana Rayfield:
-_G.Window = Window
+local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
 
--- Hacer global la función SaveTheme
-_G.SaveTheme = function(themeName)
-    local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
+local function SaveTheme(themeName)
     if not isfile(themeSavePath) then
         makefolder("JmodsUniversal")
     end
     writefile(themeSavePath, themeName)
 end
 
--- Hacer global la función LoadSavedTheme
-_G.LoadSavedTheme = function()
-    local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
+local function LoadSavedTheme()
     if isfile(themeSavePath) then
         local theme = readfile(themeSavePath)
-        _G.Window:ModifyTheme(theme)
+        Window.ModifyTheme(theme)
     else
-        _G.Window:ModifyTheme("Bloom") -- Default
+        Window.ModifyTheme("Bloom") -- Default si no hay guardado
     end
 end
 
--- Llamar al cargar
-_G.LoadSavedTheme()
+-- Cargar tema guardado
+LoadSavedTheme()
 
 -- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
