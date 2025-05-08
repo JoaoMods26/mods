@@ -19,9 +19,7 @@ Button.BackgroundTransparency = 1
 Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Visible = game:GetService("UserInputService").TouchEnabled
-
-local originalButtonSize = Button.Size
+Button.Visible = false -- se actualizará con base en el toggle
 
 StateLabelFrame.Parent = Button
 StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -72,13 +70,12 @@ end
 
 local function AnimateButtonPress()
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local shrinkSize = UDim2.new(originalButtonSize.X.Scale - 0.01, 0, originalButtonSize.Y.Scale - 0.01, 0)
-
+	local shrinkSize = Button.Size - UDim2.new(0.01, 0, 0.01, 0)
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = shrinkSize })
-	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = originalButtonSize })
+	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = UDim2.new(0.0636, 0, 0.0661, 0) })
 
 	tweenShrink:Play()
-	tweenShrink.Completed:Once(function()
+	tweenShrink.Completed:Connect(function()
 		tweenGrow:Play()
 	end)
 end
@@ -151,12 +148,27 @@ end)
 
 UpdateImage("OFF")
 
--- Rayfield UI
+-- Rayfield UI Toggle
 MainTab:CreateToggle({
 	Name = "Shiftlock Q para activar",
 	CurrentValue = false,
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
 		shiftlockEnabled = Value
+		Button.Visible = shiftlockEnabled and UserInputService.TouchEnabled
+
+		if not shiftlockEnabled and isActive then
+			isActive = false
+			UpdateAutoRotate(true)
+			UpdateImage("OFF")
+			Crosshair.Visible = false
+			UserInputService.MouseIconEnabled = true
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+			if cameraConnection then
+				cameraConnection:Disconnect()
+				cameraConnection = nil
+			end
+		end
 	end
 })
