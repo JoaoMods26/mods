@@ -30,6 +30,13 @@ loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
    end,
 })
 
+ Button3 = TPTab:CreateButton({
+   Name = "Remote Spy (Octo spy)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Octo-Spy/refs/heads/main/Main.lua", true))()
+   end,
+})
+
  Button4 = TPTab:CreateButton({
    Name = "Fly universal",
    Callback = function()
