@@ -1,4 +1,4 @@
-ShiftlockTab = _G.Window:CreateTab("Shiftlock", nil)
+
 
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
@@ -149,7 +149,7 @@ end)
 UpdateImage("OFF")
 
 -- Rayfield UI
-ShiftlockTab:CreateToggle({
+MainTab:CreateToggle({
 	Name = "Shiftlock",
 	CurrentValue = false,
 	Flag = "ShiftlockToggle",
@@ -157,3 +157,6 @@ ShiftlockTab:CreateToggle({
 		shiftlockEnabled = Value
 	end
 })
+
+
+
