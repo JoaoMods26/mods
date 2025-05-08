@@ -150,7 +150,7 @@ UpdateImage("OFF")
 
 -- Rayfield UI
 MainTab:CreateToggle({
-	Name = "Shiftlock",
+	Name = "Shiftlock Q para activar",
 	CurrentValue = false,
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
