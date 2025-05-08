@@ -3501,66 +3501,10 @@ ColorPicker = themesTab:CreateColorPicker({
 
 ----Creditos-----
 
+_G.Window = Window
 
-CreditosTab = Window:CreateTab("Creditos", nil)
-Section = CreditosTab:CreateSection("Creador")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/creditos"))()
 
- DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
-
-ParagraphFake = CreditosTab:CreateButton({
-    Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
-    Callback = function()
-        setclipboard(DiscordInvite)
- Rayfield:Notify({
-           Title = "Discord!",
-       Content = "Se copio el link de invitacion, no olvides ver su canal",
-       Duration = 5,
-       Image = 13458017478,
-             Callback = function()
-          end
- 
-    })
-    end,
-})
-
- Section = CreditosTab:CreateSection("Testers")
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "erjazzy",
-    Content = "chupen pico"
-})
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "Andr3ssf",
-    Content = "Top 1 de torreon coahuila"
-})
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "santiago64226",
-    Content = "No asi esta bien"
-})
-
- Section = CreditosTab:CreateSection("Colaboradores")
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "HolaCapo_94",
-    Content = "Siganme en roblox xD"
-})  
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "El Cazador",
-    Content = "jmods es el mejor xd"
-})  
-
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "Masha💀🔥",
-    Content = "me comi al osoo"
-})  
-
- Paragraph = CreditosTab:CreateParagraph({
-    Title = "TuTioPeruan0",
-    Content = "xD"
-})  
 
    
 
