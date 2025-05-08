@@ -1816,8 +1816,10 @@ MainTab:CreateSlider({
 })
 
 
+---Shiftlock
 
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Main%20segunda%20parte"))()
 
 
 
