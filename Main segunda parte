@@ -1,5 +1,3 @@
-
-
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
 
@@ -22,6 +20,8 @@ Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
 Button.Visible = game:GetService("UserInputService").TouchEnabled
+
+local originalButtonSize = Button.Size
 
 StateLabelFrame.Parent = Button
 StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -72,10 +72,13 @@ end
 
 local function AnimateButtonPress()
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = Button.Size - UDim2.new(0.01, 0, 0.01, 0) })
-	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = Button.Size })
+	local shrinkSize = UDim2.new(originalButtonSize.X.Scale - 0.01, 0, originalButtonSize.Y.Scale - 0.01, 0)
+
+	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = shrinkSize })
+	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = originalButtonSize })
+
 	tweenShrink:Play()
-	tweenShrink.Completed:Connect(function()
+	tweenShrink.Completed:Once(function()
 		tweenGrow:Play()
 	end)
 end
@@ -157,6 +160,3 @@ MainTab:CreateToggle({
 		shiftlockEnabled = Value
 	end
 })
-
-
-
