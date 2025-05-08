@@ -2738,7 +2738,7 @@ JugadoresTab:CreateSlider({
 
 ---Scripts 
 
-Window = _G.Window
+_G.Window = _G.Window
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Script%20y%20de%20juegos"))()
 
 
