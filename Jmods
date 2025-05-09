@@ -31,6 +31,36 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
+
+-- Eliminar splash de carga de Rayfield
+task.spawn(function()
+    -- Esperar un poco para que la GUI se cree
+    task.wait(1)
+
+    local gui = game:GetService("CoreGui"):FindFirstChild("Rayfield")
+    if gui then
+        for _, v in ipairs(gui:GetDescendants()) do
+            -- Borrar texto de marca "Rayfield"
+            if v:IsA("TextLabel") and string.find(v.Text, "Rayfield") then
+                v.Text = ""
+            end
+            -- Ocultar cualquier logo o decorativo
+            if v:IsA("ImageLabel") or v:IsA("Frame") then
+                if v.Name == "Loading" or v.Name == "Logo" then
+                    v.Visible = false
+                end
+            end
+        end
+    end
+end)
+
+
+-------Wea de owner
+
+
+
+
+
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
