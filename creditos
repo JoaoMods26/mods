@@ -59,3 +59,64 @@ CreditosTab:CreateParagraph({
     Title = "TuTioPeruan0",
     Content = "xD"
 })  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---info---
+
+
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local LocalizationService = game:GetService("LocalizationService")
+
+
+
+-- Obtener nombre del juego
+local success, gameInfo = pcall(function()
+    return MarketplaceService:GetProductInfo(game.PlaceId)
+end)
+
+local gameName = success and gameInfo.Name or "Desconocido"
+local countryCode = "Cargando..."
+
+-- Crear label con contenido inicial
+local InfoLabel = CreditosTab:CreateLabel("Jugadores conectados: ...\nJuego: " .. gameName .. "\nRegión del servidor: " .. countryCode)
+
+-- Obtener país estimado usando el primer jugador
+task.spawn(function()
+    local firstPlayer = Players:GetPlayers()[1]
+    if firstPlayer then
+        local success, result = pcall(function()
+            return LocalizationService:GetCountryRegionForPlayerAsync(firstPlayer)
+        end)
+        if success and result then
+            countryCode = result
+        else
+            countryCode = "Desconocida"
+        end
+    else
+        countryCode = "Sin jugadores"
+    end
+    InfoLabel:Set("Jugadores conectados: " .. #Players:GetPlayers() .. "\nJuego: " .. gameName .. "\nRegión del servidor: " .. countryCode)
+end)
+
+-- Función para actualizar el label
+local function UpdateLabel()
+    InfoLabel:Set("Jugadores conectados: " .. #Players:GetPlayers() .. "\nJuego: " .. gameName .. "\nRegión del servidor: " .. countryCode)
+end
+
+-- Conectar eventos
+Players.PlayerAdded:Connect(UpdateLabel)
+Players.PlayerRemoving:Connect(UpdateLabel)
+
