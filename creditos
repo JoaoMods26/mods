@@ -74,13 +74,9 @@ CreditosTab:CreateParagraph({
 
 
 ---info---
-CreditosTab:CreateSection("Info de servidor")
-
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalizationService = game:GetService("LocalizationService")
-
-
 
 -- Obtener nombre del juego
 local success, gameInfo = pcall(function()
@@ -108,7 +104,7 @@ task.spawn(function()
     else
         countryCode = "Sin jugadores"
     end
-    InfoLabel:Set("Jugadores conectados: " .. #Players:GetPlayers() .. "\nJuego: " .. gameName .. "\nRegión del servidor: " .. countryCode)
+    -- No actualizar inmediatamente aquí, lo haremos con el temporizador
 end)
 
 -- Función para actualizar el label
@@ -116,7 +112,22 @@ local function UpdateLabel()
     InfoLabel:Set("Jugadores conectados: " .. #Players:GetPlayers() .. "\nJuego: " .. gameName .. "\nRegión del servidor: " .. countryCode)
 end
 
--- Conectar eventos
-Players.PlayerAdded:Connect(UpdateLabel)
-Players.PlayerRemoving:Connect(UpdateLabel)
+-- Actualizar solo cada segundo
+local lastUpdate = tick()
+task.spawn(function()
+    while true do
+        task.wait(1)  -- Esperar 1 segundo entre actualizaciones
+        if tick() - lastUpdate >= 1 then
+            UpdateLabel()
+            lastUpdate = tick()
+        end
+    end
+end)
 
+-- Conectar eventos de jugadores
+Players.PlayerAdded:Connect(function()
+    lastUpdate = tick()  -- Fuerza una actualización inmediata cuando un jugador se une
+end)
+Players.PlayerRemoving:Connect(function()
+    lastUpdate = tick()  -- Fuerza una actualización inmediata cuando un jugador se va
+end)
