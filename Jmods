@@ -155,27 +155,66 @@ task.spawn(function()
     CheckAndConnectPlayers()
 end)
 
+
+
+
 -- FUNCIONES DE TEMA
 local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
 
+-- Guardar el tema
 local function SaveTheme(themeName)
     if not isfile(themeSavePath) then
         makefolder("JmodsUniversal")
     end
     writefile(themeSavePath, themeName)
+    print("Tema guardado:", themeName)  -- Depuración
 end
 
+-- Cargar el tema guardado
 local function LoadSavedTheme()
+    local validThemes = {
+        ["Light"] = true,
+        ["Dark"] = true,
+        ["Aqua"] = true,
+        ["Jester"] = true,
+        ["Moon"] = true,
+        ["Synapse"] = true,
+        ["Sentinel"] = true,
+        ["Midnight"] = true,
+        ["Serpent"] = true,
+        ["Bloom"] = true,
+        ["Discord"] = true,
+        ["Default"] = true, -- Asegúrate de que todos los temas sean válidos
+        ["AmberGlow"] = true,
+        ["Amethyst"] = true,
+        ["DarkBlue"] = true,
+        ["Green"] = true,
+        ["Ocean"] = true,
+        ["Serenity"] = true,
+    }
+
     if isfile(themeSavePath) then
         local theme = readfile(themeSavePath)
-        Window.ModifyTheme(theme)
+        print("Tema leído del archivo:", theme)  -- Depuración
+        if validThemes[theme] then
+            print("Cargando tema:", theme)  -- Depuración: tema válido
+            Window.ModifyTheme(theme)
+        else
+            warn("Tema inválido:", theme)
+            Window.ModifyTheme("Bloom")  -- Tema por defecto
+        end
     else
-        Window.ModifyTheme("Bloom") -- Default si no hay guardado
+        print("No se encontró el archivo de tema, cargando el predeterminado...")
+        Window.ModifyTheme("Bloom")  -- Tema por defecto
     end
 end
 
--- Cargar tema guardado
+-- Cargar tema guardado al inicio
 LoadSavedTheme()
+
+
+
+
 
 -- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
