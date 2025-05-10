@@ -183,6 +183,7 @@ local humanoid = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")
 local character = game.Players.LocalPlayer.Character
 local isWalkingInAir = false
 local floorPart = nil  -- Variable para almacenar el piso gigante
+local heartbeatConnection = nil  -- Para almacenar la conexión Heartbeat
 
 -- Función para detectar si el jugador está tocando el suelo
 local function isTouchingGround()
@@ -190,6 +191,28 @@ local function isTouchingGround()
     local hitPart = workspace:FindPartOnRay(ray, character)  -- Comprobamos si tocamos algo
     return hitPart and hitPart.CanCollide  -- Si tocamos algo con colisión, significa que estamos en el suelo
 end
+
+-- Función para crear el piso invisible
+local function createFloor()
+    -- Crear el piso invisible gigante debajo del jugador si no existe aún
+    if not floorPart then
+        floorPart = Instance.new("Part")
+        floorPart.Size = Vector3.new(50, 1, 50)  -- Un tamaño grande para el piso
+        floorPart.Anchored = true  -- Asegurarse de que esté fijo
+        floorPart.CanCollide = true  -- Activar colisiones para que el jugador pueda caminar sobre él
+        floorPart.Transparency = 1  -- Hacerlo invisible
+        floorPart.Parent = workspace  -- Añadirlo al espacio de trabajo
+    end
+end
+
+-- Función para manejar el Respawn del jugador
+local function onPlayerRespawned()
+    humanoid = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")  -- Actualizar el humanoide
+    character = game.Players.LocalPlayer.Character  -- Actualizar el personaje
+end
+
+-- Conexión para detectar el respawn del jugador
+game.Players.LocalPlayer.CharacterAdded:Connect(onPlayerRespawned)
 
 -- Crear toggle en el MainTab
 MainTab:CreateToggle({
@@ -200,39 +223,32 @@ MainTab:CreateToggle({
         isWalkingInAir = Value
 
         if isWalkingInAir then
-            -- Crear el piso invisible gigante debajo del jugador si no existe aún
-            if not floorPart then
-                floorPart = Instance.new("Part")
-                floorPart.Size = Vector3.new(50, 1, 50)  -- Un tamaño grande para el piso
-                floorPart.Anchored = true  -- Asegurarse de que esté fijo
-                floorPart.CanCollide = true  -- Activar colisiones para que el jugador pueda caminar sobre él
-                floorPart.Transparency = 1  -- Hacerlo invisible
-                floorPart.Parent = workspace  -- Añadirlo al espacio de trabajo
-            end
+            -- Crear el piso invisible cuando se activa el toggle
+            createFloor()
 
-            -- Actualización constante de la posición del piso justo debajo del jugador
-            local heartbeatConnection
-            heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                if isWalkingInAir and floorPart then
-                    -- Solo actualizamos la posición del piso si el jugador está en el aire
-                    if not isTouchingGround() then
-                        -- Posicionar el piso debajo del jugador (ajustamos la distancia)
-                        floorPart.Position = humanoid.RootPart.Position - Vector3.new(0, 3, 0)  -- Ajusta esta distancia si es necesario
+            -- Conectar la actualización constante de la posición del piso debajo del jugador
+            if not heartbeatConnection then
+                heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                    if isWalkingInAir and floorPart then
+                        -- Solo actualizamos la posición del piso si el jugador está en el aire
+                        if not isTouchingGround() then
+                            -- Posicionar el piso debajo del jugador (ajustamos la distancia)
+                            floorPart.Position = humanoid.RootPart.Position - Vector3.new(0, 3, 0)  -- Ajusta esta distancia si es necesario
+                        end
                     end
-                end
-            end)
-
-            -- Desconectar la función Heartbeat cuando el toggle se desactive
-            game:GetService("RunService").Heartbeat:Connect(function()
-                if not isWalkingInAir and heartbeatConnection then
-                    heartbeatConnection:Disconnect()  -- Detener la actualización del piso cuando se desactiva el toggle
-                end
-            end)
+                end)
+            end
         else
             -- Eliminar el piso invisible cuando se desactiva el toggle
             if floorPart then
                 floorPart:Destroy()  -- Eliminar el piso
                 floorPart = nil
+            end
+
+            -- Desconectar la función Heartbeat cuando el toggle se desactiva
+            if heartbeatConnection then
+                heartbeatConnection:Disconnect()  -- Detener la actualización del piso
+                heartbeatConnection = nil  -- Limpiar la conexión
             end
         end
     end,
