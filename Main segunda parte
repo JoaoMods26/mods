@@ -1,3 +1,5 @@
+
+-- Variables globales
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
 
@@ -19,7 +21,7 @@ Button.BackgroundTransparency = 1
 Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Visible = false -- se actualizará con base en el toggle
+Button.Visible = false -- Se actualizará con base en el toggle
 
 StateLabelFrame.Parent = Button
 StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -43,7 +45,7 @@ Crosshair.TextScaled = true
 Crosshair.TextColor3 = Color3.new(1, 1, 1)
 Crosshair.Visible = false
 
--- Services
+-- Servicios
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -175,10 +177,7 @@ MainTab:CreateToggle({
 
 
 
-
------Caminar en el aire
-
-
+-- Caminar en el aire
 local humanoid = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")
 local character = game.Players.LocalPlayer.Character
 local isWalkingInAir = false
@@ -255,72 +254,37 @@ MainTab:CreateToggle({
 })
 
 
-
-
-local SoundService = game:GetService("SoundService")
-local Players = game:GetService("Players")
-local VoiceChatService = game:GetService("VoiceChatService")
-local LocalPlayer = Players.LocalPlayer
-
-local mutedSounds = {}
-local toggleActive = false
-
--- Función para identificar si un sonido es de voz
-local function isVoiceSound(sound)
-    if sound:IsDescendantOf(VoiceChatService) then
-        return true
-    end
-    if sound.Name:lower():find("voice") or sound.Name:lower():find("vc") then
-        return true
-    end
-    return false
-end
-
--- Mutear todos los sonidos excepto los de voz
-local function muteAllExceptVoice()
-    for _, sound in ipairs(game:GetDescendants()) do
-        if sound:IsA("Sound") and not isVoiceSound(sound) then
-            if sound.Playing and sound.Volume > 0 then
-                mutedSounds[sound] = sound.Volume
-                sound.Volume = 0
-            end
-        end
-    end
-end
-
--- Restaurar los sonidos mutados
-local function unmuteAll()
-    for sound, originalVolume in pairs(mutedSounds) do
-        if sound and sound.Parent then
-            sound.Volume = originalVolume
-        end
-    end
-    mutedSounds = {}
-end
-
 -- Manejar sonidos nuevos creados después de activar el toggle
 local function handleNewSound(sound)
-    if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
-        mutedSounds[sound] = sound.Volume
-        sound.Volume = 0
-    end
+	if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
+		if sound.Playing and sound.Volume > 0 then
+			mutedSounds[sound] = sound.Volume
+			sound.Volume = 0
+		end
+
+		sound:GetPropertyChangedSignal("Playing"):Connect(function()
+			if sound.Playing and not isVoiceSound(sound) then
+				mutedSounds[sound] = sound.Volume
+				sound.Volume = 0
+			end
+		end)
+	end
 end
 
--- Conectar evento para nuevos sonidos
+-- Escuchar sonidos nuevos en todo el juego
 game.DescendantAdded:Connect(handleNewSound)
 
--- Agregar Toggle al MainTab de Rayfield
+-- Crear el toggle en Rayfield
 MainTab:CreateToggle({
-    Name = "Mutear sonidos(voz no)",
-    CurrentValue = false,
-    Flag = "MuteAudios",
-    Callback = function(Value)
-        toggleActive = Value
-        if Value then
-            muteAllExceptVoice()
-        else
-            unmuteAll()
-        end
-    end
+	Name = "Silenciar sonidos excepto voz",
+	CurrentValue = false,
+	Flag = "MuteExceptVoiceToggle",
+	Callback = function(Value)
+		toggleActive = Value
+		if toggleActive then
+			muteAllExceptVoice()
+		else
+			unmuteAll()
+		end
+	end
 })
-
