@@ -1,13 +1,13 @@
- HttpService = game:GetService("HttpService")
- Players = game:GetService("Players")
- LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
- AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
-AnimacionesTab:CreateSection("Animaciones R15")
+local AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
 
- selectedSpeed = 1
- currentTrack = nil
- buttonsCreated = false
+local selectedSpeed = 1
+local currentTrack = nil
+local buttonsCreated = false
+local buttonsCreatedR6 = false
 
 -- Devuelve el Humanoid actual
 local function getHumanoid()
@@ -59,10 +59,12 @@ local function safePlayAnim(animId)
 	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
 end
 
--- Crear los botones solo cuando se abre el tab
-local function setupUI()
+-- Botones para animaciones R15
+local function setupUI_R15()
 	if buttonsCreated then return end
 	buttonsCreated = true
+
+	AnimacionesTab:CreateSection("Animaciones R15")
 
 	AnimacionesTab:CreateButton({
 		Name = "❌ Quitar Animación",
@@ -115,15 +117,69 @@ local function setupUI()
 				end
 			end
 		else
-			warn("❌ Error al cargar emotes:", emotes)
+			warn("❌ Error al cargar emotes R15:", emotes)
 		end
 	end)
 end
 
--- Solo cargar cuando el tab se activa
+-- Botones para animaciones R6
+local function setupUI_R6()
+	if buttonsCreatedR6 then return end
+	buttonsCreatedR6 = true
+
+	AnimacionesTab:CreateSection("Animaciones R6")
+
+	AnimacionesTab:CreateButton({
+		Name = "❌ Quitar Animación R6",
+		Callback = function()
+			local humanoid = getHumanoid()
+			if humanoid then
+				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+					track:Stop()
+				end
+			end
+			currentTrack = nil
+		end
+	})
+
+	task.spawn(function()
+		local success, emotes = pcall(function()
+			local raw = game:HttpGet("https://pastebin.com/raw/iUCKWXKV")
+			return HttpService:JSONDecode(raw)
+		end)
+
+		if success then
+			for _, emote in ipairs(emotes) do
+				if emote.name and emote.animationid then
+					AnimacionesTab:CreateButton({
+						Name = "[R6] " .. emote.name,
+						Callback = function()
+							local humanoid = getHumanoid()
+							if humanoid then
+								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+									track:Stop()
+								end
+								safePlayAnim(emote.animationid)
+							end
+						end
+					})
+				end
+			end
+		else
+			warn("❌ Error al cargar emotes R6:", emotes)
+		end
+	end)
+end
+
+-- Carga los botones al presionar
 AnimacionesTab:CreateButton({
-	Name = "▶️Cargar Animaciones(Pisa solo 1 vez)",
-	Callback = setupUI
+	Name = "▶️ Cargar Animaciones R15 (Pisa solo 1 vez)",
+	Callback = setupUI_R15
+})
+
+AnimacionesTab:CreateButton({
+	Name = "▶️ Cargar Animaciones R6 (Pisa solo 1 vez)",
+	Callback = setupUI_R6
 })
 
 -- Reset de animaciones al respawn
