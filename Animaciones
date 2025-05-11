@@ -1,15 +1,13 @@
-------Animaciones------
+ HttpService = game:GetService("HttpService")
+ Players = game:GetService("Players")
+ LocalPlayer = Players.LocalPlayer
 
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
+ AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
 AnimacionesTab:CreateSection("Animaciones R15")
 
-local selectedSpeed = 1
-local currentTrack = nil
-local buttonsCreated = false
+ selectedSpeed = 1
+ currentTrack = nil
+ buttonsCreated = false
 
 -- Devuelve el Humanoid actual
 local function getHumanoid()
@@ -27,7 +25,7 @@ local function getAnimator(Humanoid)
 		if animator then return animator end
 		animator = Instance.new("Animator")
 		animator.Parent = Humanoid
-		task.wait(0.1)
+		task.wait(0.05)
 	end
 	return nil
 end
@@ -41,7 +39,7 @@ local function safePlayAnim(animId)
 	anim.AnimationId = animId
 
 	local success, track
-	for attempt = 1, 10 do
+	for attempt = 1, 5 do
 		local animator = getAnimator(humanoid)
 		if not animator then
 			warn("❌ No se pudo obtener Animator.")
@@ -56,16 +54,16 @@ local function safePlayAnim(animId)
 			currentTrack = track
 			return
 		end
-		task.wait(0.2)
+		task.wait(0.1)
 	end
 	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
 end
 
--- Crear los botones una sola vez
+-- Crear los botones solo cuando se abre el tab
 local function setupUI()
 	if buttonsCreated then return end
+	buttonsCreated = true
 
-	-- Botón para quitar animación
 	AnimacionesTab:CreateButton({
 		Name = "❌ Quitar Animación",
 		Callback = function()
@@ -79,13 +77,12 @@ local function setupUI()
 		end
 	})
 
-	-- Slider de velocidad
 	AnimacionesTab:CreateSlider({
 		Name = "Velocidad de animación",
-		Range = {0, 5},
+		Range = {0, 10},
 		Increment = 0.1,
 		Suffix = "x",
-		CurrentValue = 1,
+		CurrentValue = selectedSpeed,
 		Callback = function(value)
 			selectedSpeed = value
 			if currentTrack then
@@ -94,45 +91,42 @@ local function setupUI()
 		end
 	})
 
-	-- Botones de emotes
-	local success, emotes = pcall(function()
-		local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
-		return HttpService:JSONDecode(raw)
-	end)
+	task.spawn(function()
+		local success, emotes = pcall(function()
+			local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+			return HttpService:JSONDecode(raw)
+		end)
 
-	if success then
-		for _, emote in ipairs(emotes) do
-			if emote.name and emote.animationid then
-				AnimacionesTab:CreateButton({
-					Name = emote.name,
-					Callback = function()
-						local humanoid = getHumanoid()
-						if humanoid then
-							for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-								track:Stop()
+		if success then
+			for _, emote in ipairs(emotes) do
+				if emote.name and emote.animationid then
+					AnimacionesTab:CreateButton({
+						Name = emote.name,
+						Callback = function()
+							local humanoid = getHumanoid()
+							if humanoid then
+								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+									track:Stop()
+								end
+								safePlayAnim(emote.animationid)
 							end
-							safePlayAnim(emote.animationid)
 						end
-					end
-				})
+					})
+				end
 			end
+		else
+			warn("❌ Error al cargar emotes:", emotes)
 		end
-	else
-		warn("❌ Error al cargar emotes:", emotes)
-	end
-
-	buttonsCreated = true
+	end)
 end
 
--- Inicializar UI y escuchar reinicios
-setupUI()
+-- Solo cargar cuando el tab se activa
+AnimacionesTab:CreateButton({
+	Name = "▶️Cargar Animaciones(Pisa solo 1 vez)",
+	Callback = setupUI
+})
+
+-- Reset de animaciones al respawn
 LocalPlayer.CharacterAdded:Connect(function()
 	currentTrack = nil
 end)
-
-
-
-
-
-
-----Aniamciones R6
