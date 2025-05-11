@@ -253,3 +253,74 @@ MainTab:CreateToggle({
         end
     end,
 })
+
+
+
+
+local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
+local VoiceChatService = game:GetService("VoiceChatService")
+local LocalPlayer = Players.LocalPlayer
+
+local mutedSounds = {}
+local toggleActive = false
+
+-- Función para identificar si un sonido es de voz
+local function isVoiceSound(sound)
+    if sound:IsDescendantOf(VoiceChatService) then
+        return true
+    end
+    if sound.Name:lower():find("voice") or sound.Name:lower():find("vc") then
+        return true
+    end
+    return false
+end
+
+-- Mutear todos los sonidos excepto los de voz
+local function muteAllExceptVoice()
+    for _, sound in ipairs(game:GetDescendants()) do
+        if sound:IsA("Sound") and not isVoiceSound(sound) then
+            if sound.Playing and sound.Volume > 0 then
+                mutedSounds[sound] = sound.Volume
+                sound.Volume = 0
+            end
+        end
+    end
+end
+
+-- Restaurar los sonidos mutados
+local function unmuteAll()
+    for sound, originalVolume in pairs(mutedSounds) do
+        if sound and sound.Parent then
+            sound.Volume = originalVolume
+        end
+    end
+    mutedSounds = {}
+end
+
+-- Manejar sonidos nuevos creados después de activar el toggle
+local function handleNewSound(sound)
+    if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
+        mutedSounds[sound] = sound.Volume
+        sound.Volume = 0
+    end
+end
+
+-- Conectar evento para nuevos sonidos
+game.DescendantAdded:Connect(handleNewSound)
+
+-- Agregar Toggle al MainTab de Rayfield
+MainTab:CreateToggle({
+    Name = "Mutear sonidos(voz no)",
+    CurrentValue = false,
+    Flag = "MuteAudios",
+    Callback = function(Value)
+        toggleActive = Value
+        if Value then
+            muteAllExceptVoice()
+        else
+            unmuteAll()
+        end
+    end
+})
+
