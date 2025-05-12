@@ -1,134 +1,85 @@
----- Hitbox Expander Optimizado sin Noclip ----
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local PhysicsService = game:GetService("PhysicsService")
+----Discord Noti---
 
-local HitboxTab = Window:CreateTab("Hitbox", nil)
+-- [[ CONFIGURACIÓN DE NOTIFICACIÓN ]] --
+local player = game.Players.LocalPlayer
+local placeName = "Juego desconocido"
+local ejecutador = "Desconocido"
 
-getgenv().HitboxSize = 15
-getgenv().HitboxTransparency = 0.9
-getgenv().HitboxStatus = false
-getgenv().TeamCheck = false
-
--- Crear grupo de colisión sin colisiones
+-- Detectar nombre del juego y ejecutador
 pcall(function()
-    PhysicsService:RegisterCollisionGroup("NoCollision")
-    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
+    placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
 end)
 
-local function applyNoCollision(part)
-    if part and part:IsA("BasePart") then
-        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
-    end
+pcall(function()
+    ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or (syn and "Synapse X") or "Otro"
+end)
+
+getgenv().Main = {
+    Title = "✅ Jmods Universal",
+    ThumbnailURL = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png", -- Imagen del juego
+    ColorEmbed = "#FFC0CB"
+}
+
+getgenv().Field = {
+    Name = "📌 Información",
+    FieldValue = "👤 Usuario: " .. player.Name ..
+                 "\n🎮 Juego: " .. placeName ..
+                 "\n🧠 Ejecutador: " .. ejecutador ..
+                 "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S")
+}
+
+getgenv().Footer = {
+    FooterURL = "", -- Puedes poner un ícono aquí si deseas
+    FooterText = "Jmods Universal Notifier"
+}
+
+getgenv().Authorization = {
+    Secret = "",
+    Channel = "https://discord.com/api/webhooks/1371552329144336514/RJ2vw2O0OgBQ1I4NGqGws4vveKtmPjEnSzP0XlHrb_0swaqYaeBTac-Coz16Ulf4PPFP"
+}
+
+getgenv().field = true
+
+-- [[ ANTI-SPAM ]] --
+local CoreGui = game:GetService("CoreGui")
+local folderName = "Jmods_NotifyFlag"
+if not CoreGui:FindFirstChild(folderName) then
+    local folder = Instance.new("Folder")
+    folder.Name = folderName
+    folder.Parent = CoreGui
+
+    -- [[ ENVIAR WEBHOOK ]] --
+    local HttpService = game:GetService("HttpService")
+    local embed = {
+        title = getgenv().Main.Title,
+        color = tonumber(getgenv().Main.ColorEmbed:sub(2), 16),
+        thumbnail = {
+            url = getgenv().Main.ThumbnailURL
+        },
+        footer = {
+            text = getgenv().Footer.FooterText,
+            icon_url = getgenv().Footer.FooterURL
+        },
+        fields = getgenv().field and { {
+            name = getgenv().Field.Name,
+            value = getgenv().Field.FieldValue,
+            inline = true
+        } } or nil,
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    }
+
+    local payload = HttpService:JSONEncode({
+        embeds = {embed}
+    })
+
+    pcall(function()
+        (syn and syn.request or http_request or request)( {
+            Url = getgenv().Authorization.Channel,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = payload
+        } )
+    end)
 end
-
-local function applyNoCollisionToCharacter(character)
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            applyNoCollision(part)
-        end
-    end
-end
-
-local function updateHitboxes()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            local isEnemy = not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team)
-
-            local size = isEnemy and Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or Vector3.new(2, 2, 1)
-            local transparency = isEnemy and getgenv().HitboxTransparency or 1
-            local color = isEnemy and BrickColor.new("Really black") or BrickColor.new("Medium stone grey")
-            local material = isEnemy and Enum.Material.Neon or Enum.Material.Plastic
-
-            -- Solo cambia si es necesario
-            if hrp.Size ~= size then hrp.Size = size end
-            if hrp.Transparency ~= transparency then hrp.Transparency = transparency end
-            if hrp.BrickColor ~= color then hrp.BrickColor = color end
-            if hrp.Material ~= material then hrp.Material = material end
-            if hrp.CanCollide then hrp.CanCollide = false end
-
-            applyNoCollisionToCharacter(v.Character)
-        end
-    end
-end
-
-local function resetHitboxes()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            if hrp.Size ~= Vector3.new(2, 2, 1) then hrp.Size = Vector3.new(2, 2, 1) end
-            if hrp.Transparency ~= 1 then hrp.Transparency = 1 end
-            if hrp.BrickColor ~= BrickColor.new("Medium stone grey") then hrp.BrickColor = BrickColor.new("Medium stone grey") end
-            if hrp.Material ~= Enum.Material.Plastic then hrp.Material = Enum.Material.Plastic end
-            if hrp.CanCollide then hrp.CanCollide = false end
-
-            applyNoCollisionToCharacter(v.Character)
-        end
-    end
-end
-
--- Toggle principal de Hitbox
-local hitboxConnection
-HitboxTab:CreateToggle({
-    Name = "Hitbox Expander",
-    CurrentValue = false,
-    Flag = "HitboxToggle",
-    Callback = function(state)
-        getgenv().HitboxStatus = state
-
-        if state then
-            updateHitboxes()
-            hitboxConnection = RunService.Heartbeat:Connect(function()
-                if getgenv().HitboxStatus then
-                    updateHitboxes()
-                    task.wait(0.2) -- Ajusta la frecuencia según necesidad
-                end
-            end)
-        else
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-                hitboxConnection = nil
-            end
-            resetHitboxes()
-        end
-    end,
-})
-
--- Toggle de Team Check
-HitboxTab:CreateToggle({
-    Name = "Team Checker",
-    CurrentValue = false,
-    Flag = "TeamCheckToggle",
-    Callback = function(state)
-        getgenv().TeamCheck = state
-        if getgenv().HitboxStatus then
-            updateHitboxes()
-        end
-    end,
-})
-
--- Slider de tamaño del Hitbox
-HitboxTab:CreateSlider({
-    Name = "Tamaño del Hitbox",
-    Range = {2, 500},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = getgenv().HitboxSize,
-    Flag = "HitboxSizeSlider",
-    Callback = function(val)
-        getgenv().HitboxSize = val
-    end,
-})
-
--- Slider de transparencia del Hitbox
-HitboxTab:CreateSlider({
-    Name = "Transparencia",
-    Range = {0, 1},
-    Increment = 0.05,
-    CurrentValue = getgenv().HitboxTransparency,
-    Flag = "HitboxTransparencySlider",
-    Callback = function(val)
-        getgenv().HitboxTransparency = val
-    end,
-})
