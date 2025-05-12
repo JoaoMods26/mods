@@ -216,6 +216,101 @@ LoadSavedTheme()
 
 
 
+---------------------
+----Discord Noti---
+
+-- [[ CONFIGURACIÓN DE NOTIFICACIÓN ]] --
+local player = game.Players.LocalPlayer
+local placeName = "Juego desconocido"
+local ejecutador = "Desconocido"
+
+-- Detectar nombre del juego y ejecutador
+pcall(function()
+    placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+end)
+
+pcall(function()
+    ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or (syn and "Synapse X") or "Otro"
+end)
+
+getgenv().Main = {
+    Title = "✅ Jmods Universal",
+    ThumbnailURL = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png", -- Imagen del juego
+    ColorEmbed = "#FFC0CB"
+}
+
+getgenv().Field = {
+    Name = "📌 Información",
+    FieldValue = "👤 Usuario: " .. player.Name ..
+                 "\n🎮 Juego: " .. placeName ..
+                 "\n🧠 Ejecutador: " .. ejecutador ..
+                 "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S")
+}
+
+getgenv().Footer = {
+    FooterURL = "", -- Puedes poner un ícono aquí si deseas
+    FooterText = "Jmods Universal Notifier"
+}
+
+getgenv().Authorization = {
+    Secret = "",
+    Channel = "https://discord.com/api/webhooks/1371552329144336514/RJ2vw2O0OgBQ1I4NGqGws4vveKtmPjEnSzP0XlHrb_0swaqYaeBTac-Coz16Ulf4PPFP"
+}
+
+getgenv().field = true
+
+-- [[ ANTI-SPAM ]] --
+local CoreGui = game:GetService("CoreGui")
+local folderName = "Jmods_NotifyFlag"
+if not CoreGui:FindFirstChild(folderName) then
+    local folder = Instance.new("Folder")
+    folder.Name = folderName
+    folder.Parent = CoreGui
+
+    -- [[ ENVIAR WEBHOOK ]] --
+    local HttpService = game:GetService("HttpService")
+    local embed = {
+        title = getgenv().Main.Title,
+        color = tonumber(getgenv().Main.ColorEmbed:sub(2), 16),
+        thumbnail = {
+            url = getgenv().Main.ThumbnailURL
+        },
+        footer = {
+            text = getgenv().Footer.FooterText,
+            icon_url = getgenv().Footer.FooterURL
+        },
+        fields = getgenv().field and { {
+            name = getgenv().Field.Name,
+            value = getgenv().Field.FieldValue,
+            inline = true
+        } } or nil,
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    }
+
+    local payload = HttpService:JSONEncode({
+        embeds = {embed}
+    })
+
+    pcall(function()
+        (syn and syn.request or http_request or request)( {
+            Url = getgenv().Authorization.Channel,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = payload
+        } )
+    end)
+end
+---
+
+
+
+
+
+
+
+
 -- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
 MainSection = MainTab:CreateSection("Main")
