@@ -1,33 +1,46 @@
+-- Servicios
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local VoiceChatService = game:GetService("VoiceChatService")
 
--- Variables globales
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+
+-- Shiftlock variables
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
+local isActive = false
+local cameraConnection = nil
 
--- GUI elements
+-- GUI Shiftlock
 local ShiftlockGui = Instance.new("ScreenGui")
-local Button = Instance.new("ImageButton")
-local StateLabelFrame = Instance.new("Frame")
-local StateLabel = Instance.new("TextLabel")
-local Crosshair = Instance.new("TextLabel")
-
 ShiftlockGui.Name = "ShiftlockGUI"
 ShiftlockGui.ResetOnSpawn = false
 ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ShiftlockGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ShiftlockGui.Parent = player:WaitForChild("PlayerGui")
 
+local Button = Instance.new("ImageButton")
 Button.Name = "ShiftlockButton"
 Button.Parent = ShiftlockGui
 Button.BackgroundTransparency = 1
 Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Visible = false -- Se actualizará con base en el toggle
+Button.Visible = false
 
+local StateLabelFrame = Instance.new("Frame")
 StateLabelFrame.Parent = Button
 StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
 StateLabelFrame.BackgroundTransparency = 0.5
 StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 
+local StateLabel = Instance.new("TextLabel")
 StateLabel.Parent = StateLabelFrame
 StateLabel.Size = UDim2.new(1, 0, 1, 0)
 StateLabel.BackgroundTransparency = 1
@@ -36,6 +49,7 @@ StateLabel.TextColor3 = Color3.new(1, 1, 1)
 StateLabel.TextScaled = true
 StateLabel.Font = Enum.Font.SourceSansBold
 
+local Crosshair = Instance.new("TextLabel")
 Crosshair.Parent = ShiftlockGui
 Crosshair.Size = UDim2.new(0, 30, 0, 30)
 Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
@@ -45,21 +59,7 @@ Crosshair.TextScaled = true
 Crosshair.TextColor3 = Color3.new(1, 1, 1)
 Crosshair.Visible = false
 
--- Servicios
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local character = player.Character or player.CharacterAdded:Wait()
-local root = character:WaitForChild("HumanoidRootPart")
-local humanoid = character:WaitForChild("Humanoid")
-
-local isActive = false
-local cameraConnection = nil
-
+-- Funciones Shiftlock
 local function UpdateImage(state)
 	StateLabel.Text = state
 end
@@ -75,7 +75,6 @@ local function AnimateButtonPress()
 	local shrinkSize = Button.Size - UDim2.new(0.01, 0, 0.01, 0)
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = shrinkSize })
 	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = UDim2.new(0.0636, 0, 0.0661, 0) })
-
 	tweenShrink:Play()
 	tweenShrink.Completed:Connect(function()
 		tweenGrow:Play()
@@ -121,36 +120,31 @@ local function ShiftLockToggle()
 	end
 end
 
--- Reaparece personaje
 player.CharacterAdded:Connect(function(char)
 	character = char
-	root = character:WaitForChild("HumanoidRootPart")
 	humanoid = character:WaitForChild("Humanoid")
+	root = character:WaitForChild("HumanoidRootPart")
 	if isActive then
 		UpdateAutoRotate(false)
 	end
 end)
 
--- Botón táctil
 Button.MouseButton1Click:Connect(function()
 	if shiftlockEnabled then
 		ShiftLockToggle()
 	end
 end)
 
--- Tecla en PC
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
-	if not UserInputService.TouchEnabled and shiftlockEnabled then
-		if input.KeyCode == shiftlockKeybind then
-			ShiftLockToggle()
-		end
+	if not UserInputService.TouchEnabled and shiftlockEnabled and input.KeyCode == shiftlockKeybind then
+		ShiftLockToggle()
 	end
 end)
 
 UpdateImage("OFF")
 
--- Rayfield UI Toggle
+-- Toggle Shiftlock
 MainTab:CreateToggle({
 	Name = "Shiftlock Q para activar",
 	CurrentValue = false,
@@ -158,7 +152,6 @@ MainTab:CreateToggle({
 	Callback = function(Value)
 		shiftlockEnabled = Value
 		Button.Visible = shiftlockEnabled and UserInputService.TouchEnabled
-
 		if not shiftlockEnabled and isActive then
 			isActive = false
 			UpdateAutoRotate(true)
@@ -166,7 +159,6 @@ MainTab:CreateToggle({
 			Crosshair.Visible = false
 			UserInputService.MouseIconEnabled = true
 			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-
 			if cameraConnection then
 				cameraConnection:Disconnect()
 				cameraConnection = nil
@@ -175,156 +167,104 @@ MainTab:CreateToggle({
 	end
 })
 
-
-
 -- Caminar en el aire
-local humanoid = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")
-local character = game.Players.LocalPlayer.Character
 local isWalkingInAir = false
-local floorPart = nil  -- Variable para almacenar el piso gigante
-local heartbeatConnection = nil  -- Para almacenar la conexión Heartbeat
+local floorPart = nil
+local heartbeatConnection = nil
 
--- Función para detectar si el jugador está tocando el suelo
 local function isTouchingGround()
-    local ray = Ray.new(humanoid.RootPart.Position, Vector3.new(0, -5, 0))  -- Hacemos un raycast hacia abajo
-    local hitPart = workspace:FindPartOnRay(ray, character)  -- Comprobamos si tocamos algo
-    return hitPart and hitPart.CanCollide  -- Si tocamos algo con colisión, significa que estamos en el suelo
+	local ray = Ray.new(root.Position, Vector3.new(0, -5, 0))
+	local hitPart = workspace:FindPartOnRay(ray, character)
+	return hitPart and hitPart.CanCollide
 end
 
--- Función para crear el piso invisible
 local function createFloor()
-    -- Crear el piso invisible gigante debajo del jugador si no existe aún
-    if not floorPart then
-        floorPart = Instance.new("Part")
-        floorPart.Size = Vector3.new(50, 1, 50)  -- Un tamaño grande para el piso
-        floorPart.Anchored = true  -- Asegurarse de que esté fijo
-        floorPart.CanCollide = true  -- Activar colisiones para que el jugador pueda caminar sobre él
-        floorPart.Transparency = 1  -- Hacerlo invisible
-        floorPart.Parent = workspace  -- Añadirlo al espacio de trabajo
-    end
+	if not floorPart then
+		floorPart = Instance.new("Part")
+		floorPart.Size = Vector3.new(50, 1, 50)
+		floorPart.Anchored = true
+		floorPart.CanCollide = true
+		floorPart.Transparency = 1
+		floorPart.Parent = workspace
+	end
 end
 
--- Función para manejar el Respawn del jugador
-local function onPlayerRespawned()
-    humanoid = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")  -- Actualizar el humanoide
-    character = game.Players.LocalPlayer.Character  -- Actualizar el personaje
-end
-
--- Conexión para detectar el respawn del jugador
-game.Players.LocalPlayer.CharacterAdded:Connect(onPlayerRespawned)
-
--- Crear toggle en el MainTab
 MainTab:CreateToggle({
-    Name = "Caminar en el aire",
-    CurrentValue = isWalkingInAir,
-    Flag = "walkInAirToggle",
-    Callback = function(Value)
-        isWalkingInAir = Value
+	Name = "Caminar en el aire",
+	CurrentValue = isWalkingInAir,
+	Flag = "walkInAirToggle",
+	Callback = function(Value)
+		isWalkingInAir = Value
 
-        if isWalkingInAir then
-            -- Crear el piso invisible cuando se activa el toggle
-            createFloor()
-
-            -- Conectar la actualización constante de la posición del piso debajo del jugador
-            if not heartbeatConnection then
-                heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                    if isWalkingInAir and floorPart then
-                        -- Solo actualizamos la posición del piso si el jugador está en el aire
-                        if not isTouchingGround() then
-                            -- Posicionar el piso debajo del jugador (ajustamos la distancia)
-                            floorPart.Position = humanoid.RootPart.Position - Vector3.new(0, 3, 0)  -- Ajusta esta distancia si es necesario
-                        end
-                    end
-                end)
-            end
-        else
-            -- Eliminar el piso invisible cuando se desactiva el toggle
-            if floorPart then
-                floorPart:Destroy()  -- Eliminar el piso
-                floorPart = nil
-            end
-
-            -- Desconectar la función Heartbeat cuando el toggle se desactiva
-            if heartbeatConnection then
-                heartbeatConnection:Disconnect()  -- Detener la actualización del piso
-                heartbeatConnection = nil  -- Limpiar la conexión
-            end
-        end
-    end,
+		if isWalkingInAir then
+			createFloor()
+			if not heartbeatConnection then
+				heartbeatConnection = RunService.Heartbeat:Connect(function()
+					if isWalkingInAir and floorPart and not isTouchingGround() then
+						floorPart.Position = root.Position - Vector3.new(0, 3, 0)
+					end
+				end)
+			end
+		else
+			if floorPart then
+				floorPart:Destroy()
+				floorPart = nil
+			end
+			if heartbeatConnection then
+				heartbeatConnection:Disconnect()
+				heartbeatConnection = nil
+			end
+		end
+	end,
 })
 
-
-
-
-
-
----Sonidos 
-
-
-
-local SoundService = game:GetService("SoundService")
-local Players = game:GetService("Players")
-local VoiceChatService = game:GetService("VoiceChatService")
-local LocalPlayer = Players.LocalPlayer
-
+-- Mutear sonidos excepto voz
 local mutedSounds = {}
 local toggleActive = false
 
--- Función para identificar si un sonido es de voz
 local function isVoiceSound(sound)
-    if sound:IsDescendantOf(VoiceChatService) then
-        return true
-    end
-    if sound.Name:lower():find("voice") or sound.Name:lower():find("vc") then
-        return true
-    end
-    return false
+	if sound:IsDescendantOf(VoiceChatService) then return true end
+	local name = sound.Name:lower()
+	return name:find("voice") or name:find("vc")
 end
 
--- Mutear todos los sonidos excepto los de voz
 local function muteAllExceptVoice()
-    for _, sound in ipairs(game:GetDescendants()) do
-        if sound:IsA("Sound") and not isVoiceSound(sound) then
-            if sound.Playing and sound.Volume > 0 then
-                mutedSounds[sound] = sound.Volume
-                sound.Volume = 0
-            end
-        end
-    end
+	for _, sound in ipairs(game:GetDescendants()) do
+		if sound:IsA("Sound") and not isVoiceSound(sound) then
+			if sound.Playing and sound.Volume > 0 then
+				mutedSounds[sound] = sound.Volume
+				sound.Volume = 0
+			end
+		end
+	end
 end
 
--- Restaurar los sonidos mutados
 local function unmuteAll()
-    for sound, originalVolume in pairs(mutedSounds) do
-        if sound and sound.Parent then
-            sound.Volume = originalVolume
-        end
-    end
-    mutedSounds = {}
+	for sound, vol in pairs(mutedSounds) do
+		if sound and sound.Parent then
+			sound.Volume = vol
+		end
+	end
+	mutedSounds = {}
 end
 
--- Manejar sonidos nuevos creados después de activar el toggle
-local function handleNewSound(sound)
-    if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
-        mutedSounds[sound] = sound.Volume
-        sound.Volume = 0
-    end
-end
+game.DescendantAdded:Connect(function(sound)
+	if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
+		mutedSounds[sound] = sound.Volume
+		sound.Volume = 0
+	end
+end)
 
--- Conectar evento para nuevos sonidos
-game.DescendantAdded:Connect(handleNewSound)
-
--- Agregar Toggle al MainTab de Rayfield
 MainTab:CreateToggle({
-    Name = "Mutear sonidos(voz no)",
-    CurrentValue = false,
-    Flag = "MuteAudios",
-    Callback = function(Value)
-        toggleActive = Value
-        if Value then
-            muteAllExceptVoice()
-        else
-            unmuteAll()
-        end
-    end
+	Name = "Mutear sonidos (voz no)",
+	CurrentValue = false,
+	Flag = "MuteAudios",
+	Callback = function(Value)
+		toggleActive = Value
+		if Value then
+			muteAllExceptVoice()
+		else
+			unmuteAll()
+		end
+	end
 })
