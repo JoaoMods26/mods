@@ -2584,78 +2584,77 @@ JugadoresTab:CreateToggle({
         end
     end
 })
--- Botón para Sentarse de manera segura
-JugadoresTab:CreateButton({
-    Name = "Sentarse en la cabesa(puedes salir volando)",
-    Callback = function()
-        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-            local localChar = game.Players.LocalPlayer.Character
+
+
+
+
+
+
+
+local sitToggle = false
+local sitConnection
+local isSitting = false
+
+JugadoresTab:CreateToggle({
+    Name = "Sentarse en la cabesa",
+    Default = false,
+    Callback = function(state)
+        local localChar = game.Players.LocalPlayer.Character
+        local humanoid = localChar and localChar:FindFirstChildOfClass("Humanoid")
+
+        sitToggle = state
+
+        if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") and humanoid then
             local head = selectedPlayer.Character.Head
 
-            if not isSitting then
-                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
-                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                    humanoid.Sit = true
+            humanoid.Sit = true
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+            humanoid.JumpHeight = 0
 
-                    -- Posicionar al personaje en la cabeza del jugador seleccionado
-                    local sitPosition = head.Position + Vector3.new(0, 1, 0)
-                    localChar.HumanoidRootPart.CFrame = CFrame.new(sitPosition)
+            local voddyPosition = head.Position + Vector3.new(0, 1, 0)
+            localChar.HumanoidRootPart.CFrame = CFrame.new(voddyPosition)
 
-                    -- Anclar al personaje brevemente para evitar que se mueva o vuele
-                    localChar.HumanoidRootPart.Anchored = true
-                    wait(0.01)  -- Anclar por un pequeño tiempo
-                    localChar.HumanoidRootPart.Anchored = false
+            localChar.HumanoidRootPart.Anchored = true
+            wait(0.01)
+            localChar.HumanoidRootPart.Anchored = false
 
-                    -- Conectar un Heartbeat para mantener al personaje sentado en la cabeza del jugador
-                    sitConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-                            local headPos = selectedPlayer.Character.Head.Position
-                            localChar.HumanoidRootPart.CFrame = CFrame.new(headPos + Vector3.new(0, 1, 0))
-                        end
-                    end)
-
-                    isSitting = true
-                    Rayfield:Notify({
-                        Title = "Headsit Activado",
-                        Content = "Sentado sobre " .. selectedPlayer.Name,
-                        Duration = 3,
-                        Image = 4483362458
-                    })
+            sitConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
+                    local headPos = selectedPlayer.Character.Head.Position
+                    localChar.HumanoidRootPart.CFrame = CFrame.new(headPos + Vector3.new(0, 1, 0))
                 end
-            else
-                -- Anclar al jugador por 0.01 segundos antes de levantarse
-                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
-                    local originalPosition = localChar.HumanoidRootPart.Position
-                    -- Anclar durante 0.01 segundos
-                    localChar.HumanoidRootPart.Anchored = true
-                    wait(0.01)
-                    localChar.HumanoidRootPart.Anchored = false
-                    localChar.HumanoidRootPart.CFrame = CFrame.new(originalPosition)
-                    
-                    localChar:FindFirstChildOfClass("Humanoid").Sit = false
-                end
-                if sitConnection then
-                    sitConnection:Disconnect()
-                    sitConnection = nil
-                end
-                isSitting = false
-                Rayfield:Notify({
-                    Title = "Headsit Desactivado",
-                    Content = "Te has levantado y la posición ha sido restaurada.",
-                    Duration = 3,
-                    Image = 4483362458
-                })
+            end)
+
+            isSitting = true
+        elseif not sitToggle and humanoid then
+            if sitConnection then
+                sitConnection:Disconnect()
+                sitConnection = nil
             end
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Jugador no válido o sin cabeza.",
-                Duration = 3,
-                Image = 4483362458
-            })
+
+            local originalPosition = localChar.HumanoidRootPart.Position
+            localChar.HumanoidRootPart.Anchored = true
+            wait(0.01)
+            localChar.HumanoidRootPart.Anchored = false
+            localChar.HumanoidRootPart.CFrame = CFrame.new(originalPosition)
+
+            humanoid.Sit = false
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+            humanoid.JumpHeight = 7.2
+
+            isSitting = false
         end
     end
 })
+
+
+
+
+
+
+
 
 
 
