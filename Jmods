@@ -1994,7 +1994,6 @@ local doggyCurrentDistance = 2.7
 local doggyTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local pataEnabled = false
 local pataConnection
 local pataAnimId = 18526288497
@@ -2005,7 +2004,6 @@ local pataCurrentDistance = 3
 local pataTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local cariEnabled = false
 local cariConnection
 local cariAnimId = 15679624464
@@ -2016,7 +2014,6 @@ local cariCurrentDistance = 2.7
 local cariTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local wataEnabled = false
 local wataConnection
 local wataAnimId = 12992262118
@@ -2227,17 +2224,7 @@ local function findPlayerByPartialName(name)
     end
 end
 
--- Función para encontrar jugador por nombre parcial o DisplayName
-local function findPlayerByPartialName(name)
-    name = name:lower()
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        local usernameMatch = player.Name:lower():sub(1, #name) == name
-        local displaynameMatch = player.DisplayName:lower():sub(1, #name) == name
-        if usernameMatch or displaynameMatch then
-            return player
-        end
-    end
-end
+
 
 -- Función para controlar la colisión
 local function SetNoCollision(char, state)
@@ -2840,7 +2827,6 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
 
 
 
