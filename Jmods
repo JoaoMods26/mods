@@ -21,13 +21,13 @@ local Window = Rayfield:CreateWindow({
     },
     KeySystem = false,
     KeySettings = {
-        Title = "Jmods",
-        Subtitle = "Key",
-        Note = "la key la tiene joao (POSIBLE MANTENIMIENTO)",
+        Title = "Jmods Universal",
+        Subtitle = "Mantenimiento",
+Note = "Hasta mañana. Más info en mi Discord: discord.gg/4bzTyQBBnt",
         FileName = "key",
         SaveKey = false,
         GrabKeyFromSite = false,
-        Key = {"keyjoao"}
+        Key = {"keymanxd"}
     }
 })
 
