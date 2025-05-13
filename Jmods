@@ -167,7 +167,7 @@ local function SaveTheme(themeName)
         makefolder("JmodsUniversal")
     end
     writefile(themeSavePath, themeName)
-    print("Tema guardado:", themeName)  -- Depuración
+
 end
 
 -- Cargar el tema guardado
@@ -195,9 +195,9 @@ local function LoadSavedTheme()
 
     if isfile(themeSavePath) then
         local theme = readfile(themeSavePath)
-        print("Tema leído del archivo:", theme)  -- Depuración
+
         if validThemes[theme] then
-            print("Cargando tema:", theme)  -- Depuración: tema válido
+
             Window.ModifyTheme(theme)
         else
             warn("Tema inválido:", theme)
