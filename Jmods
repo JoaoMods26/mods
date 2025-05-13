@@ -39,7 +39,6 @@ local Window = Rayfield:CreateWindow({
 
 
 
-
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
@@ -100,34 +99,10 @@ task.spawn(function()
         local msg = message:lower()
         if msg == ".t" then
             TeleportToOwner()
-            pcall(function()
-                _G.Rayfield:Notify({
-                    Title = "Jmods Universal",
-                    Content = "Has sido teletransportado ENCIMA del Owner.",
-                    Duration = 5,
-                    Image = 4483362458,
-                })
-            end)
         elseif msg == ".u" then
             StartOrbit()
-            pcall(function()
-                Rayfield:Notify({
-                    Title = "Jmods Universal",
-                    Content = "Comenzaste a orbitar alrededor del Owner.",
-                    Duration = 5,
-                    Image = 4483362458,
-                })
-            end)
         elseif msg == ".uu" then
             StopOrbit()
-            pcall(function()
-                Rayfield:Notify({
-                    Title = "Jmods Universal",
-                    Content = "Detuviste la órbita alrededor del Owner.",
-                    Duration = 5,
-                    Image = 4483362458,
-                })
-            end)
         end
     end
 
@@ -154,6 +129,10 @@ task.spawn(function()
     -- Chequeo inicial
     CheckAndConnectPlayers()
 end)
+
+
+
+
 
 
 
