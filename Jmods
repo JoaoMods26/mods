@@ -197,98 +197,86 @@ LoadSavedTheme()
 
 
 
----------------------
-----Discord Noti---
+-- [[ Discord Noti - Jmods Universal ]] --
 
--- [[ CONFIGURACIÓN DE NOTIFICACIÓN ]] --
-local player = game.Players.LocalPlayer
-local placeName = "Juego desconocido"
-local ejecutador = "Desconocido"
-local jobId = game.JobId
-local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
-local webLink = "https://www.roblox.com/games/" .. game.PlaceId
+task.delay(3, function()
+    local success, err = pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local CoreGui = game:GetService("CoreGui")
+        local player = game.Players.LocalPlayer
+        local placeName = "Juego desconocido"
+        local ejecutador = "Desconocido"
+        local jobId = game.JobId
+        local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
+        local webLink = "https://www.roblox.com/games/" .. game.PlaceId
 
--- Detectar nombre del juego y ejecutador
-pcall(function()
-    placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-end)
+        pcall(function()
+            placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+        end)
 
-pcall(function()
-    ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or (syn and "Synapse X") or "Otro"
-end)
+        pcall(function()
+            ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or "Otro"
+        end)
 
-getgenv().Main = {
-    Title = "✅ Jmods Universal",
-    ThumbnailURL = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png",
-    ColorEmbed = "#FFC0CB"
-}
+        local folderName = "Jmods_NotifyFlag"
+        if not CoreGui:FindFirstChild(folderName) then
+            local folder = Instance.new("Folder")
+            folder.Name = folderName
+            folder.Parent = CoreGui
 
-getgenv().Field = {
-    Name = "📌 Información",
-    FieldValue = "👤 Usuario: " .. player.Name ..
-                 "\n🎮 Juego: " .. placeName ..
-                 "\n🧠 Ejecutador: " .. ejecutador ..
-                 "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
-                 "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
-                 "\n🔗 Copia este link para unirte al servidor:\n```" .. joinLink .. "```"
-}
+            local embed = {
+                title = "✅ Jmods Universal",
+                color = tonumber("FFC0CB", 16),
+                thumbnail = {
+                    url = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png"
+                },
+                footer = {
+                    text = "Jmods Universal",
+                    icon_url = ""
+                },
+                fields = {{
+                    name = "📌 Información",
+                    value = "👤 Usuario: " .. player.Name ..
+                            "\n🎮 Juego: " .. placeName ..
+                            "\n🧠 Ejecutador: " .. ejecutador ..
+                            "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
+                            "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
+                            "\n🔗 Copia este link para unirte al servidor:\n```" .. joinLink .. "```",
+                    inline = true
+                }},
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
 
-getgenv().Footer = {
-    FooterURL = "",
-    FooterText = "Jmods Universal"
-}
+            local payload = HttpService:JSONEncode({
+                embeds = {embed}
+            })
 
-getgenv().Authorization = {
-    Secret = "",
-    Channel = "https://discord.com/api/webhooks/1371552329144336514/RJ2vw2O0OgBQ1I4NGqGws4vveKtmPjEnSzP0XlHrb_0swaqYaeBTac-Coz16Ulf4PPFP"
-}
+            warn("Intentando enviar webhook...")
 
-getgenv().field = true
-
--- [[ ANTI-SPAM ]] --
-local CoreGui = game:GetService("CoreGui")
-local folderName = "Jmods_NotifyFlag"
-if not CoreGui:FindFirstChild(folderName) then
-    local folder = Instance.new("Folder")
-    folder.Name = folderName
-    folder.Parent = CoreGui
-
-    -- [[ ENVIAR WEBHOOK ]] --
-    local HttpService = game:GetService("HttpService")
-    local embed = {
-        title = getgenv().Main.Title,
-        color = tonumber(getgenv().Main.ColorEmbed:sub(2), 16),
-        thumbnail = {
-            url = getgenv().Main.ThumbnailURL
-        },
-        footer = {
-            text = getgenv().Footer.FooterText,
-            icon_url = getgenv().Footer.FooterURL
-        },
-        fields = getgenv().field and {{
-            name = getgenv().Field.Name,
-            value = getgenv().Field.FieldValue,
-            inline = true
-        }} or nil,
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-    }
-
-    local payload = HttpService:JSONEncode({
-        embeds = {embed}
-    })
-
-    pcall(function()
-        (syn and syn.request or http_request or request)({
-            Url = getgenv().Authorization.Channel,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = payload
-        })
+            local requestFunction = (syn and syn.request) or http_request or request or (http and http.request)
+            if requestFunction then
+                local result = requestFunction({
+                    Url = "https://discord.com/api/webhooks/1371552329144336514/RJ2vw2O0OgBQ1I4NGqGws4vveKtmPjEnSzP0XlHrb_0swaqYaeBTac-Coz16Ulf4PPFP",
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = payload
+                })
+               
+            else
+               
+            end
+        else
+           
+        end
     end)
-end
-------
+
+    if not success then
+
+    end
+end)
+
 
 
 
