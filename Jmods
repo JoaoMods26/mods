@@ -216,6 +216,8 @@ LoadSavedTheme()
 
 
 
+
+
 ---------------------
 ----Discord Noti---
 
@@ -223,6 +225,9 @@ LoadSavedTheme()
 local player = game.Players.LocalPlayer
 local placeName = "Juego desconocido"
 local ejecutador = "Desconocido"
+local jobId = game.JobId
+local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
+local webLink = "https://www.roblox.com/games/" .. game.PlaceId
 
 -- Detectar nombre del juego y ejecutador
 pcall(function()
@@ -235,7 +240,7 @@ end)
 
 getgenv().Main = {
     Title = "✅ Jmods Universal",
-    ThumbnailURL = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png", -- Imagen del juego
+    ThumbnailURL = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png",
     ColorEmbed = "#FFC0CB"
 }
 
@@ -244,12 +249,14 @@ getgenv().Field = {
     FieldValue = "👤 Usuario: " .. player.Name ..
                  "\n🎮 Juego: " .. placeName ..
                  "\n🧠 Ejecutador: " .. ejecutador ..
-                 "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S")
+                 "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
+                 "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
+                 "\n🔗 Copia este link para unirte al servidor:\n```" .. joinLink .. "```"
 }
 
 getgenv().Footer = {
-    FooterURL = "", -- Puedes poner un ícono aquí si deseas
-    FooterText = "Jmods Universal Notifier"
+    FooterURL = "",
+    FooterText = "Jmods Universal"
 }
 
 getgenv().Authorization = {
@@ -279,11 +286,11 @@ if not CoreGui:FindFirstChild(folderName) then
             text = getgenv().Footer.FooterText,
             icon_url = getgenv().Footer.FooterURL
         },
-        fields = getgenv().field and { {
+        fields = getgenv().field and {{
             name = getgenv().Field.Name,
             value = getgenv().Field.FieldValue,
             inline = true
-        } } or nil,
+        }} or nil,
         timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
     }
 
@@ -292,17 +299,20 @@ if not CoreGui:FindFirstChild(folderName) then
     })
 
     pcall(function()
-        (syn and syn.request or http_request or request)( {
+        (syn and syn.request or http_request or request)({
             Url = getgenv().Authorization.Channel,
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json"
             },
             Body = payload
-        } )
+        })
     end)
 end
----
+------
+
+
+
 
 
 
