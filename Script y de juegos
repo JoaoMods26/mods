@@ -23,6 +23,17 @@ loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
    end,
 })
 
+
+ Button3 = TPTab:CreateButton({
+   Name = "FLing(Kawaii op)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-FREAKY-FLING/main/kawaii_freaky_fling.lua",true))()
+end)
+   end,
+})
+
+
  Button3 = TPTab:CreateButton({
    Name = "AFEM (Animaciones R15)",
    Callback = function()
@@ -87,6 +98,17 @@ loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660
    end,
 })
 
+
+ Button6 = TPTab:CreateButton({
+   Name = "TALENTLESS (Auto piano)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/TALENTLESS/main/TALENTLESS", true))()
+end)
+   end,
+})
+
+
  Button6 = TPTab:CreateButton({
    Name = "HitBox Expander Gui",
    Callback = function()
@@ -98,6 +120,16 @@ Button6 = TPTab:CreateButton({
    Name = "WISL hub",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
+   end,
+})
+
+
+ Button3 = TPTab:CreateButton({
+   Name = "Black hole(Kawaii op)",
+   Callback = function()
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-AURA/main/kawaii_aura.lua", true))()
+end)
    end,
 })
 
