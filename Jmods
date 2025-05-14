@@ -1660,7 +1660,18 @@ MainTab:CreateSlider({
 })
 
 
-
+-- Slider de velocidad
+MainTab:CreateSlider({
+	Name = "Velocidad de camara",
+	Range = {0.1, 10},
+	Increment = 0.1,
+	Suffix = "speed",
+	CurrentValue =  speed,
+	Flag = "speed",
+	Callback = function(Value)
+		 speed  = Value
+	end,
+})
 
 
 
