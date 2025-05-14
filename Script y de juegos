@@ -141,6 +141,14 @@ loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
    end,
 })
 
+ Button6 = TPTab:CreateButton({
+   Name = "Shaders pshade",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/randomstring0/pshade-ultimate/refs/heads/main/src/cd.lua'))()
+   end,
+})
+
+
 Button6 = TPTab:CreateButton({
    Name = "Subir FPS",
    Callback = function()
