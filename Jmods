@@ -2482,32 +2482,36 @@ JugadoresTab:CreateInput({
 })
 
 
--- Espectar
-JugadoresTab:CreateButton({
+
+local espectando = false
+local cameraSubjectBackup
+
+JugadoresTab:CreateToggle({
     Name = "Espectar",
-    Callback = function()
-        if selectedPlayer then
-            game.Workspace.CurrentCamera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+    CurrentValue = false,
+    Callback = function(Value)
+        local camera = workspace.CurrentCamera
+        local localPlayer = game.Players.LocalPlayer
+
+        if Value then
+            if selectedPlayer and selectedPlayer.Character then
+                cameraSubjectBackup = camera.CameraSubject
+                camera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                espectando = true
+            end
+        else
+            if localPlayer and localPlayer.Character then
+                camera.CameraSubject = localPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                espectando = false
+
+            end
         end
     end
 })
 
--- Restaurar vista
-JugadoresTab:CreateButton({
-    Name = "Restaurar Vista",
-    Callback = function()
-        local player = game.Players.LocalPlayer
-        if player and player.Character then
-            workspace.CurrentCamera.CameraSubject = player.Character:FindFirstChildWhichIsA("Humanoid")
-            Rayfield:Notify({
-                Title = "Vista Restaurada",
-                Content = "Has vuelto a la vista normal.",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end
-})
+
+
+
 
 -- Teleportarse
 JugadoresTab:CreateButton({
@@ -2602,12 +2606,7 @@ JugadoresTab:CreateToggle({
                 end
             end
 
-            Rayfield:Notify({
-                Title = "Órbita Activada",
-                Content = "Orbitando a " .. selectedPlayer.Name,
-                Duration = 3,
-                Image = 4483362458
-            })
+
         elseif not orbitEnabled then
             local localChar = game.Players.LocalPlayer.Character
             if localChar and localChar:FindFirstChild("HumanoidRootPart") then
@@ -2618,12 +2617,7 @@ JugadoresTab:CreateToggle({
                 RestoreCollisions(localChar)
             end
 
-            Rayfield:Notify({
-                Title = "Órbita Desactivada",
-                Content = "Has dejado de orbitar.",
-                Duration = 3,
-                Image = 4483362458
-            })
+
         end
     end
 })
@@ -2869,6 +2863,8 @@ JugadoresTab:CreateSlider({
         end
     end
 })
+
+
 
 
 
