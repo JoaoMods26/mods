@@ -19,7 +19,7 @@ local Window = Rayfield:CreateWindow({
         Invite = "4gGUz2tk",
         RememberJoins = false
     },
-    KeySystem = true,
+    KeySystem = false,
     KeySettings = {
         Title = "Jmods Universal",
         Subtitle = "Mantenimiento",
