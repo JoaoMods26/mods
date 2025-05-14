@@ -2723,7 +2723,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Doggy
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = doggySpeed,
@@ -2767,7 +2767,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Pata
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = pataSpeed,
@@ -2808,7 +2808,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Cari
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = cariSpeed,
@@ -2850,7 +2850,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Wata
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = wataSpeed,
@@ -2916,10 +2916,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 
 
 
-
-
-
-----Aniamciones R6
 
 
 
