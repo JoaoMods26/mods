@@ -298,7 +298,7 @@ task.delay(0.3, function()
                 },
                 fields = { {
                     name = "📌 Información",
-                    value = "👤 Usuario: " .. player.Name ..
+                    value = "👤 Usuario: " .. player.Name .. " @" .. player.DisplayName .. "" ..
                             "\n🎮 Juego: " .. placeName ..
                             "\n🧠 Ejecutador: " .. ejecutador ..
                             "\n🆔 WHID: `" .. whid .. "`" ..
