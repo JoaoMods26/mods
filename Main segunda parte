@@ -272,6 +272,52 @@ MainTab:CreateToggle({
 
 
 
+---Fullbright
+
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local originalSettings = {}
+local connection
+
+MainTab:CreateToggle({
+	Name = "Fullbright",
+	Flag = "Fullbright",
+	CurrentValue = false,
+	Callback = function(enabled)
+		if enabled then
+			-- Guardar valores originales
+			originalSettings.Brightness = Lighting.Brightness
+			originalSettings.ClockTime = Lighting.ClockTime
+			originalSettings.Ambient = Lighting.Ambient
+			originalSettings.OutdoorAmbient = Lighting.OutdoorAmbient
+			originalSettings.GlobalShadows = Lighting.GlobalShadows
+
+			-- Conexión para forzar iluminación
+			if not connection then
+				connection = RunService.RenderStepped:Connect(function()
+					Lighting.Brightness = 1.5
+					Lighting.ClockTime = 12
+					Lighting.Ambient = Color3.new(1, 1, 1)
+					Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+					Lighting.GlobalShadows = false
+				end)
+			end
+		else
+			-- Restaurar valores
+			if connection then
+				connection:Disconnect()
+				connection = nil
+			end
+			for prop, value in pairs(originalSettings) do
+				Lighting[prop] = value
+			end
+		end
+	end
+})
+
+
+
+
 
 
 
