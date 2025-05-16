@@ -318,6 +318,95 @@ MainTab:CreateToggle({
 
 
 
+-- Servicios y variables necesarias
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local unlockCameraConnection
+local cameraUnlocked = true
+local originalCameraSettings = {}
+
+-- Función para forzar el control de cámara
+local function enableCameraControl()
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid")
+
+	-- Guardar estado original una sola vez
+	if not originalCameraSettings.saved then
+		originalCameraSettings.CameraType = Camera.CameraType
+		originalCameraSettings.CameraSubject = Camera.CameraSubject
+		originalCameraSettings.CameraMode = LocalPlayer.CameraMode
+		originalCameraSettings.MaxZoom = LocalPlayer.CameraMaxZoomDistance
+		originalCameraSettings.MinZoom = LocalPlayer.CameraMinZoomDistance
+		originalCameraSettings.saved = true
+	end
+
+	-- Desconectar si ya había una conexión previa
+	if unlockCameraConnection then
+		unlockCameraConnection:Disconnect()
+	end
+
+	unlockCameraConnection = RunService.RenderStepped:Connect(function()
+		if not cameraUnlocked then return end
+
+		if Camera.CameraType ~= Enum.CameraType.Custom then
+			Camera.CameraType = Enum.CameraType.Custom
+		end
+
+		if Camera.CameraSubject ~= humanoid then
+			Camera.CameraSubject = humanoid
+		end
+
+		LocalPlayer.CameraMode = Enum.CameraMode.Classic
+		LocalPlayer.CameraMaxZoomDistance = 128
+		LocalPlayer.CameraMinZoomDistance = 0.5
+	end)
+end
+
+-- Reaplicar cuando el personaje reaparece
+LocalPlayer.CharacterAdded:Connect(function()
+	if cameraUnlocked then
+		enableCameraControl()
+	end
+end)
+
+-- Inicializar si ya hay personaje
+if LocalPlayer.Character then
+	enableCameraControl()
+end
+
+-- TOGGLE: Unlock Camera
+MainTab:CreateToggle({
+	Name = "Desbloquear Camara",
+	Flag = "unlockCam",
+	CurrentValue = false,
+	Callback = function(enabled)
+		cameraUnlocked = enabled
+
+		if not enabled then
+			-- Desconectar render loop
+			if unlockCameraConnection then
+				unlockCameraConnection:Disconnect()
+				unlockCameraConnection = nil
+			end
+
+			-- Restaurar valores originales si estaban guardados
+			if originalCameraSettings.saved then
+				Camera.CameraType = originalCameraSettings.CameraType
+				Camera.CameraSubject = originalCameraSettings.CameraSubject
+				LocalPlayer.CameraMode = originalCameraSettings.CameraMode
+				LocalPlayer.CameraMaxZoomDistance = originalCameraSettings.MaxZoom
+				LocalPlayer.CameraMinZoomDistance = originalCameraSettings.MinZoom
+			end
+		else
+			enableCameraControl()
+		end
+	end
+})
+
+
 
 
 
