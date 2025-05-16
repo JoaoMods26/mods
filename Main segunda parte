@@ -407,6 +407,77 @@ MainTab:CreateToggle({
 })
 
 
+-- Asegúrate de que estas variables están definidas
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Variables de control
+local boostEnabled = false
+local boostStrength = 100
+local baseWalkSpeed = 16
+local baseJumpPower = 50
+local originalStats = {}
+
+-- Función para aplicar boost
+local function applyBoost()
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+	if humanoid then
+		-- Guardar valores originales una vez
+		if not originalStats.saved then
+			originalStats.WalkSpeed = humanoid.WalkSpeed
+			originalStats.JumpPower = humanoid.JumpPower
+			originalStats.saved = true
+		end
+
+		humanoid.UseJumpPower = true
+		local speedMultiplier = (boostStrength * 0.1) / 100
+		local jumpMultiplier = (boostStrength * 0.4) / 100
+		humanoid.WalkSpeed = baseWalkSpeed * (1 + speedMultiplier)
+		humanoid.JumpPower = baseJumpPower * (1 + jumpMultiplier)
+	end
+end
+
+-- Restaurar valores originales
+local function restoreStats()
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+	if humanoid and originalStats.saved then
+		humanoid.WalkSpeed = originalStats.WalkSpeed
+		humanoid.JumpPower = originalStats.JumpPower
+	end
+end
+
+-- Toggle en MainTab
+MainTab:CreateToggle({
+	Name = "Salto y Velocidad Indetectable",
+	Flag = "movementBoost",
+	CurrentValue = false,
+	Callback = function(value)
+		boostEnabled = value
+		if boostEnabled then
+			applyBoost()
+		else
+			restoreStats()
+		end
+	end
+})
+
+-- Slider en MainTab
+MainTab:CreateSlider({
+	Name = "Aumento Velocidad Indetectable",
+	Flag = "boostStrength",
+	Range = {0, 100},
+	Increment = 5,
+	CurrentValue = boostStrength,
+	Suffix = "+",
+	Callback = function(value)
+		boostStrength = value
+		if boostEnabled then
+			applyBoost()
+		end
+	end
+})
 
 
 
