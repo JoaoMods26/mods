@@ -268,3 +268,188 @@ MainTab:CreateToggle({
 		end
 	end
 })
+
+
+
+
+
+
+
+
+
+---No funcional pero puesto
+
+local v35 = false;
+local v36;
+local function v37()
+	local v92 = 0 - 0 ;
+	local v93;
+	local v94;
+	while true do
+		if (v92 == (0 + 0)) then
+			v93 = v14.Character or v14.CharacterAdded:Wait() ;
+			v94 = v93:WaitForChild("Humanoid");
+			v92 = 1481 - (641 + 839) ;
+		end
+		if (v92 == (914 - (910 + 3))) then
+			v36 = v12.RenderStepped:Connect(function()
+				if  not v35 then
+					return;
+				end
+				if (v13.CameraType ~= Enum.CameraType.Custom) then
+					v13.CameraType = Enum.CameraType.Custom;
+				end
+				if (v13.CameraSubject ~= v94) then
+					v13.CameraSubject = v94;
+				end
+				v14.CameraMode = Enum.CameraMode.Classic;
+				v14.CameraMaxZoomDistance = 128;
+				v14.CameraMinZoomDistance = 0.5;
+			end);
+			break;
+		end
+	end
+end
+if v14.Character then
+	v37();
+else
+	local v230 = 0;
+	while true do
+		if (v230 == (0 - 0)) then
+			v14.CharacterAdded:Wait();
+			v37();
+			break;
+		end
+	end
+end
+MainTab:CreateToggle({
+	Name = "Unlock Camera",
+	Flag = "unlockCam",
+	CurrentValue = true,
+	Callback = function(v95)
+		v35 = v95;
+		if ( not v95 and v36) then
+			v36:Disconnect();
+			v36 = nil;
+		elseif (v95 and  not v36) then
+			v37();
+		end
+	end
+});
+local v38 = {};
+local v39 = false;
+local v40;
+MainTab:CreateToggle({
+	Name = "Fullbright",
+	Flag = "Fullbright",
+	CurrentValue = false,
+	Callback = function(v96)
+		local v97 = 0;
+		while true do
+			if (v97 == (1684 - (1466 + 218))) then
+				v39 = v96;
+				if v96 then
+					local v345 = 0;
+					while true do
+						if (v345 == (1 + 0)) then
+							v38.Brightness = v18.Brightness;
+							v38.ClockTime = v18.ClockTime;
+							v345 = 2;
+						end
+						if (v345 == (1148 - (556 + 592))) then
+							v38.Ambient = v18.Ambient;
+							v38.OutdoorAmbient = v18.OutdoorAmbient;
+							v345 = 1 + 0 ;
+						end
+						if (v345 == (810 - (329 + 479))) then
+							v38.GlobalShadows = v18.GlobalShadows;
+							if  not v40 then
+								v40 = v12.RenderStepped:Connect(function()
+									v18.Ambient = Color3.new(855 - (174 + 680) , 3 - 2 , 1 - 0 );
+									v18.OutdoorAmbient = Color3.new(1 + 0 , 740 - (396 + 343) , 1 + 0 );
+									v18.Brightness = 1.5;
+									v18.ClockTime = 1491 - (29 + 1448) ;
+									v18.GlobalShadows = false;
+								end);
+							end
+							break;
+						end
+					end
+				else
+					if v40 then
+						local v420 = 1389 - (135 + 1254) ;
+						while true do
+							if (v420 == (0 - 0)) then
+								v40:Disconnect();
+								v40 = nil;
+								break;
+							end
+						end
+					end
+					for v394, v395 in pairs(v38) do
+						v18[v394] = v395;
+					end
+				end
+				break;
+			end
+		end
+	end
+});
+MainTab:CreateToggle({
+	Name = "No Fog",
+	Flag = "noFog",
+	CurrentValue = false,
+	Callback = function(v98)
+		local v99 = 0 - 0 ;
+		local v100;
+		while true do
+			if (v99 == 0) then
+				v100 = game:GetService("Lighting");
+				if v98 then
+					v100.FogEnd = 10000001527 - (389 + 1138) ;
+					v100.FogStart = (10000000574 - (102 + 472)) - (1 + 0) ;
+					local v348 = v100:FindFirstChildOfClass("Atmosphere");
+					if v348 then
+						local v421 = 0 + 0 ;
+						while true do
+							if (v421 == (0 + 0)) then
+								v348.Density = 0;
+								v348.Haze = 0;
+								break;
+							end
+						end
+					end
+				else
+					v100.FogEnd = 2545 - (320 + 1225) ;
+					v100.FogStart = 0 - 0 ;
+					local v351 = v100:FindFirstChildOfClass("Atmosphere");
+					if v351 then
+						local v422 = 0 + 0 ;
+						while true do
+							if (v422 == 0) then
+								v351.Density = 1464.3 - (157 + 1307) ;
+								v351.Haze = 1860 - (821 + 1038) ;
+								break;
+							end
+						end
+					end
+				end
+				break;
+			end
+		end
+	end
+});
+MainTab:CreateSlider({
+	Name = "Camera FOV",
+	Flag = "camFOV",
+	Range = {
+		40,
+		14 + 106
+	},
+	Increment = 1 - 0 ,
+	Suffix = "°",
+	CurrentValue = workspace.CurrentCamera.FieldOfView,
+	Callback = function(v101)
+		workspace.CurrentCamera.FieldOfView = v101;
+	end
+});
