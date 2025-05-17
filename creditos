@@ -43,7 +43,7 @@ CreditosTab:CreateSection("Colaboradores")
 
 CreditosTab:CreateParagraph({
     Title = "INFINITYHACK",
-    Content = "Jefe de los enanos albinos"
+    Content = "Jefe de los enanos albinos 🧑‍🦲"
 })
 
 
