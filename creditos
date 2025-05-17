@@ -22,6 +22,7 @@ CreditosTab:CreateButton({
 -- Testers
 CreditosTab:CreateSection("Testers")
 
+
 CreditosTab:CreateParagraph({
     Title = "erjazzy",
     Content = "chupen pico"
@@ -39,6 +40,13 @@ CreditosTab:CreateParagraph({
 
 -- Colaboradores
 CreditosTab:CreateSection("Colaboradores")
+
+CreditosTab:CreateParagraph({
+    Title = "INFINITYHACK",
+    Content = "Jefe de los enanos albinos"
+})
+
+
 
 CreditosTab:CreateParagraph({
     Title = "HolaCapo_94",
