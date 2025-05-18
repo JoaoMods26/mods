@@ -3,7 +3,7 @@ _G.Rayfield = Rayfield
 -- Crear ventana
 local Window = Rayfield:CreateWindow({
     Name = "Jmods Universal",
-    Icon = 85360702031139,
+    Icon = 127271155083726,
     LoadingTitle = "Jmods Universal",
     LoadingSubtitle = "joao_mods",
     Theme = "Bloom",
