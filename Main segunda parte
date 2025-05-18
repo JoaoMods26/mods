@@ -483,15 +483,28 @@ MainTab:CreateSlider({
 
 
 
+
+
+
+-----
+
+
+
+
+
+
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
 local antiFlingEnabled = false
 local characterConnections = {}
+local collisionLoop
 
 local function SetNoCollision(character)
 	for _, item in pairs(character:GetDescendants()) do
-		if item:IsA("BasePart") then
+		if item:IsA("BasePart") and item.CanCollide then
 			item.CanCollide = false
 		end
 	end
@@ -501,7 +514,7 @@ local function OnCharacterAdded(player, character)
 	if not antiFlingEnabled or player == LocalPlayer then return end
 	SetNoCollision(character)
 
-	-- Escuchar si se agregan nuevas partes al personaje después
+	-- Nuevas partes
 	local conn = character.DescendantAdded:Connect(function(desc)
 		if desc:IsA("BasePart") then
 			desc.CanCollide = false
@@ -512,33 +525,53 @@ local function OnCharacterAdded(player, character)
 end
 
 local function EnableAntiFling()
+	-- Inicial
 	for _, player in pairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer then
 			if player.Character then
 				OnCharacterAdded(player, player.Character)
 			end
-			characterConnections[player] = player.CharacterAdded:Connect(function(character)
-				OnCharacterAdded(player, character)
+			characterConnections[player] = player.CharacterAdded:Connect(function(char)
+				OnCharacterAdded(player, char)
 			end)
 		end
 	end
 
-	-- Manejar nuevos jugadores que se unan después
+	-- Nuevos jugadores
 	characterConnections["_PlayerAdded"] = Players.PlayerAdded:Connect(function(player)
 		if player == LocalPlayer then return end
-		characterConnections[player] = player.CharacterAdded:Connect(function(character)
-			OnCharacterAdded(player, character)
+		characterConnections[player] = player.CharacterAdded:Connect(function(char)
+			OnCharacterAdded(player, char)
 		end)
+	end)
+
+	-- Loop seguro cada 0.25s para mantener colisión desactivada
+	local timer = 0
+	collisionLoop = RunService.Stepped:Connect(function(_, dt)
+		timer += dt
+		if timer >= 0.25 then
+			timer = 0
+			for _, player in pairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer and player.Character then
+					SetNoCollision(player.Character)
+				end
+			end
+		end
 	end)
 end
 
 local function DisableAntiFling()
-	for player, conn in pairs(characterConnections) do
+	for _, conn in pairs(characterConnections) do
 		if typeof(conn) == "RBXScriptConnection" then
 			conn:Disconnect()
 		end
 	end
 	characterConnections = {}
+
+	if collisionLoop then
+		collisionLoop:Disconnect()
+		collisionLoop = nil
+	end
 
 	-- Restaurar colisión
 	for _, player in pairs(Players:GetPlayers()) do
@@ -564,5 +597,6 @@ MainTab:CreateToggle({
 		end
 	end,
 })
+
 
 
