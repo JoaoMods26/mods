@@ -606,7 +606,7 @@ MainTab:CreateToggle({
 
 MainTab:CreateSlider({
 	Name = "Altura del Salto",
-	Range = {0.01, 4},
+	Range = {0.01, 7},
 	Increment = 0.01,
 	Suffix = " altura",
 	CurrentValue = currentJumpHeight,
