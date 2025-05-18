@@ -1,4 +1,4 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/RayfMODJmods'))()
 _G.Rayfield = Rayfield
 -- Crear ventana
 local Window = Rayfield:CreateWindow({
