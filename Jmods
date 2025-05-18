@@ -630,12 +630,6 @@ Button = MainTab:CreateButton({
        -- Toggles 
        _G.infinjump = not _G.infinjump
 
-       -- Notificación
-       game.StarterGui:SetCore("SendNotification", {
-           Title = "jmods",
-           Text = _G.infinjump and "Salto infinito Activado!" or "Salto infinito Desactivado!",
-           Duration = 5;
-       })
 
        if _G.infinJumpStarted == nil then
            _G.infinJumpStarted = true
