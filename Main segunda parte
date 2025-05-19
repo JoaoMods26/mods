@@ -318,6 +318,7 @@ MainTab:CreateToggle({
 
 
 
+
 -- Servicios y variables necesarias
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -325,7 +326,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local unlockCameraConnection
-local cameraUnlocked = true
+local cameraUnlocked = false -- INICIALMENTE FALSO
 local originalCameraSettings = {}
 
 -- Función para forzar el control de cámara
@@ -365,18 +366,6 @@ local function enableCameraControl()
 	end)
 end
 
--- Reaplicar cuando el personaje reaparece
-LocalPlayer.CharacterAdded:Connect(function()
-	if cameraUnlocked then
-		enableCameraControl()
-	end
-end)
-
--- Inicializar si ya hay personaje
-if LocalPlayer.Character then
-	enableCameraControl()
-end
-
 -- TOGGLE: Unlock Camera
 MainTab:CreateToggle({
 	Name = "Desbloquear Camara",
@@ -385,7 +374,9 @@ MainTab:CreateToggle({
 	Callback = function(enabled)
 		cameraUnlocked = enabled
 
-		if not enabled then
+		if enabled then
+			enableCameraControl()
+		else
 			-- Desconectar render loop
 			if unlockCameraConnection then
 				unlockCameraConnection:Disconnect()
@@ -400,11 +391,30 @@ MainTab:CreateToggle({
 				LocalPlayer.CameraMaxZoomDistance = originalCameraSettings.MaxZoom
 				LocalPlayer.CameraMinZoomDistance = originalCameraSettings.MinZoom
 			end
-		else
-			enableCameraControl()
 		end
 	end
 })
+
+-- Ejecutar enableCameraControl() solo si el toggle está activado al cargar (opcional)
+if cameraUnlocked then
+	enableCameraControl()
+end
+
+-- Reaplicar si reaparece el personaje, pero solo si está activado
+LocalPlayer.CharacterAdded:Connect(function()
+	if cameraUnlocked then
+		enableCameraControl()
+	end
+end)
+
+
+
+
+
+
+
+
+
 
 
 -- Asegúrate de que estas variables están definidas
