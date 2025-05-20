@@ -612,15 +612,15 @@ MainTab:CreateToggle({
 
 -----Anti AFK
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
+
+local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
 local AntiAfkEnabled = false
-local AntiAfkConnection
+local AntiAfkThread
 
 MainTab:CreateToggle({
     Name = "Anti-AFK",
@@ -630,16 +630,26 @@ MainTab:CreateToggle({
         AntiAfkEnabled = Value
 
         if AntiAfkEnabled then
-            AntiAfkConnection = RunService.Heartbeat:Connect(function()
-                task.wait(60)
-                if AntiAfkEnabled and humanoid and humanoid.Health > 0 then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            AntiAfkThread = task.spawn(function()
+                while AntiAfkEnabled do
+                    if humanoid and humanoid.Health > 0 then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                    task.wait(60)
                 end
             end)
-        elseif AntiAfkConnection then
-            AntiAfkConnection:Disconnect()
         end
     end,
+})
+
+-- Opcional: detener el thread al desactivar el toggle
+MainTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAfkToggle",
+    Callback = function(Value)
+        AntiAfkEnabled = Value
+    end
 })
 
 
