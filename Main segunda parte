@@ -618,12 +618,13 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
+local camera = workspace.CurrentCamera
 
 local AntiAfkEnabled = false
 local AntiAfkThread
 
 MainTab:CreateToggle({
-    Name = "Anti-AFK",
+    Name = "Anti-AFK OP",
     CurrentValue = false,
     Flag = "AntiAfkToggle",
     Callback = function(Value)
@@ -632,24 +633,27 @@ MainTab:CreateToggle({
         if AntiAfkEnabled then
             AntiAfkThread = task.spawn(function()
                 while AntiAfkEnabled do
+                    -- Simular salto
                     if humanoid and humanoid.Health > 0 then
                         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                     end
-                    task.wait(60)
+
+                    -- Simular rotación de cámara
+                    local camCF = camera.CFrame
+                    local rotation = CFrame.Angles(0, math.rad(1), 0) -- gira un poco a la derecha
+                    camera.CFrame = camCF * rotation
+
+                    task.wait(60) -- cada 60 segundos
                 end
             end)
+        else
+            if AntiAfkThread then
+                task.cancel(AntiAfkThread)
+                AntiAfkThread = nil
+            end
         end
     end,
 })
 
--- Opcional: detener el thread al desactivar el toggle
-MainTab:CreateToggle({
-    Name = "Anti-AFK",
-    CurrentValue = false,
-    Flag = "AntiAfkToggle",
-    Callback = function(Value)
-        AntiAfkEnabled = Value
-    end
-})
 
 
