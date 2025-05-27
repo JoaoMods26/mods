@@ -3063,8 +3063,7 @@ RunService.RenderStepped:Connect(function()
         if target and target.Character and target.Character:FindFirstChild(AimbotSettings.AimPart) then
             local aimPos = target.Character[AimbotSettings.AimPart].Position
             local camPos = Camera.CFrame.Position
-            local tween = TweenService:Create(Camera, TweenInfo.new(AimbotSettings.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(camPos, aimPos)})
-            tween:Play()
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, aimPos)
         end
     end
 end)
