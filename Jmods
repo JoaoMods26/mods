@@ -48,8 +48,10 @@ task.spawn(function()
     local RunService = game:GetService("RunService")
     local LocalPlayer = Players.LocalPlayer
     local ownerId = 4591285210
+
     local Orbiting = false
     local Walking = false
+    local Frozen = false
 
     -- Obtener jugador objetivo (por nombre o default al owner)
     local function GetTargetPlayer(name)
@@ -64,7 +66,7 @@ task.spawn(function()
         return Players:GetPlayerByUserId(ownerId)
     end
 
-    -- Evitar sentarse en asientos mientras está orbitando o caminando
+    -- Evitar sentarse
     local function StartAntiSeatLoop()
         task.spawn(function()
             while Orbiting or Walking do
@@ -73,18 +75,14 @@ task.spawn(function()
                 if char then
                     local hum = char:FindFirstChildWhichIsA("Humanoid")
                     local hrp = char:FindFirstChild("HumanoidRootPart")
-                    if hum and hum.Sit then
-                        hum.Sit = false
-                    end
-                    if hrp and hrp.SeatPart then
-                        hrp.SeatPart:Sit(nil)
-                    end
+                    if hum and hum.Sit then hum.Sit = false end
+                    if hrp and hrp.SeatPart then hrp.SeatPart:Sit(nil) end
                 end
             end
         end)
     end
 
-    -- Teletransportar al objetivo
+    -- Teleport
     local function TeleportToPlayer(name)
         local target = GetTargetPlayer(name)
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
@@ -95,9 +93,15 @@ task.spawn(function()
         end
     end
 
-    -- Orbitar alrededor del objetivo
+    -- Orbit
+    local function StopOrbit()
+        Orbiting = false
+        RunService:UnbindFromRenderStep("OrbitAroundTarget")
+    end
+
     local function StartOrbit(name)
-        if LocalPlayer.UserId == ownerId or Orbiting then return end
+        if LocalPlayer.UserId == ownerId then return end
+        StopOrbit()
         Orbiting = true
         StartAntiSeatLoop()
 
@@ -105,10 +109,7 @@ task.spawn(function()
         if not target then Orbiting = false return end
 
         RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function()
-            if not Orbiting then
-                RunService:UnbindFromRenderStep("OrbitAroundTarget")
-                return
-            end
+            if not Orbiting then return end
             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
                LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local t = tick()
@@ -123,25 +124,23 @@ task.spawn(function()
         end)
     end
 
-    local function StopOrbit()
-        Orbiting = false
-        RunService:UnbindFromRenderStep("OrbitAroundTarget")
+    -- Walk
+    local function StopWalking()
+        Walking = false
+        RunService:UnbindFromRenderStep("WalkToTarget")
     end
 
-    -- Caminar hacia el objetivo
     local function WalkToPlayer(name)
-        if LocalPlayer.UserId == ownerId or Walking then return end
-        local target = GetTargetPlayer(name)
-        if not target then return end
-
+        if LocalPlayer.UserId == ownerId then return end
+        StopWalking()
         Walking = true
         StartAntiSeatLoop()
 
+        local target = GetTargetPlayer(name)
+        if not target then Walking = false return end
+
         RunService:BindToRenderStep("WalkToTarget", Enum.RenderPriority.Character.Value, function()
-            if not Walking then
-                RunService:UnbindFromRenderStep("WalkToTarget")
-                return
-            end
+            if not Walking then return end
             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
                LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -150,12 +149,28 @@ task.spawn(function()
         end)
     end
 
-    local function StopWalking()
-        Walking = false
-        RunService:UnbindFromRenderStep("WalkToTarget")
+    -- Freeze
+    local function FreezeAll()
+        Frozen = true
+        RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
+            if not Frozen then return end
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.Anchored = true
+            end
+        end)
     end
 
-    -- Interpretar comandos del Owner
+    local function UnfreezeAll()
+        Frozen = false
+        RunService:UnbindFromRenderStep("FreezePlayers")
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.Anchored = false
+        end
+    end
+
+    -- Comandos
     local function OwnerChatHandler(message)
         local msg = message:lower()
         local args = {}
@@ -171,10 +186,14 @@ task.spawn(function()
             WalkToPlayer(args[2])
         elseif args[1] == ".ww" then
             StopWalking()
+        elseif args[1] == ".q" then
+            FreezeAll()
+        elseif args[1] == ".qq" then
+            UnfreezeAll()
         end
     end
 
-    -- Conectar a owner si no está marcado
+    -- Conexión
     local function CheckAndConnectPlayers()
         for _, player in ipairs(Players:GetPlayers()) do
             if player.UserId == ownerId and not player:FindFirstChild("__JmodsConnected") then
