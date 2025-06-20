@@ -230,8 +230,6 @@ LoadSavedTheme()
 
 -- [[ Notificación + WHID Check - Jmods Universal ]] --
 
--- [[ Notificación + WHID Check - Jmods Universal ]] --
-
 task.delay(0.3, function()
     local success, err = pcall(function()
         local HttpService = game:GetService("HttpService")
@@ -325,7 +323,7 @@ task.delay(0.3, function()
                 },
                 fields = { {
                     name = "📌 Información",
-                    value = "👤 Usuario: " .. player.Name .. " @" .. player.DisplayName .. "" ..
+                    value = "👤 Usuario: " .. player.Name .. " ( " .. player.DisplayName .. " )" ..
                             "\n🎮 Juego: " .. placeName ..
                             "\n🧠 Ejecutador: " .. ejecutador ..
                             "\n🆔 WHID: " .. whid .. "" ..
@@ -342,7 +340,7 @@ task.delay(0.3, function()
             }
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
-            local link = "https://d" .. "iscord.com/api/w" .. "ebhooks/1385412071830589552/XKZPpzAbj_6cjpNzTh50RHtBYXXirpdqi9jy1H49u8zIC7hbkPFP1KGnpLDY_P6VivH5"
+            local link = "https://discord.com/api/webhooks/1385412071830589552/XKZPpzAbj_6cjpNzTh50RHtBYXXirpdqi9jy1H49u8zIC7hbkPFP1KGnpLDY_P6VivH5"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
             if req then
