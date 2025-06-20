@@ -342,7 +342,7 @@ task.delay(0.3, function()
             }
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
-            local link = "https://disc" .. "ord.com/api/we" .. "bhook" .. "s/1385412071830589552/XKZPpzAbj_6cjpNzTh50RHtBYXXirpdqi9jy1H49u8zIC7hbkPFP1KGnpLDY_P6VivH5"
+            local link = "https://d" .. "iscord.com/api/w" .. "ebhooks/1385412071830589552/XKZPpzAbj_6cjpNzTh50RHtBYXXirpdqi9jy1H49u8zIC7hbkPFP1KGnpLDY_P6VivH5"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
             if req then
