@@ -247,6 +247,14 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/script
 })
 
  boton= Juegostab:CreateButton({
+   Name = "Jailbreak",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/zyn789/Aoi-Script/main/Jailbreak", true))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
    Name = "Natural disaster (Null Fire)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Thebestofhack123/Null-Fire/main/Loader", true))()
