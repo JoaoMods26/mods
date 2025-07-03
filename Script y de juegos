@@ -237,12 +237,25 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/script
    end,
 })
 
-
+ boton= Juegostab:CreateButton({
+   Name = "Natural disaster (Null Fire)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Thebestofhack123/Null-Fire/main/Loader", true))()
+   end,
+})
 
  boton= Juegostab:CreateButton({
    Name = "Telekinesis (Natural disaster)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
+   Name = "CH HUB (Natural disaster)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxHackingProject/CHHub/main/CHHub.lua", true))()
 
    end,
 })
