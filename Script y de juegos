@@ -223,6 +223,13 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Po
 })
 
  boton= Juegostab:CreateButton({
+   Name = "Basicamente FNF Remix",
+   Callback = function()
+loadstring(game:HttpGet("https://orbitsc.net/bfnf"))()
+   end,
+})
+
+ boton= Juegostab:CreateButton({
    Name = "Natural disaster",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
