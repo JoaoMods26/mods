@@ -207,7 +207,7 @@ loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
 })
 
  boton= Juegostab:CreateButton({
-   Name = "Piggy (ESP y TP a items)",
+   Name = "Tora (Grow a Garden)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/GrowaGarden"))()
 
