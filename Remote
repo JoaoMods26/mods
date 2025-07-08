@@ -4,7 +4,7 @@ task.spawn(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local LocalPlayer = Players.LocalPlayer
-    local ownerId = 4591285210
+    local ownerId = 4591285210, 3758584431
 
     local Orbiting = false
     local Walking = false
