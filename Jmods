@@ -284,6 +284,330 @@ MainSection = MainTab:CreateSection("Main")
           end
 
     })
+
+
+---Chat HAKER----
+-- 🔧 Servicios necesarios
+ HttpService = game:GetService("HttpService")
+Players = game:GetService("Players")
+player = Players.LocalPlayer
+firebaseURL = "https://chatsitouwu-xd-xd-default-rtdb.firebaseio.com/Chat.json"
+request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
+
+-- Variables globales
+ gui, chatBox, frame, sendButton, textBox, settingsFrame, bgImage = nil
+ ultimoMensajeID = nil
+ guiActivo = false
+
+-- Crear GUI
+function crearChatGUI()
+	if gui then gui:Destroy() end
+
+	gui = Instance.new("ScreenGui")
+	gui.Name = "JXNullChat"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.Parent = game:GetService("CoreGui")
+
+	frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0.3, 0, 0.5, 0)
+	frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	frame.BorderSizePixel = 0
+	frame.Parent = gui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+	bgImage = Instance.new("ImageLabel")
+	bgImage.Size = UDim2.new(1, 0, 1, 0)
+	bgImage.Position = UDim2.new(0, 0, 0, 0)
+	bgImage.ImageTransparency = 1
+	bgImage.BackgroundTransparency = 1
+	bgImage.Image = ""
+	bgImage.ZIndex = 1
+	bgImage.Parent = frame
+
+	local title = Instance.new("TextLabel", frame)
+	title.Size = UDim2.new(1, 0, 0, 30)
+	title.Position = UDim2.new(0, 0, 0, -30)
+	title.BackgroundTransparency = 1
+	title.Text = "<font color=\"rgb(255,0,0)\">J</font><font color=\"rgb(0,255,0)\">X</font><font color=\"rgb(0,200,255)\">N</font><font color=\"rgb(255,255,0)\">u</font><font color=\"rgb(255,0,255)\">l</font><font color=\"rgb(200,200,200)\">l</font>"
+	title.RichText = true
+	title.TextColor3 = Color3.new(1, 1, 1)
+	title.TextScaled = true
+	title.Font = Enum.Font.SourceSansBold
+
+	chatBox = Instance.new("ScrollingFrame", frame)
+	chatBox.Size = UDim2.new(1, -10, 0.75, -5)
+	chatBox.Position = UDim2.new(0, 5, 0, 5)
+	chatBox.ScrollBarThickness = 6
+	chatBox.BackgroundTransparency = 1
+	chatBox.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	chatBox.CanvasSize = UDim2.new(0, 0, 0, 0)
+	chatBox.ClipsDescendants = true
+	chatBox.ZIndex = 2
+
+	local layout = Instance.new("UIListLayout", chatBox)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 6)
+
+	textBox = Instance.new("TextBox", frame)
+	textBox.Text = ""
+	textBox.Size = UDim2.new(0.8, -10, 0.2, -5)
+	textBox.Position = UDim2.new(0, 5, 0.8, 0)
+	textBox.PlaceholderText = "Escribe tu mensaje"
+	textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	textBox.TextColor3 = Color3.new(1, 1, 1)
+	textBox.BorderSizePixel = 0
+	textBox.Font = Enum.Font.SourceSans
+	textBox.TextSize = 16
+	textBox.ClearTextOnFocus = false
+
+	sendButton = Instance.new("TextButton", frame)
+	sendButton.Size = UDim2.new(0.2, -5, 0.2, -5)
+	sendButton.Position = UDim2.new(0.8, 0, 0.8, 0)
+	sendButton.Text = "Enviar"
+	sendButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+	sendButton.TextColor3 = Color3.new(1, 1, 1)
+	sendButton.Font = Enum.Font.SourceSans
+	sendButton.TextSize = 16
+	sendButton.BorderSizePixel = 0
+
+	sendButton.MouseButton1Click:Connect(function()
+		local texto = textBox.Text
+		if texto ~= "" and #texto < 200 then
+			local data = {
+				username = player.Name,
+				text = texto,
+				time = os.time()
+			}
+			local json = HttpService:JSONEncode(data)
+			request({
+				Url = firebaseURL,
+				Method = "POST",
+				Headers = { ["Content-Type"] = "application/json" },
+				Body = json
+			})
+			textBox.Text = ""
+		end
+	end)
+
+	-- ⚙️ Botón de ajustes
+	local settingsBtn = Instance.new("TextButton", frame)
+	settingsBtn.Size = UDim2.new(0, 24, 0, 24)
+	settingsBtn.Position = UDim2.new(1, -28, 0, 4)
+	settingsBtn.Text = "⚙"
+	settingsBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	settingsBtn.TextColor3 = Color3.new(1, 1, 1)
+	settingsBtn.Font = Enum.Font.SourceSans
+	settingsBtn.TextSize = 16
+	settingsBtn.BorderSizePixel = 0
+
+	-- ⚙️ Panel de configuración
+	settingsFrame = Instance.new("Frame", gui)
+	settingsFrame.Size = UDim2.new(0, 180, 0, 120)
+	settingsFrame.Position = UDim2.new(0.05, 300, 0.3, 0)
+	settingsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	settingsFrame.Visible = false
+	Instance.new("UICorner", settingsFrame).CornerRadius = UDim.new(0, 8)
+
+	local transparencyInput = Instance.new("TextBox", settingsFrame)
+	transparencyInput.Size = UDim2.new(1, -10, 0, 30)
+	transparencyInput.Position = UDim2.new(0, 5, 0, 5)
+	transparencyInput.PlaceholderText = "Transparencia (0-1)"
+	transparencyInput.Text = ""
+	transparencyInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	transparencyInput.TextColor3 = Color3.new(1, 1, 1)
+	transparencyInput.Font = Enum.Font.SourceSans
+	transparencyInput.TextSize = 14
+
+	local imageInput = Instance.new("TextBox", settingsFrame)
+	imageInput.Size = UDim2.new(1, -10, 0, 30)
+	imageInput.Position = UDim2.new(0, 5, 0, 40)
+	imageInput.PlaceholderText = "ID de imagen de fondo"
+	imageInput.Text = ""
+	imageInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	imageInput.TextColor3 = Color3.new(1, 1, 1)
+	imageInput.Font = Enum.Font.SourceSans
+	imageInput.TextSize = 14
+
+	local applyBtn = Instance.new("TextButton", settingsFrame)
+	applyBtn.Size = UDim2.new(1, -10, 0, 30)
+	applyBtn.Position = UDim2.new(0, 5, 0, 75)
+	applyBtn.Text = "Aplicar"
+	applyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	applyBtn.TextColor3 = Color3.new(1, 1, 1)
+	applyBtn.Font = Enum.Font.SourceSans
+	applyBtn.TextSize = 14
+
+	applyBtn.MouseButton1Click:Connect(function()
+		local t = tonumber(transparencyInput.Text)
+		if t then frame.BackgroundTransparency = math.clamp(t, 0, 1) end
+		local id = imageInput.Text:match("%d+")
+		if id then bgImage.Image = "rbxassetid://" .. id bgImage.ImageTransparency = 0.1 end
+	end)
+
+	settingsBtn.MouseButton1Click:Connect(function()
+		settingsFrame.Visible = not settingsFrame.Visible
+	end)
+
+	local function actualizarPosicionSettings()
+		settingsFrame.Position = UDim2.new(0, frame.AbsolutePosition.X + frame.AbsoluteSize.X + 10, 0, frame.AbsolutePosition.Y)
+	end
+
+	frame:GetPropertyChangedSignal("AbsolutePosition"):Connect(actualizarPosicionSettings)
+	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(actualizarPosicionSettings)
+	task.wait()
+	actualizarPosicionSettings()
+end
+
+-- Mostrar mensajes
+local function showMessages(data)
+	if not chatBox then return end
+	for _, child in ipairs(chatBox:GetChildren()) do
+		if not child:IsA("UIListLayout") then child:Destroy() end
+	end
+	local mensajes = {}
+	for _, value in pairs(data or {}) do
+		table.insert(mensajes, value)
+	end
+	table.sort(mensajes, function(a, b)
+		return (a.time or 0) < (b.time or 0)
+	end)
+	for _, msg in ipairs(mensajes) do
+		local username = tostring(msg.username or "???")
+		local text = tostring(msg.text or "")
+		local fullText = username .. ": " .. text
+		local userId = 1
+		local success, result = pcall(function()
+			return Players:GetUserIdFromNameAsync(username)
+		end)
+		if success then userId = result end
+		local container = Instance.new("Frame")
+		container.Size = UDim2.new(1, -10, 0, 48)
+		container.BackgroundTransparency = 1
+		container.Parent = chatBox
+		local image = Instance.new("ImageLabel")
+		image.Size = UDim2.new(0, 48, 0, 48)
+		image.BackgroundTransparency = 1
+		image.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=48&height=48&format=png"
+		image.Position = UDim2.new(0, 0, 0, 0)
+		image.Parent = container
+		local textLabel = Instance.new("TextLabel")
+		textLabel.Size = UDim2.new(1, -110, 1, 0)
+		textLabel.Position = UDim2.new(0, 54, 0, 0)
+		textLabel.BackgroundTransparency = 1
+		textLabel.Text = fullText
+		textLabel.TextColor3 = Color3.new(1, 1, 1)
+		textLabel.TextXAlignment = Enum.TextXAlignment.Left
+		textLabel.Font = Enum.Font.SourceSans
+		textLabel.TextSize = 16
+		textLabel.TextWrapped = true
+		textLabel.Parent = container
+		local copyBtn = Instance.new("TextButton")
+		copyBtn.Size = UDim2.new(0, 48, 0, 48)
+		copyBtn.Position = UDim2.new(1, -60, 0, 0)
+		copyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		copyBtn.Text = "📋"
+		copyBtn.TextColor3 = Color3.new(1, 1, 1)
+		copyBtn.Font = Enum.Font.SourceSansBold
+		copyBtn.TextSize = 20
+		copyBtn.BorderSizePixel = 0
+		copyBtn.Parent = container
+		copyBtn.MouseButton1Click:Connect(function()
+			if setclipboard then setclipboard(fullText) end
+		end)
+	end
+	task.wait()
+	chatBox.CanvasPosition = Vector2.new(0, chatBox.AbsoluteCanvasSize.Y)
+end
+
+-- 🔔 Notificaciones y escucha
+task.spawn(function()
+	while true do
+		local success, response = pcall(function()
+			return request({ Url = firebaseURL, Method = "GET" })
+		end)
+		if success and response and response.Body then
+			local ok, decoded = pcall(function()
+				return HttpService:JSONDecode(response.Body)
+			end)
+			if ok and typeof(decoded) == "table" then
+				local mensajes = {}
+				for key, value in pairs(decoded) do
+					value._id = key
+					table.insert(mensajes, value)
+				end
+				table.sort(mensajes, function(a, b)
+					return (a.time or 0) < (b.time or 0)
+				end)
+				if #mensajes > 0 then
+					local ultimo = mensajes[#mensajes]
+					if ultimoMensajeID and ultimo._id ~= ultimoMensajeID then
+						Rayfield:Notify({
+							Title = "Nuevo mensaje",
+							Content = (ultimo.username or "???") .. ": " .. (ultimo.text or ""),
+							Duration = 5
+						})
+					end
+					ultimoMensajeID = ultimo._id
+				end
+				showMessages(decoded)
+			end
+		end
+		task.wait(3)
+	end
+end)
+
+-- 🔘 Toggle para mostrar u ocultar el GUI
+MainTab:CreateToggle({
+	Name = "Chat Global",
+	CurrentValue = false,
+	Callback = function(state)
+		if state then
+			if not guiActivo then
+				crearChatGUI()
+				guiActivo = true
+
+		-- ⚡ Cargar mensajes inmediatamente
+		task.spawn(function()
+			local success, response = pcall(function()
+				return request({ Url = firebaseURL, Method = "GET" })
+			end)
+			if success and response and response.Body then
+				local ok, decoded = pcall(function()
+					return HttpService:JSONDecode(response.Body)
+				end)
+				if ok and typeof(decoded) == "table" then
+					showMessages(decoded)
+				end
+			end
+		end)
+
+			end
+		else
+			pcall(function()
+	if gui then gui:Destroy() end
+end)
+gui = nil
+guiActivo = false
+		end
+	end,
+})
+
+
+------------------OTRAS COSAS---
+
+
+
+
+
+
+
+
+
+
+
+
     
     
 ---barra de velocidad---
