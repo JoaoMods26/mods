@@ -273,7 +273,7 @@ end)
 -- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
 MainSection = MainTab:CreateSection("Main")
-_G.MainTab = MainTab
+
 
 
     Rayfield:Notify({
