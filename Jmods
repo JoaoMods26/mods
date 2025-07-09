@@ -288,6 +288,8 @@ MainSection = MainTab:CreateSection("Main")
 
 
 ---Chat HAKER----
+
+repeat task.wait() until _G.MainTab
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/UWUMAxd/refs/heads/main/JxN"))()
 
 ------------------OTRAS COSAS---
