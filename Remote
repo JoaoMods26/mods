@@ -4,11 +4,32 @@ task.spawn(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local LocalPlayer = Players.LocalPlayer
-    local ownerId = 4591285210
+    local ownerIds = {4591285210, 3758584431}
 
     local Orbiting = false
     local Walking = false
     local Frozen = false
+
+    -- Helper: Verificar si un userId es owner
+    local function IsOwner(userId)
+        for _, id in ipairs(ownerIds) do
+            if userId == id then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- Helper: Obtener jugador owner si está presente
+    local function GetOwnerPlayer()
+        for _, id in ipairs(ownerIds) do
+            local player = Players:GetPlayerByUserId(id)
+            if player then
+                return player
+            end
+        end
+        return nil
+    end
 
     -- Obtener jugador objetivo (por nombre o default al owner)
     local function GetTargetPlayer(name)
@@ -20,7 +41,7 @@ task.spawn(function()
                 end
             end
         end
-        return Players:GetPlayerByUserId(ownerId)
+        return GetOwnerPlayer()
     end
 
     -- Evitar sentarse
@@ -57,7 +78,7 @@ task.spawn(function()
     end
 
     local function StartOrbit(name)
-        if LocalPlayer.UserId == ownerId then return end
+        if IsOwner(LocalPlayer.UserId) then return end
         StopOrbit()
         Orbiting = true
         StartAntiSeatLoop()
@@ -88,7 +109,7 @@ task.spawn(function()
     end
 
     local function WalkToPlayer(name)
-        if LocalPlayer.UserId == ownerId then return end
+        if IsOwner(LocalPlayer.UserId) then return end
         StopWalking()
         Walking = true
         StartAntiSeatLoop()
@@ -153,7 +174,7 @@ task.spawn(function()
     -- Conexión
     local function CheckAndConnectPlayers()
         for _, player in ipairs(Players:GetPlayers()) do
-            if player.UserId == ownerId and not player:FindFirstChild("__JmodsConnected") then
+            if IsOwner(player.UserId) and not player:FindFirstChild("__JmodsConnected") then
                 local marker = Instance.new("BoolValue")
                 marker.Name = "__JmodsConnected"
                 marker.Parent = player
@@ -164,7 +185,7 @@ task.spawn(function()
 
     Players.PlayerAdded:Connect(function(player)
         task.wait(0.5)
-        if player.UserId == ownerId then
+        if IsOwner(player.UserId) then
             CheckAndConnectPlayers()
         end
     end)
