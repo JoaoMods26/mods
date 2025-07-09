@@ -272,6 +272,7 @@ end)
 
 -- SECCIÓN PRINCIPAL
 MainTab = Window:CreateTab("Principal", nil) -- Title, Image
+_G.MainTab = MainTab
 MainSection = MainTab:CreateSection("Main")
 
 
