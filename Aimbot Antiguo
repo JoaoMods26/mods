@@ -1,0 +1,359 @@
+-- Configuración
+local AimbotSettings = {
+    Enabled = false,
+    ESPEnabled = false,
+    FOVRadius = 350,
+    FOVColor = Color3.fromRGB(0, 0, 255),
+    ESPColor = Color3.fromRGB(0, 0, 255),
+    ESPSizeMultiplier = 5,
+    Sensitivity = 0,
+    AimPart = "Head",
+    TeamCheckEnabled = false,
+    TracersEnabled = false,
+    TracerColor = Color3.fromRGB(0, 0, 255),
+    AutoAimEnabled = false,
+    OnlyClosePlayers = false, -- 🔥 NUEVO: solo apuntar a cercanos
+    CloseDistanceThreshold = 100,
+    WallCheck = false, -- 🔥 NUEVO: distancia en studs para considerar "cercano"
+}
+
+local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Holding = false
+
+-- FOV circle
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Filled = false
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 64
+FOVCircle.Transparency = 0.7
+FOVCircle.Visible = false
+
+-- Obtener el jugador más cercano
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            -- Verificar si no es del mismo equipo
+            if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                continue
+            end
+            
+            local targetPos = v.Character.HumanoidRootPart.Position
+
+            -- WallCheck
+            if AimbotSettings.WallCheck then
+                local origin = Camera.CFrame.Position
+                local direction = targetPos - origin
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                
+                local result = workspace:Raycast(origin, direction, rayParams)
+                if result and result.Instance and not v.Character:IsAncestorOf(result.Instance) then
+                    continue -- Algo bloquea la visión
+                end
+            end
+
+            local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPos)
+            if onScreen then
+                local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - UserInputService:GetMouseLocation()).Magnitude
+                -- Verificar si está dentro del FOV y si el jugador está cerca (si la opción está activada)
+                if distance < shortestDistance and distance < AimbotSettings.FOVRadius then
+                    -- Verificar si solo queremos apuntar a jugadores cercanos
+                    local distFromPlayer = (targetPos - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then
+                        continue
+                    end
+
+                    shortestDistance = distance
+                    closestPlayer = v
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+
+-- Input para apuntar
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = false
+    end
+end)
+
+-- Aimbot + FOV Circle
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y - 36)
+    FOVCircle.Radius = AimbotSettings.FOVRadius
+    FOVCircle.Color = AimbotSettings.FOVColor
+    FOVCircle.Visible = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
+
+    if AimbotSettings.Enabled and (Holding or AimbotSettings.AutoAimEnabled) then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild(AimbotSettings.AimPart) then
+            local aimPos = target.Character[AimbotSettings.AimPart].Position
+            local camPos = Camera.CFrame.Position
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, aimPos)
+        end
+    end
+end)
+
+-- BOX ESP
+local ESPBoxes = {}
+
+RunService.RenderStepped:Connect(function()
+    for _, box in pairs(ESPBoxes) do
+        if box and box.Remove then
+            box:Remove()
+        end
+    end
+    ESPBoxes = {}
+
+    if not AimbotSettings.ESPEnabled then return end
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+            and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+
+            if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local hrp = v.Character.HumanoidRootPart
+            local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen then
+                local distFromPlayer = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                local scaleFactor = 1 / (hrp.Position - Camera.CFrame.Position).Magnitude * 100
+                local boxHeight = math.clamp(6 * scaleFactor * AimbotSettings.ESPSizeMultiplier, 2, 500)
+                local boxWidth = boxHeight / 1.5
+
+                local box = Drawing.new("Square")
+                box.Color = (AimbotSettings.OnlyClosePlayers and distFromPlayer <= AimbotSettings.CloseDistanceThreshold)
+    and Color3.fromRGB(255, 0, 0)
+    or AimbotSettings.ESPColor
+                box.Thickness = 1
+                box.Filled = false
+                box.Transparency = 1
+                box.Size = Vector2.new(boxWidth, boxHeight)
+                box.Position = Vector2.new(rootPos.X - boxWidth / 2, rootPos.Y - boxHeight / 2)
+                box.Visible = true
+
+                table.insert(ESPBoxes, box)
+            end
+        end
+    end
+end)
+
+-- Tracers
+local Lines = {}
+
+RunService.RenderStepped:Connect(function()
+    for _, line in pairs(Lines) do
+        if line and line.Remove then
+            line:Remove()
+        end
+    end
+    Lines = {}
+
+    if AimbotSettings.TracersEnabled then
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+               and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+
+                if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then
+                    continue
+                end
+
+                local hrp = v.Character.HumanoidRootPart
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    local distFromPlayer = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+
+                    local line = Drawing.new("Line")
+                    line.Thickness = 1.5
+                    line.Transparency = 0.9
+                    line.Color = (AimbotSettings.OnlyClosePlayers and distFromPlayer <= AimbotSettings.CloseDistanceThreshold)
+    and Color3.fromRGB(255, 0, 0)
+    or AimbotSettings.TracerColor
+
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(screenPos.X, screenPos.Y)
+                    line.Visible = true
+
+                    table.insert(Lines, line)
+                end
+            end
+        end
+    end
+end)
+
+-- UI Rayfield
+AimbotTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.Enabled = state
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Auto Apuntar",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.AutoAimEnabled = state
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Tamaño del FOV",
+    Range = {10, 1000},
+    Increment = 1,
+    CurrentValue = AimbotSettings.FOVRadius,
+    Callback = function(val)
+        AimbotSettings.FOVRadius = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = AimbotSettings.WallCheck,
+    Callback = function(value)
+        AimbotSettings.WallCheck = value
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color del FOV",
+    Color = AimbotSettings.FOVColor,
+    Callback = function(val)
+        AimbotSettings.FOVColor = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.ESPEnabled = state
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color del ESP",
+    Color = AimbotSettings.ESPColor,
+    Callback = function(val)
+        AimbotSettings.ESPColor = val
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Tamaño del ESP",
+    Range = {1, 10},
+    Increment = 0.1,
+    CurrentValue = AimbotSettings.ESPSizeMultiplier,
+    Callback = function(val)
+        AimbotSettings.ESPSizeMultiplier = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "No apuntar al Team",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.TeamCheckEnabled = state
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Mostrar Líneas (Tracers)",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.TracersEnabled = state
+    end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color de las Líneas (Tracers)",
+    Color = AimbotSettings.TracerColor,
+    Callback = function(val)
+        AimbotSettings.TracerColor = val
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Apuntar a jugadores cercanos",
+    CurrentValue = false,
+    Callback = function(state)
+        AimbotSettings.OnlyClosePlayers = state
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Distancia",
+    Range = {1, 300},
+    Increment = 1,
+    CurrentValue = AimbotSettings.CloseDistanceThreshold,
+    Callback = function(val)
+        if AimbotSettings.OnlyClosePlayers then
+            AimbotSettings.CloseDistanceThreshold = val
+        end
+    end
+})
+
+
+local rainbowEnabled = false  -- Controlar el toggle único
+local rainbowSpeed = 5  -- Velocidad del cambio de colores
+
+local function GetRainbowColor()
+    local time = tick() * rainbowSpeed
+    return Color3.fromHSV(time % 1, 1, 1)
+end
+
+
+AimbotTab:CreateToggle({
+    Name = "Rainbow",
+    CurrentValue = false,
+    Flag = "RainbowEffects",
+    Callback = function(Value)
+        rainbowEnabled = Value
+    end
+})
+
+-- Crear un slider para la velocidad de cambio de color
+AimbotTab:CreateSlider({
+    Name = "Rainbow",
+    Range = {0, 20},  -- Rango de velocidad
+    Increment = 0.1,  -- Incremento de 1
+    CurrentValue = rainbowSpeed,
+    Callback = function(Value)
+        rainbowSpeed = Value
+    end
+})
+
+-- Cambiar colores en cada paso del RenderStepped
+RunService.RenderStepped:Connect(function()
+    if rainbowEnabled then
+        -- FOV Rainbow
+        AimbotSettings.FOVColor = GetRainbowColor()
+
+        -- ESP Rainbow
+        AimbotSettings.ESPColor = GetRainbowColor()
+
+        -- Tracers Rainbow
+        AimbotSettings.TracerColor = GetRainbowColor()
+    end
+end)
