@@ -12,9 +12,9 @@ local TraceEnabled = false
 local ESPColor = Color3.fromRGB(255, 0, 0)
 local FOVColor = Color3.fromRGB(0, 255, 0)
 
-AimbotTabx:CreateSection("Aimbot de Mouse")
+AimbotTab:CreateSection("Aimbot de Mouse")
 
-AimbotTabx:CreateToggle({
+AimbotTab:CreateToggle({
     Name = "Activar Aimbot",
     CurrentValue = false,
     Flag = "AimbotEnabled",
@@ -23,7 +23,7 @@ AimbotTabx:CreateToggle({
     end
 })
 
-AimbotTabx:CreateKeybind({
+AimbotTab:CreateKeybind({
     Name = "Activar/Desactivar",
     CurrentKeybind = "E",
     Hold = false,
@@ -33,7 +33,7 @@ AimbotTabx:CreateKeybind({
     end
 })
 
-AimbotTabx:CreateToggle({
+AimbotTab:CreateToggle({
     Name = "Mostrar FOV",
     CurrentValue = false,
     Flag = "FOVEnabled",
@@ -42,7 +42,7 @@ AimbotTabx:CreateToggle({
     end
 })
 
-AimbotTabx:CreateSlider({
+AimbotTab:CreateSlider({
     Name = "FOV del Aimbot",
     Range = {50, 500},
     Increment = 1,
@@ -55,7 +55,7 @@ AimbotTabx:CreateSlider({
 })
 
 
-AimbotTabx:CreateToggle({
+AimbotTab:CreateToggle({
     Name = "ESP",
     CurrentValue = false,
     Flag = "ESPEnabled",
@@ -64,7 +64,7 @@ AimbotTabx:CreateToggle({
     end
 })
 
-AimbotTabx:CreateToggle({
+AimbotTab:CreateToggle({
     Name = "Tracers",
     CurrentValue = false,
     Flag = "TracersEnabled",
@@ -76,7 +76,7 @@ AimbotTabx:CreateToggle({
 
 
 
-AimbotTabx:CreateSlider({
+AimbotTab:CreateSlider({
     Name = "Suavizado",
     Range = {1, 20},
     Increment = 1,
@@ -88,7 +88,7 @@ AimbotTabx:CreateSlider({
     end
 })
 
-AimbotTabx:CreateColorPicker({
+AimbotTab:CreateColorPicker({
     Name = "Colores",
     Color = Color3.fromRGB(255, 0, 0),
     Flag = "FOVColor",
@@ -98,7 +98,7 @@ AimbotTabx:CreateColorPicker({
     end
 })
 
-AimbotTabx:CreateToggle({
+AimbotTab:CreateToggle({
     Name = "Arcoíris",
     CurrentValue = false,
     Flag = "RainbowToggle",
@@ -107,7 +107,7 @@ AimbotTabx:CreateToggle({
     end
 })
 
-AimbotTabx:CreateSlider({
+AimbotTab:CreateSlider({
     Name = "Tamaño ESP",
     Range = {30, 150},
     Increment = 1,
