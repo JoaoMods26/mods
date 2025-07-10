@@ -1,0 +1,269 @@
+
+
+local AimbotEnabled = false
+local AimbotPaused = false
+local MouseFOV = 200
+local MouseSmoothness = 5
+local ESPEnabled = false
+local FOVEnabled = false
+local RainbowMode = false
+local TraceEnabled = false
+
+local ESPColor = Color3.fromRGB(255, 0, 0)
+local FOVColor = Color3.fromRGB(0, 255, 0)
+
+AimbotTabx:CreateSection("Aimbot de Mouse")
+
+AimbotTabx:CreateToggle({
+    Name = "Activar Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotEnabled",
+    Callback = function(Value)
+        AimbotEnabled = Value
+    end
+})
+
+AimbotTabx:CreateKeybind({
+    Name = "Activar/Desactivar",
+    CurrentKeybind = "E",
+    Hold = false,
+    Flag = "PauseAimbotKey",
+    Callback = function()
+        AimbotPaused = not AimbotPaused
+    end
+})
+
+AimbotTabx:CreateToggle({
+    Name = "Mostrar FOV",
+    CurrentValue = false,
+    Flag = "FOVEnabled",
+    Callback = function(Value)
+        FOVEnabled = Value
+    end
+})
+
+AimbotTabx:CreateSlider({
+    Name = "FOV del Aimbot",
+    Range = {50, 500},
+    Increment = 1,
+    Suffix = "px",
+    CurrentValue = 200,
+    Flag = "AimbotFOV",
+    Callback = function(Value)
+        MouseFOV = Value
+    end
+})
+
+
+AimbotTabx:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESPEnabled",
+    Callback = function(Value)
+        ESPEnabled = Value
+    end
+})
+
+AimbotTabx:CreateToggle({
+    Name = "Tracers",
+    CurrentValue = false,
+    Flag = "TracersEnabled",
+    Callback = function(Value)
+        TraceEnabled = Value
+    end
+})
+
+
+
+
+AimbotTabx:CreateSlider({
+    Name = "Suavizado",
+    Range = {1, 20},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = 5,
+    Flag = "AimbotSmooth",
+    Callback = function(Value)
+        MouseSmoothness = Value
+    end
+})
+
+AimbotTabx:CreateColorPicker({
+    Name = "Colores",
+    Color = Color3.fromRGB(255, 0, 0),
+    Flag = "FOVColor",
+    Callback = function(Value)
+        ESPColor = Value
+        FOVColor = Value
+    end
+})
+
+AimbotTabx:CreateToggle({
+    Name = "Arcoíris",
+    CurrentValue = false,
+    Flag = "RainbowToggle",
+    Callback = function(Value)
+        RainbowMode = Value
+    end
+})
+
+AimbotTabx:CreateSlider({
+    Name = "Tamaño ESP",
+    Range = {30, 150},
+    Increment = 1,
+    Suffix = "%",
+    CurrentValue = 50,
+    Flag = "ESPSizing",
+    Callback = function(Value)
+        _G.ESPSizing = Value / 100
+    end
+})
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Radius = MouseFOV
+FOVCircle.Thickness = 1.5
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.ZIndex = 2
+FOVCircle.Color = FOVColor
+
+local function getRainbowColor()
+	local t = tick() * 2
+	return Color3.fromHSV((t % 5) / 5, 1, 1)
+end
+
+local function CreateBox()
+	local box = {
+		Outline = Drawing.new("Square"),
+		Box = Drawing.new("Square")
+	}
+	box.Outline.Thickness = 3
+	box.Box.Thickness = 1
+	box.Outline.Transparency = 1
+	box.Box.Transparency = 1
+	box.Outline.Filled = false
+	box.Box.Filled = false
+	return box
+end
+
+local function CreateTracer()
+	local line = Drawing.new("Line")
+	line.Thickness = 1.5
+	line.Transparency = 1
+	return line
+end
+
+local ESPBoxes = {}
+_G.ESPSizing = 0.5
+
+local function UpdateESP()
+	for _, item in pairs(ESPBoxes) do
+		if item.Box then item.Box:Remove() end
+		if item.Outline then item.Outline:Remove() end
+		if item.Tracer then item.Tracer:Remove() end
+	end
+	table.clear(ESPBoxes)
+
+	if not (ESPEnabled or TraceEnabled) then return end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+			local head = player.Character:FindFirstChild("Head")
+
+			if hrp and head then
+				local headPos, onScreen1 = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.3, 0))
+				local rootPos, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 0.3, 0))
+
+				if onScreen1 and onScreen2 then
+					local height = math.abs(headPos.Y - rootPos.Y)
+					local width = height * (_G.ESPSizing or 0.5)
+					local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
+					local color = RainbowMode and getRainbowColor() or ESPColor
+					local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+					local box = ESPEnabled and CreateBox() or { Box = nil, Outline = nil }
+					local tracer = TraceEnabled and CreateTracer() or nil
+
+					if box.Outline then
+						box.Outline.Position = topLeft
+						box.Outline.Size = Vector2.new(width, height)
+						box.Outline.Color = Color3.new(0, 0, 0)
+					end
+
+					if box.Box then
+						box.Box.Position = topLeft
+						box.Box.Size = Vector2.new(width, height)
+						box.Box.Color = color
+					end
+
+					if tracer then
+						tracer.From = screenCenter
+						tracer.To = Vector2.new(rootPos.X, rootPos.Y)
+						tracer.Color = color
+					end
+
+					table.insert(ESPBoxes, {
+						Box = box.Box,
+						Outline = box.Outline,
+						Tracer = tracer
+					})
+				end
+			end
+		end
+	end
+end
+
+local function IsReady(Character)
+	if not Character or not Character:FindFirstChild("Humanoid") or Character.Humanoid.Health <= 0 then
+		return false
+	end
+	local part = Character:FindFirstChild("Head") or Character:FindFirstChild("HumanoidRootPart")
+	if not part then return false end
+	local pos, visible = Camera:WorldToViewportPoint(part.Position)
+	return visible, part, pos
+end
+
+RunService.RenderStepped:Connect(function()
+	local mousePos = UserInputService:GetMouseLocation()
+
+	FOVCircle.Position = mousePos
+	FOVCircle.Radius = MouseFOV
+	FOVCircle.Color = RainbowMode and getRainbowColor() or FOVColor
+	FOVCircle.Visible = FOVEnabled
+
+	UpdateESP()
+
+	if not AimbotEnabled then return end
+	if AimbotPaused then return end
+
+	local closest = nil
+	local shortest = math.huge
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character then
+			local visible, part, pos = IsReady(plr.Character)
+			if visible then
+				local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+				if dist < shortest and dist <= MouseFOV then
+					shortest = dist
+					closest = part
+				end
+			end
+		end
+	end
+
+	if closest and getfenv().mousemoverel then
+		local screen = Camera:WorldToViewportPoint(closest.Position)
+		local dx = (screen.X - mousePos.X) / MouseSmoothness
+		local dy = (screen.Y - mousePos.Y) / MouseSmoothness
+		getfenv().mousemoverel(dx, dy)
+	end
+end)
