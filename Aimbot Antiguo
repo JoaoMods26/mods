@@ -1,3 +1,5 @@
+local AimbotTab = _G.AimbotTab
+
 -- Configuración
 local AimbotSettings = {
     Enabled = false,
