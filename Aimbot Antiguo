@@ -10,6 +10,8 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
     local AimbotTab = _G.AimbotTab
 
+AimbotTab:CreateSection("Aimbot Movil/Pc")
+
     local AimbotSettings = {
         Enabled = false,
         ESPEnabled = false,
