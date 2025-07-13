@@ -1,3 +1,147 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+
+-- // Variables de jugador
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local camera = workspace.CurrentCamera
+
+-- // Variables de ghost
+local isGhostMode = false
+local ghostPart = nil
+local platform = nil
+local lastPosition = nil
+
+-- // Funciones originales
+local function createPlatform(position)
+    if platform then platform:Destroy() end
+    platform = Instance.new("Part")
+    platform.Name = "PlayerPlatform"
+    platform.Size = Vector3.new(10, 1, 10)
+    platform.Position = position - Vector3.new(0, 3.5, 0)
+    platform.Anchored = true
+    platform.BrickColor = BrickColor.new("Really black")
+    platform.Parent = workspace
+end
+
+local function createGhostPart(position)
+    if ghostPart then ghostPart:Destroy() end
+    ghostPart = Instance.new("Part")
+    ghostPart.Name = "GhostPart"
+    ghostPart.Size = Vector3.new(2, 2, 2)
+    ghostPart.Position = position.Position + Vector3.new(0, 2, 0)
+    ghostPart.Transparency = 0.5
+    ghostPart.BrickColor = BrickColor.new("Really white")
+    ghostPart.CanCollide = false
+    ghostPart.Anchored = false
+    ghostPart.Parent = workspace
+
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = ghostPart
+
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
+    bodyGyro.CFrame = CFrame.new(ghostPart.Position)
+    bodyGyro.Parent = ghostPart
+
+    camera.CameraSubject = ghostPart
+    camera.CameraType = Enum.CameraType.Follow
+end
+
+local function updateGhostPartMovement()
+    if not isGhostMode or not ghostPart then return end
+    local moveDirection = Vector3.new(0, 0, 0)
+    local speed = 60
+    local cameraCFrame = camera.CFrame
+
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+        moveDirection += cameraCFrame.LookVector * speed
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+        moveDirection -= cameraCFrame.LookVector * speed
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+        moveDirection -= cameraCFrame.RightVector * speed
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+        moveDirection += cameraCFrame.RightVector * speed
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        moveDirection += Vector3.new(0, speed, 0)
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        moveDirection -= Vector3.new(0, speed, 0)
+    end
+
+    local bodyVelocity = ghostPart:FindFirstChildOfClass("BodyVelocity")
+    if bodyVelocity then
+        bodyVelocity.Velocity = moveDirection
+    end
+end
+
+local function teleportAndGhost()
+    if isGhostMode then
+        humanoidRootPart.CFrame = ghostPart and CFrame.new(ghostPart.Position + Vector3.new(0, 3, 0)) or CFrame.new(0, 100, 0)
+        character.Humanoid.WalkSpeed = 16
+        character.Humanoid.JumpPower = 50
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 0
+            end
+        end
+        camera.CameraSubject = character.Humanoid
+        camera.CameraType = Enum.CameraType.Follow
+        if ghostPart then ghostPart:Destroy() ghostPart = nil end
+        if platform then platform:Destroy() platform = nil end
+        isGhostMode = false
+    else
+        lastPosition = humanoidRootPart.CFrame
+        local teleportPosition = Vector3.new(math.random(-1000, 1000), 100, math.random(-1000, 1000))
+        createPlatform(teleportPosition)
+        humanoidRootPart.CFrame = CFrame.new(teleportPosition)
+        createGhostPart(lastPosition)
+        character.Humanoid.WalkSpeed = 0
+        character.Humanoid.JumpPower = 0
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+            elseif part:IsA("Decal") then
+                part.Transparency = 0
+            end
+        end
+        isGhostMode = true
+    end
+end
+
+-- // Toggle de invincibilidad Rayfield
+MainTab:CreateToggle({
+    Name = "Modo Fantasma",
+    CurrentValue = false,
+    Flag = "InvincibilityToggle",
+    Callback = function(Value)
+        if Value and not isGhostMode then
+            teleportAndGhost()
+        elseif not Value and isGhostMode then
+            teleportAndGhost()
+        end
+    end,
+})
+
+-- // Loop de movimiento
+RunService.Heartbeat:Connect(function()
+    updateGhostPartMovement()
+end)
+
+
+-----Shift lock abajo
+
+
+
 -- Servicios
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
