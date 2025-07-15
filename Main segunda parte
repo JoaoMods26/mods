@@ -1,4 +1,4 @@
----Fantasma
+-- // Fantasma
 
 -- // Servicios
 local UserInputService = game:GetService("UserInputService")
@@ -45,6 +45,13 @@ local function createGhostPart(position)
     ghostPart.CanCollide = false
     ghostPart.Anchored = false
     ghostPart.Parent = workspace
+
+    -- 🌟 Mesh reducido
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.FileMesh
+    mesh.MeshId = "rbxassetid://11003401773"
+    mesh.Scale = Vector3.new(0.15, 0.15, 0.15)
+    mesh.Parent = ghostPart
 
     local bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -155,7 +162,7 @@ end)
 
 -- // Toggle de invincibilidad Rayfield
 MainTab:CreateToggle({
-    Name = "Invincibilidad",
+    Name = "Fantasma",
     CurrentValue = false,
     Flag = "InvincibilityToggle",
     Callback = function(Value)
@@ -171,6 +178,8 @@ MainTab:CreateToggle({
 RunService.Heartbeat:Connect(function()
     updateGhostPartMovement()
 end)
+
+
 
 
 
