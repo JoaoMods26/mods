@@ -1,0 +1,454 @@
+-- // JMODS Notifier Estilo Amethyst + Dropdown fijo a la derecha + Toggle Rainbow funcional con animación suave
+
+
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+
+
+local duenosURL = "https://pastebin.com/raw/S2X3j15A"
+local duenos = {}
+
+local function actualizarDuenos()
+    pcall(function()
+        local request = (syn and syn.request) or (http and http.request) or request
+        if request then
+            local res = request({Url = duenosURL, Method = "GET"})
+            if res and res.Body then
+                -- Limpiar la lista anterior
+                table.clear(duenos)
+                -- Volver a llenar
+                for nombre in string.gmatch(res.Body, "[^\r\n]+") do
+                    duenos[nombre] = true
+                end
+            end
+        end
+    end)
+end
+
+-- Actualizar por primera vez al cargar
+actualizarDuenos()
+
+-- Actualizar cada 5 minutos
+task.spawn(function()
+    while true do
+        task.wait(400) -- 5 minutos = 300 segundos
+        actualizarDuenos()
+    end
+end)
+
+-- Uso
+if duenos[player.Name] then
+    -- Mostrar interfaz
+end
+
+if getgenv then
+    if getgenv().__JMODS_RUNNING then return end
+    getgenv().__JMODS_RUNNING = true
+end
+
+
+for _, gui in ipairs(CoreGui:GetChildren()) do
+    if gui.Name == "JmodsNotifierUI" or gui.Name == "JmodsNotificacionVisual" then
+        gui:Destroy()
+    end
+end
+
+
+
+local firebaseURL = "https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json"
+local claveSeguridad = "JMODS2024"
+local ultimoTimestamp = 0
+local posicionesDisponibles = {"Arriba izquierda", "Arriba Derecha", "Abajo izquierda", "Abajo derecha", "En medio"}
+
+---if player.Name == nombreDelDueno then
+if duenos[player.Name] then
+    local screenGui = Instance.new("ScreenGui", CoreGui)
+    screenGui.Name = "JmodsNotifierUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+    local frame = Instance.new("Frame", screenGui)
+    frame.Size = UDim2.new(0, 400, 0, 260)
+    frame.Position = UDim2.new(0, 50, 0.4, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    Instance.new("UICorner", frame)
+
+    local titulo = Instance.new("TextLabel", frame)
+    titulo.Size = UDim2.new(1, 0, 0, 25)
+    titulo.BackgroundTransparency = 1
+    titulo.Text = " Enviar Notificación"
+    titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titulo.Font = Enum.Font.GothamBold
+    titulo.TextSize = 16
+
+    local encabezadoBox = Instance.new("TextBox", frame)
+    encabezadoBox.Size = UDim2.new(0.6, -20, 0, 30)
+    encabezadoBox.Position = UDim2.new(0, 10, 0, 30)
+    encabezadoBox.PlaceholderText = "Encabezado"
+    encabezadoBox.Text = ""
+    encabezadoBox.TextScaled = true
+
+    local cajaMensaje = Instance.new("TextBox", frame)
+    cajaMensaje.Size = UDim2.new(0.6, -20, 0, 40)
+    cajaMensaje.Position = UDim2.new(0, 10, 0, 65)
+    cajaMensaje.PlaceholderText = "Escribe el mensaje"
+    cajaMensaje.Text = ""
+    cajaMensaje.TextWrapped = true
+    cajaMensaje.TextScaled = true
+    cajaMensaje.ClearTextOnFocus = false
+
+    local duracionBox = Instance.new("TextBox", frame)
+    duracionBox.Size = UDim2.new(0.6, -20, 0, 30)
+    duracionBox.Position = UDim2.new(0, 10, 0, 110)
+    duracionBox.PlaceholderText = "Duración (s)"
+    duracionBox.Text = "6"
+    duracionBox.TextScaled = true
+
+    local posicionDropdown = Instance.new("TextButton", frame)
+    posicionDropdown.Size = UDim2.new(0.35, -10, 0, 30)
+    posicionDropdown.Position = UDim2.new(0.65, 5, 0, 30)
+    posicionDropdown.Text = "Elegir Posición"
+    posicionDropdown.TextScaled = true
+    posicionDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    posicionDropdown.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", posicionDropdown)
+
+    local dropdownFrame = Instance.new("Frame", frame)
+    dropdownFrame.Size = UDim2.new(0.35, -10, 0, #posicionesDisponibles * 25)
+    dropdownFrame.Position = UDim2.new(0.65, 5, 0, 65)
+    dropdownFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    dropdownFrame.Visible = false
+    dropdownFrame.ZIndex = 10
+    Instance.new("UICorner", dropdownFrame)
+
+    for i, pos in ipairs(posicionesDisponibles) do
+        local option = Instance.new("TextButton", dropdownFrame)
+        option.Size = UDim2.new(1, 0, 0, 25)
+        option.Position = UDim2.new(0, 0, 0, (i-1)*25)
+        option.Text = pos
+        option.TextScaled = true
+        option.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        option.TextColor3 = Color3.new(1,1,1)
+        option.ZIndex = 11
+        option.MouseButton1Click:Connect(function()
+            posicionDropdown.Text = pos
+            dropdownFrame.Visible = false
+        end)
+    end
+
+    posicionDropdown.MouseButton1Click:Connect(function()
+        dropdownFrame.Visible = not dropdownFrame.Visible
+    end)
+
+    local rainbowToggle = Instance.new("TextButton", frame)
+    rainbowToggle.Size = UDim2.new(0.35, -10, 0, 25)
+    rainbowToggle.Position = UDim2.new(0.65, 5, 0, 110)
+    rainbowToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    rainbowToggle.TextColor3 = Color3.new(1, 1, 1)
+    rainbowToggle.Text = "🌈 Modo Rainbow: OFF"
+    rainbowToggle.TextScaled = true
+    Instance.new("UICorner", rainbowToggle)
+
+    local isRainbow = false
+    rainbowToggle.MouseButton1Click:Connect(function()
+        isRainbow = not isRainbow
+        rainbowToggle.Text = isRainbow and "🌈 Modo Rainbow: ON" or "🌈 Modo Rainbow: OFF"
+    end)
+
+    local colorR = Instance.new("TextBox", frame)
+    colorR.Size = UDim2.new(0.2, -10, 0, 25)
+    colorR.Position = UDim2.new(0, 10, 0, 155)
+    colorR.PlaceholderText = "R"
+    colorR.Text = "0"
+    colorR.TextScaled = true
+
+    local colorG = Instance.new("TextBox", frame)
+    colorG.Size = UDim2.new(0.2, -10, 0, 25)
+    colorG.Position = UDim2.new(0.2, 5, 0, 155)
+    colorG.PlaceholderText = "G"
+    colorG.Text = "0"
+    colorG.TextScaled = true
+
+    local colorB = Instance.new("TextBox", frame)
+    colorB.Size = UDim2.new(0.2, -10, 0, 25)
+    colorB.Position = UDim2.new(0.4, 0, 0, 155)
+    colorB.PlaceholderText = "B"
+    colorB.Text = "0"
+    colorB.TextScaled = true
+
+    local boton = Instance.new("TextButton", frame)
+    boton.Size = UDim2.new(1, -20, 0, 30)
+    boton.Position = UDim2.new(0, 10, 0, 195)
+    boton.Text = " Enviar a todos"
+    boton.TextScaled = true
+    boton.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+    boton.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", boton)
+
+    boton.MouseButton1Click:Connect(function()
+        local encabezado = encabezadoBox.Text
+        if encabezado == "" then return end
+        local mensaje = cajaMensaje.Text
+        local duracion = tonumber(duracionBox.Text) or 6
+        local posicion = posicionDropdown.Text
+        local r = tonumber(colorR.Text) or 109
+        local g = tonumber(colorG.Text) or 89
+        local b = tonumber(colorB.Text) or 122
+
+        local data = {
+            encabezado = encabezado,
+            mensaje = mensaje,
+            duracion = duracion,
+            posicion = posicion,
+            color = {r,g,b},
+            rainbow = isRainbow,
+            timestamp = os.time(),
+            key = claveSeguridad
+        }
+
+        local jsonData = HttpService:JSONEncode(data)
+        local request = (syn and syn.request) or (http and http.request) or request
+        if request then
+            request({
+                Url = firebaseURL,
+                Method = "PUT",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = jsonData
+            })
+            task.delay(duracion, function()
+                request({Url = firebaseURL, Method = "DELETE"})
+            end)
+        end
+    end)
+end
+
+-- RECEPTOR VISUAL
+
+spawn(function()
+    local request = (syn and syn.request) or (http and http.request) or request
+    if not request then return end
+
+    while true do
+        task.wait(2.5)
+        pcall(function()
+            local response = request({ Url = firebaseURL, Method = "GET" })
+            if response and response.StatusCode == 200 and response.Body and response.Body ~= "null" then
+                local data = HttpService:JSONDecode(response.Body)
+                if data.timestamp and data.timestamp ~= ultimoTimestamp then
+                    ultimoTimestamp = data.timestamp
+
+-- Asegura que no se dupliquen notificaciones
+for _, gui in ipairs(CoreGui:GetChildren()) do
+    if gui.Name == "JmodsNotificacionVisual" then
+        gui:Destroy()
+    end
+end
+
+
+                    local notifGui = Instance.new("ScreenGui", CoreGui)
+                    notifGui.Name = "JmodsNotificacionVisual"
+                    local notifFrame = Instance.new("Frame", notifGui)
+                    notifFrame.Size = UDim2.new(0, 320, 0, 60)
+                    notifFrame.BackgroundTransparency = 0.45
+                    notifFrame.BorderSizePixel = 0
+                    notifFrame.ClipsDescendants = true
+                    Instance.new("UICorner", notifFrame)
+
+                    local pos = data.posicion or "Arriba derecha"
+                    if pos == "Arriba derecha" then
+                        notifFrame.Position = UDim2.new(1, -340, 0, 10)
+                    elseif pos == "Arroiba izquierda" then
+                        notifFrame.Position = UDim2.new(0, 10, 0, 10)
+                    elseif pos == "Abajo derecha" then
+                        notifFrame.Position = UDim2.new(1, -340, 1, -70)
+                    elseif pos == "Abajo izquierda" then
+                        notifFrame.Position = UDim2.new(0, 10, 1, -70)
+                    elseif pos == "En medio" then
+                        notifFrame.Position = UDim2.new(0.5, -160, 0.5, -30)
+                    end
+
+                    if data.rainbow then
+                        task.spawn(function()
+                            local h = 0
+                            while notifFrame.Parent do
+                                h = (h + 0.01) % 1
+                                local r, g, b = Color3.fromHSV(h, 1, 1):ToRGB()
+                                notifFrame.BackgroundColor3 = Color3.new(r, g, b)
+                                task.wait(0.05)
+                            end
+                        end)
+                    else
+                        notifFrame.BackgroundColor3 = Color3.fromRGB(unpack(data.color or {109, 89, 122}))
+                    end
+
+                    local icon = Instance.new("TextLabel", notifFrame)
+                    icon.Size = UDim2.new(0, 30, 0, 30)
+                    icon.Position = UDim2.new(0, 10, 0, 15)
+                    icon.BackgroundTransparency = 1
+                    icon.Text = "✨"
+                    icon.TextSize = 20
+                    icon.Font = Enum.Font.GothamBold
+                    icon.TextColor3 = Color3.new(1,1,1)
+
+                    local encabezadoLabel = Instance.new("TextLabel", notifFrame)
+                    encabezadoLabel.Size = UDim2.new(1, -50, 0, 20)
+                    encabezadoLabel.Position = UDim2.new(0, 50, 0, 10)
+                    encabezadoLabel.Text = data.encabezado or "Notificación"
+                    encabezadoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    encabezadoLabel.Font = Enum.Font.GothamBold
+                    encabezadoLabel.TextSize = 16
+                    encabezadoLabel.BackgroundTransparency = 1
+                    encabezadoLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local mensajeOriginal = data.mensaje or "Mensaje sin contenido"
+
+-- Función para detectar y clasificar links
+local function identificarLink(mensaje)
+    local enlaces = {
+        {clave = "youtube", nombre = "YouTube"},
+        {clave = "youtu.be", nombre = "YouTube"},
+        {clave = "roblox.com", nombre = "Roblox"},
+        {clave = "discord.gg", nombre = "Discord"},
+        {clave = "twitter.com", nombre = "Twitter"},
+        {clave = "github.com", nombre = "GitHub"},
+        {clave = "tiktok.com", nombre = "TikTok"},
+        {clave = "facebook.com", nombre = "Facebook"},
+        {clave = "instagram.com", nombre = "Instagram"}
+    }
+
+    for _, tipo in ipairs(enlaces) do
+        if string.find(mensaje:lower(), tipo.clave) then
+            local url = string.match(mensaje, "https?://[%w%p]+")
+            if url then
+                return url, tipo.nombre
+            end
+        end
+    end
+
+    -- Si contiene un link genérico
+    local url = string.match(mensaje, "https?://[%w%p]+")
+    if url then
+        return url, "Link"
+    end
+
+    return nil
+end
+
+local urlDetectado, textoEnlace = identificarLink(mensajeOriginal)
+
+if urlDetectado then
+    local contenidoBtn = Instance.new("TextButton", notifFrame)
+    contenidoBtn.Size = UDim2.new(1, -50, 0, 20)
+    contenidoBtn.Position = UDim2.new(0, 50, 0, 30)
+    contenidoBtn.Text = "🔗 " .. textoEnlace
+    contenidoBtn.TextColor3 = Color3.fromRGB(0, 170, 255)
+    contenidoBtn.Font = Enum.Font.Gotham
+    contenidoBtn.TextSize = 14
+    contenidoBtn.BackgroundTransparency = 1
+    contenidoBtn.TextXAlignment = Enum.TextXAlignment.Left
+    contenidoBtn.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard(urlDetectado)
+        end
+        if (syn and syn.open_url) then
+            syn.open_url(urlDetectado)
+        elseif (getgenv().openurl) then
+            getgenv().openurl(urlDetectado)
+        end
+    end)
+else
+    local mensajeOriginal = data.mensaje or "Mensaje sin contenido"
+local yOffset = 30
+
+local function crearLabel(texto, clickableUrl)
+    local label
+    if clickableUrl then
+        label = Instance.new("TextButton")
+        label.Text = "🔗 " .. texto
+        label.TextColor3 = Color3.fromRGB(0, 170, 255)
+        label.MouseButton1Click:Connect(function()
+            if setclipboard then setclipboard(clickableUrl) end
+            if (syn and syn.open_url) then
+                syn.open_url(clickableUrl)
+            elseif getgenv().openurl then
+                getgenv().openurl(clickableUrl)
+            end
+        end)
+        -- Para touch en móviles
+        label.TouchTap:Connect(function()
+            if setclipboard then setclipboard(clickableUrl) end
+            if (syn and syn.open_url) then
+                syn.open_url(clickableUrl)
+            elseif getgenv().openurl then
+                getgenv().openurl(clickableUrl)
+            end
+        end)
+    else
+        label = Instance.new("TextLabel")
+        label.Text = texto
+        label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+
+    label.Size = UDim2.new(1, -50, 0, 20)
+    label.Position = UDim2.new(0, 50, 0, yOffset)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = notifFrame
+
+    yOffset += 20
+end
+
+-- Función para dividir el mensaje en partes: texto normal y links
+local function procesarMensaje(msg)
+    local lastEnd = 1
+    for inicio, fin, link in msg:gmatch("()https?://[%w%p]+()") do
+        local textoPrevio = msg:sub(lastEnd, inicio - 1)
+        if textoPrevio ~= "" then
+            crearLabel(textoPrevio, nil)
+        end
+
+        local nombreAmigable = "Link"
+        if link:find("youtube") or link:find("youtu.be") then nombreAmigable = "YouTube"
+        elseif link:find("roblox.com") then nombreAmigable = "Roblox"
+        elseif link:find("discord.gg") then nombreAmigable = "Discord"
+        elseif link:find("twitter.com") then nombreAmigable = "Twitter"
+        elseif link:find("tiktok.com") then nombreAmigable = "TikTok"
+        elseif link:find("github.com") then nombreAmigable = "GitHub"
+        elseif link:find("instagram.com") then nombreAmigable = "Instagram"
+        elseif link:find("facebook.com") then nombreAmigable = "Facebook"
+        end
+
+        crearLabel(nombreAmigable, link)
+        lastEnd = fin
+    end
+
+    local textoFinal = msg:sub(lastEnd)
+    if textoFinal ~= "" then
+        crearLabel(textoFinal, nil)
+    end
+end
+
+procesarMensaje(mensajeOriginal)
+
+
+end
+
+
+
+                    task.delay(data.duracion or 6, function()
+                        notifGui:Destroy()
+                    end)
+                end
+            end
+        end)
+    end
+end)
