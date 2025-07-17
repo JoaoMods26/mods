@@ -3154,15 +3154,13 @@ ColorPicker = themesTab:CreateColorPicker({
 
 
 ----Creditos-----
-
 _G.Window = Window
-
-
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/creditos"))()
 
 
 
-
+-----Notificaciones
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Notificaciones"))()
 
 
 
