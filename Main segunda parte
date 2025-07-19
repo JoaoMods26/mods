@@ -26,7 +26,7 @@ local moveFlags = {
 	LeftControl = false,
 }
 
--- // GUI móvil (creada una sola vez)
+-- // GUI móvil
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "GhostMobileControls"
 screenGui.Parent = player:WaitForChild("PlayerGui")
@@ -46,7 +46,6 @@ for i, dir in ipairs(directions) do
 	button.Parent = screenGui
 	buttons[dir[1]] = button
 
-	-- Manejo de flags de movimiento móvil
 	button.MouseButton1Down:Connect(function()
 		moveFlags[dir[1]] = true
 	end)
@@ -55,7 +54,7 @@ for i, dir in ipairs(directions) do
 	end)
 end
 
--- // Funciones originales (sin cambios excepto plataforma invisibilidad)
+-- // Funciones originales
 local function createPlatform(position)
 	if platform then platform:Destroy() end
 	platform = Instance.new("Part")
@@ -64,8 +63,9 @@ local function createPlatform(position)
 	platform.Position = position - Vector3.new(0, 3.5, 0)
 	platform.Anchored = true
 	platform.BrickColor = BrickColor.new("Really black")
-	platform.Transparency = 1 -- invisible siempre
+	platform.Transparency = 1
 	platform.CanCollide = true
+	platform.CastShadow = false
 	platform.Parent = workspace
 end
 
@@ -111,7 +111,6 @@ local function updateGhostPartMovement()
 	local speed = 60
 	local cameraCFrame = camera.CFrame
 
-	-- Teclas físicas
 	if UserInputService:IsKeyDown(Enum.KeyCode.W) or moveFlags.W then
 		moveDirection += cameraCFrame.LookVector * speed
 	end
@@ -145,7 +144,9 @@ local function teleportAndGhost()
 
 		for _, obj in pairs(character:GetDescendants()) do
 			if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
-				obj.Transparency = 0
+				if obj.Name ~= "CollisionPart" then
+					obj.Transparency = 0
+				end
 			elseif obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
 				obj.Handle.Transparency = 0
 			elseif obj:IsA("SpecialMesh") and obj.Parent:IsA("Part") then
@@ -158,15 +159,19 @@ local function teleportAndGhost()
 			humanoidRootPart.Transparency = 1
 		end
 
+		-- Mantener CollisionPart invisible
+		local collidePart = character:FindFirstChild("CollisionPart", true)
+		if collidePart then
+			collidePart.Transparency = 1
+		end
+
 		camera.CameraSubject = character:FindFirstChildOfClass("Humanoid") or character
 		camera.CameraType = Enum.CameraType.Custom
 
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
 
-		-- Ocultar botones móviles
 		screenGui.Enabled = false
-
 		isGhostMode = false
 	else
 		lastPosition = humanoidRootPart.CFrame
@@ -199,7 +204,6 @@ player.CharacterAdded:Connect(function(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
 
-	-- Reset ghost mode al morir
 	if isGhostMode then
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
@@ -208,11 +212,16 @@ player.CharacterAdded:Connect(function(char)
 		isGhostMode = false
 	end
 
-	-- Asegurar que la plataforma se destruya siempre
 	if platform then platform:Destroy() platform = nil end
 
 	-- Ocultar botones móviles al respawnear
 	screenGui.Enabled = false
+
+	-- Asegurar CollisionPart invisible tras respawn
+	local collidePart = character:FindFirstChild("CollisionPart", true)
+	if collidePart then
+		collidePart.Transparency = 1
+	end
 end)
 
 -- // Toggle Rayfield
