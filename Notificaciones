@@ -1,4 +1,4 @@
- HttpService = game:GetService("HttpService")
+HttpService = game:GetService("HttpService")
  Players = game:GetService("Players")
  player = Players.LocalPlayer
  CoreGui = game:GetService("CoreGui")
@@ -8,7 +8,7 @@
  duenosURL = "https://pastebin.com/raw/S2X3j15A"
  duenos = {}
 
- function actualizarDuenos()
+local function actualizarDuenos()
     pcall(function()
         local request = (syn and syn.request) or (http and http.request) or request
         if request then
@@ -41,6 +41,10 @@ if duenos[player.Name] then
     -- Mostrar interfaz
 end
 
+if getgenv then
+    if getgenv().__JMODS_RUNNING then return end
+    getgenv().__JMODS_RUNNING = true
+end
 
 
 for _, gui in ipairs(CoreGui:GetChildren()) do
@@ -51,43 +55,17 @@ end
 
 
 
- firebaseURL = "https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json"
- claveSeguridad = "JMODS2024"
- ultimoTimestamp = 0
- posicionesDisponibles = {"Arriba izquierda", "Arriba Derecha", "Abajo izquierda", "Abajo derecha", "En medio"}
+local firebaseURL = "https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json"
+local claveSeguridad = "JMODS2024"
+local ultimoTimestamp = 0
+local posicionesDisponibles = {"Arriba izquierda", "Arriba Derecha", "Abajo izquierda", "Abajo derecha", "En medio"}
 
 ---if player.Name == nombreDelDueno then
 if duenos[player.Name] then
-    local UserInputService = game:GetService("UserInputService")
-    local screenGui = Instance.new("ScreenGui")
+    local screenGui = Instance.new("ScreenGui", CoreGui)
     screenGui.Name = "JmodsNotifierUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    screenGui.Enabled = false -- Oculto al inicio
-    screenGui.Parent = CoreGui
-     if not UserInputService.TouchEnabled then
-        UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if not gameProcessed and input.KeyCode == Enum.KeyCode.Home then
-                screenGui.Enabled = not screenGui.Enabled
-            end
-        end)
-    end
-
-if UserInputService.TouchEnabled then
-        local abrirBtn = Instance.new("TextButton")
-        abrirBtn.Size = UDim2.new(0, 60, 0, 30)
-        abrirBtn.Position = UDim2.new(1, -70, 1, -90)
-        abrirBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        abrirBtn.TextColor3 = Color3.new(1, 1, 1)
-        abrirBtn.Text = "🛠️ JMODS"
-        abrirBtn.TextScaled = true
-        abrirBtn.Parent = screenGui
-        Instance.new("UICorner", abrirBtn)
-
-        abrirBtn.MouseButton1Click:Connect(function()
-            screenGui.Enabled = not screenGui.Enabled
-        end)
-    end
 
     local frame = Instance.new("Frame", screenGui)
     frame.Size = UDim2.new(0, 400, 0, 260)
