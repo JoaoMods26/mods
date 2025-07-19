@@ -23,12 +23,13 @@ local lastPosition = nil
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MobileControls"
 screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Enabled = false -- 🔑 empieza oculto
 
 local buttons = {}
 
 local directions = {
-	{ name = "Up", pos = UDim2.new(0.1, 0, 0.6, 0), move = Vector3.new(0,0,-1) },
-	{ name = "Down", pos = UDim2.new(0.1, 0, 0.8, 0), move = Vector3.new(0,0,1) },
+	{ name = "Up", pos = UDim2.new(0.1, 0, 0.6, 0), move = Vector3.new(0,0,1) }, -- 🔁 corregido adelante
+	{ name = "Down", pos = UDim2.new(0.1, 0, 0.8, 0), move = Vector3.new(0,0,-1) }, -- 🔁 corregido atrás
 	{ name = "Left", pos = UDim2.new(0.05, 0, 0.7, 0), move = Vector3.new(-1,0,0) },
 	{ name = "Right", pos = UDim2.new(0.15, 0, 0.7, 0), move = Vector3.new(1,0,0) },
 	{ name = "UpY", pos = UDim2.new(0.8, 0, 0.6, 0), move = Vector3.new(0,1,0) },
@@ -42,6 +43,7 @@ for _, dir in ipairs(directions) do
 	btn.Size = UDim2.new(0, 50, 0, 50)
 	btn.Position = dir.pos
 	btn.BackgroundTransparency = 0.3
+	btn.Visible = true
 	btn.Parent = screenGui
 	buttons[dir.name] = {button = btn, move = dir.move, isPressed = false}
 
@@ -175,6 +177,8 @@ local function teleportAndGhost()
 
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
+
+		screenGui.Enabled = false -- 🔑 ocultar botones al desactivar
 		isGhostMode = false
 	else
 		lastPosition = humanoidRootPart.CFrame
@@ -193,25 +197,33 @@ local function teleportAndGhost()
 			end
 		end
 
+		screenGui.Enabled = true --  mostrar botones al activar
 		isGhostMode = true
 	end
 end
 
--- // Manejo de respawn
+--- Manejo de respawn
 player.CharacterAdded:Connect(function(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
 
+	wait(1) --- character cargue completamente
+
 	if isGhostMode then
-		if ghostPart then ghostPart:Destroy() ghostPart = nil end
-		if platform then platform:Destroy() platform = nil end
-		camera.CameraSubject = character:WaitForChild("Humanoid")
-		camera.CameraType = Enum.CameraType.Custom
-		isGhostMode = false
+		--  cámara ghostPart existe
+		if ghostPart and ghostPart.Parent then
+			camera.CameraSubject = ghostPart
+			camera.CameraType = Enum.CameraType.Custom
+			screenGui.Enabled = true -- mantener botones visibles
+		else
+			isGhostMode = false
+			screenGui.Enabled = false -- ocultar si ghostPart no existe
+		end
+	else
+		screenGui.Enabled = false -- si no estás en ghost mode, siempre ocultar
 	end
 end)
 
--- // Toggle de invincibilidad Rayfield
 MainTab:CreateToggle({
 	Name = "Fantasma",
 	CurrentValue = false,
@@ -225,11 +237,10 @@ MainTab:CreateToggle({
 	end,
 })
 
--- // Loop de movimiento
+---movimiento
 RunService.Heartbeat:Connect(function()
 	updateGhostPartMovement()
 end)
-
 
 
 
