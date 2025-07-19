@@ -27,35 +27,37 @@ screenGui.Enabled = false -- 🔑 empieza oculto
 
 local buttons = {}
 
-local directions = {
-	{ name = "Up", pos = UDim2.new(0.1, 0, 0.6, 0), move = Vector3.new(0,0,1) }, -- 🔁 corregido adelante
-	{ name = "Down", pos = UDim2.new(0.1, 0, 0.8, 0), move = Vector3.new(0,0,-1) }, -- 🔁 corregido atrás
-	{ name = "Left", pos = UDim2.new(0.05, 0, 0.7, 0), move = Vector3.new(-1,0,0) },
-	{ name = "Right", pos = UDim2.new(0.15, 0, 0.7, 0), move = Vector3.new(1,0,0) },
-	{ name = "UpY", pos = UDim2.new(0.8, 0, 0.6, 0), move = Vector3.new(0,1,0) },
-	{ name = "DownY", pos = UDim2.new(0.8, 0, 0.8, 0), move = Vector3.new(0,-1,0) },
-}
+if UserInputService.TouchEnabled then -- 🔑 solo crea botones si es móvil
+	local directions = {
+		{ name = "Up", pos = UDim2.new(0.1, 0, 0.6, 0), move = Vector3.new(0,0,1) },
+		{ name = "Down", pos = UDim2.new(0.1, 0, 0.8, 0), move = Vector3.new(0,0,-1) },
+		{ name = "Left", pos = UDim2.new(0.05, 0, 0.7, 0), move = Vector3.new(-1,0,0) },
+		{ name = "Right", pos = UDim2.new(0.15, 0, 0.7, 0), move = Vector3.new(1,0,0) },
+		{ name = "UpY", pos = UDim2.new(0.8, 0, 0.6, 0), move = Vector3.new(0,1,0) },
+		{ name = "DownY", pos = UDim2.new(0.8, 0, 0.8, 0), move = Vector3.new(0,-1,0) },
+	}
 
-for _, dir in ipairs(directions) do
-	local btn = Instance.new("TextButton")
-	btn.Name = dir.name.."Button"
-	btn.Text = dir.name
-	btn.Size = UDim2.new(0, 50, 0, 50)
-	btn.Position = dir.pos
-	btn.BackgroundTransparency = 0.3
-	btn.Visible = true
-	btn.Parent = screenGui
-	buttons[dir.name] = {button = btn, move = dir.move, isPressed = false}
+	for _, dir in ipairs(directions) do
+		local btn = Instance.new("TextButton")
+		btn.Name = dir.name.."Button"
+		btn.Text = dir.name
+		btn.Size = UDim2.new(0, 50, 0, 50)
+		btn.Position = dir.pos
+		btn.BackgroundTransparency = 0.3
+		btn.Visible = true
+		btn.Parent = screenGui
+		buttons[dir.name] = {button = btn, move = dir.move, isPressed = false}
 
-	btn.MouseButton1Down:Connect(function()
-		buttons[dir.name].isPressed = true
-	end)
-	btn.MouseButton1Up:Connect(function()
-		buttons[dir.name].isPressed = false
-	end)
-	btn.TouchTap:Connect(function()
-		buttons[dir.name].isPressed = false
-	end)
+		btn.MouseButton1Down:Connect(function()
+			buttons[dir.name].isPressed = true
+		end)
+		btn.MouseButton1Up:Connect(function()
+			buttons[dir.name].isPressed = false
+		end)
+		btn.TouchTap:Connect(function()
+			buttons[dir.name].isPressed = false
+		end)
+	end
 end
 
 -- // Funciones originales
@@ -133,15 +135,17 @@ local function updateGhostPartMovement()
 	end
 
 	-- Mobile movement
-	for name, data in pairs(buttons) do
-		if data.isPressed then
-			local dir = data.move
-			if name == "Up" or name == "Down" then
-				moveDirection += cameraCFrame.LookVector * dir.Z * speed
-			elseif name == "Left" or name == "Right" then
-				moveDirection += cameraCFrame.RightVector * dir.X * speed
-			elseif name == "UpY" or name == "DownY" then
-				moveDirection += Vector3.new(0, dir.Y * speed, 0)
+	if UserInputService.TouchEnabled then
+		for name, data in pairs(buttons) do
+			if data.isPressed then
+				local dir = data.move
+				if name == "Up" or name == "Down" then
+					moveDirection += cameraCFrame.LookVector * dir.Z * speed
+				elseif name == "Left" or name == "Right" then
+					moveDirection += cameraCFrame.RightVector * dir.X * speed
+				elseif name == "UpY" or name == "DownY" then
+					moveDirection += Vector3.new(0, dir.Y * speed, 0)
+				end
 			end
 		end
 	end
@@ -168,6 +172,7 @@ local function teleportAndGhost()
 			end
 		end
 
+		-- 🔧 Mantener HumanoidRootPart invisible
 		if humanoidRootPart then
 			humanoidRootPart.Transparency = 1
 		end
@@ -178,7 +183,7 @@ local function teleportAndGhost()
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
 
-		screenGui.Enabled = false -- 🔑 ocultar botones al desactivar
+		screenGui.Enabled = false
 		isGhostMode = false
 	else
 		lastPosition = humanoidRootPart.CFrame
@@ -197,33 +202,43 @@ local function teleportAndGhost()
 			end
 		end
 
-		screenGui.Enabled = true --  mostrar botones al activar
+		if UserInputService.TouchEnabled then
+			screenGui.Enabled = true -- solo en móvil
+		end
+
 		isGhostMode = true
 	end
 end
 
---- Manejo de respawn
+-- // Manejo de respawn
 player.CharacterAdded:Connect(function(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
 
-	wait(1) --- character cargue completamente
+	wait(1) -- 🔑 pequeño delay para cargar character
 
 	if isGhostMode then
-		--  cámara ghostPart existe
 		if ghostPart and ghostPart.Parent then
 			camera.CameraSubject = ghostPart
 			camera.CameraType = Enum.CameraType.Custom
-			screenGui.Enabled = true -- mantener botones visibles
+			if UserInputService.TouchEnabled then
+				screenGui.Enabled = true
+			end
 		else
 			isGhostMode = false
-			screenGui.Enabled = false -- ocultar si ghostPart no existe
+			screenGui.Enabled = false
+		end
+
+		-- 🔧 Mantener HumanoidRootPart invisible tras respawn
+		if humanoidRootPart then
+			humanoidRootPart.Transparency = 1
 		end
 	else
-		screenGui.Enabled = false -- si no estás en ghost mode, siempre ocultar
+		screenGui.Enabled = false
 	end
 end)
 
+-- // Toggle de invincibilidad Rayfield
 MainTab:CreateToggle({
 	Name = "Fantasma",
 	CurrentValue = false,
@@ -237,10 +252,11 @@ MainTab:CreateToggle({
 	end,
 })
 
----movimiento
+-- // Loop de movimiento
 RunService.Heartbeat:Connect(function()
 	updateGhostPartMovement()
 end)
+
 
 
 
