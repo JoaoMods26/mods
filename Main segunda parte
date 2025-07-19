@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
+local StarterGui = game:GetService("StarterGui")
 
 -- // Variables de jugador
 local player = Players.LocalPlayer
@@ -18,167 +19,216 @@ local ghostPart = nil
 local platform = nil
 local lastPosition = nil
 
+-- // GUI móvil
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MobileControls"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local buttons = {}
+
+local directions = {
+	{ name = "Up", pos = UDim2.new(0.1, 0, 0.6, 0), move = Vector3.new(0,0,-1) },
+	{ name = "Down", pos = UDim2.new(0.1, 0, 0.8, 0), move = Vector3.new(0,0,1) },
+	{ name = "Left", pos = UDim2.new(0.05, 0, 0.7, 0), move = Vector3.new(-1,0,0) },
+	{ name = "Right", pos = UDim2.new(0.15, 0, 0.7, 0), move = Vector3.new(1,0,0) },
+	{ name = "UpY", pos = UDim2.new(0.8, 0, 0.6, 0), move = Vector3.new(0,1,0) },
+	{ name = "DownY", pos = UDim2.new(0.8, 0, 0.8, 0), move = Vector3.new(0,-1,0) },
+}
+
+for _, dir in ipairs(directions) do
+	local btn = Instance.new("TextButton")
+	btn.Name = dir.name.."Button"
+	btn.Text = dir.name
+	btn.Size = UDim2.new(0, 50, 0, 50)
+	btn.Position = dir.pos
+	btn.BackgroundTransparency = 0.3
+	btn.Parent = screenGui
+	buttons[dir.name] = {button = btn, move = dir.move, isPressed = false}
+
+	btn.MouseButton1Down:Connect(function()
+		buttons[dir.name].isPressed = true
+	end)
+	btn.MouseButton1Up:Connect(function()
+		buttons[dir.name].isPressed = false
+	end)
+	btn.TouchTap:Connect(function()
+		buttons[dir.name].isPressed = false
+	end)
+end
+
 -- // Funciones originales
 local function createPlatform(position)
-    if platform then platform:Destroy() end
-    platform = Instance.new("Part")
-    platform.Name = "PlayerPlatform"
-    platform.Size = Vector3.new(10, 1, 10)
-    platform.Position = position - Vector3.new(0, 3.5, 0)
-    platform.Anchored = true
-    platform.BrickColor = BrickColor.new("Really black")
-    platform.Parent = workspace
+	if platform then platform:Destroy() end
+	platform = Instance.new("Part")
+	platform.Name = "PlayerPlatform"
+	platform.Size = Vector3.new(10, 1, 10)
+	platform.Position = position - Vector3.new(0, 3.5, 0)
+	platform.Anchored = true
+	platform.BrickColor = BrickColor.new("Really black")
+	platform.Parent = workspace
 end
 
 local function createGhostPart(position)
-    if workspace:FindFirstChild("GhostPart") then
-        workspace.GhostPart:Destroy()
-    end
-    if ghostPart then ghostPart:Destroy() end
+	if workspace:FindFirstChild("GhostPart") then
+		workspace.GhostPart:Destroy()
+	end
+	if ghostPart then ghostPart:Destroy() end
 
-    ghostPart = Instance.new("Part")
-    ghostPart.Name = "GhostPart"
-    ghostPart.Size = Vector3.new(2, 2, 2)
-    ghostPart.Position = position.Position + Vector3.new(0, 2, 0)
-    ghostPart.Transparency = 0.5
-    ghostPart.BrickColor = BrickColor.new("Really white")
-    ghostPart.CanCollide = false
-    ghostPart.Anchored = false
-    ghostPart.Parent = workspace
+	ghostPart = Instance.new("Part")
+	ghostPart.Name = "GhostPart"
+	ghostPart.Size = Vector3.new(2, 2, 2)
+	ghostPart.Position = position.Position + Vector3.new(0, 2, 0)
+	ghostPart.Transparency = 0.5
+	ghostPart.BrickColor = BrickColor.new("Really white")
+	ghostPart.CanCollide = false
+	ghostPart.Anchored = false
+	ghostPart.Parent = workspace
 
-    -- 🌟 Mesh reducido
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.FileMesh
-    mesh.MeshId = "rbxassetid://11003401773"
-    mesh.Scale = Vector3.new(0.15, 0.15, 0.15)
-    mesh.Parent = ghostPart
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.FileMesh
+	mesh.MeshId = "rbxassetid://11003401773"
+	mesh.Scale = Vector3.new(0.15, 0.15, 0.15)
+	mesh.Parent = ghostPart
 
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.Parent = ghostPart
+	local bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+	bodyVelocity.Parent = ghostPart
 
-    local bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
-    bodyGyro.CFrame = CFrame.new(ghostPart.Position)
-    bodyGyro.Parent = ghostPart
+	local bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
+	bodyGyro.CFrame = CFrame.new(ghostPart.Position)
+	bodyGyro.Parent = ghostPart
 
-    camera.CameraSubject = ghostPart
-    camera.CameraType = Enum.CameraType.Custom
+	camera.CameraSubject = ghostPart
+	camera.CameraType = Enum.CameraType.Custom
 end
 
 local function updateGhostPartMovement()
-    if not isGhostMode or not ghostPart then return end
-    local moveDirection = Vector3.new(0, 0, 0)
-    local speed = 60
-    local cameraCFrame = camera.CFrame
+	if not isGhostMode or not ghostPart then return end
+	local moveDirection = Vector3.new(0, 0, 0)
+	local speed = 60
+	local cameraCFrame = camera.CFrame
 
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-        moveDirection += cameraCFrame.LookVector * speed
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-        moveDirection -= cameraCFrame.LookVector * speed
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-        moveDirection -= cameraCFrame.RightVector * speed
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-        moveDirection += cameraCFrame.RightVector * speed
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-        moveDirection += Vector3.new(0, speed, 0)
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        moveDirection -= Vector3.new(0, speed, 0)
-    end
+	-- PC movement
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+		moveDirection += cameraCFrame.LookVector * speed
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+		moveDirection -= cameraCFrame.LookVector * speed
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		moveDirection -= cameraCFrame.RightVector * speed
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		moveDirection += cameraCFrame.RightVector * speed
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+		moveDirection += Vector3.new(0, speed, 0)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+		moveDirection -= Vector3.new(0, speed, 0)
+	end
 
-    local bodyVelocity = ghostPart:FindFirstChildOfClass("BodyVelocity")
-    if bodyVelocity then
-        bodyVelocity.Velocity = moveDirection
-    end
+	-- Mobile movement
+	for name, data in pairs(buttons) do
+		if data.isPressed then
+			local dir = data.move
+			if name == "Up" or name == "Down" then
+				moveDirection += cameraCFrame.LookVector * dir.Z * speed
+			elseif name == "Left" or name == "Right" then
+				moveDirection += cameraCFrame.RightVector * dir.X * speed
+			elseif name == "UpY" or name == "DownY" then
+				moveDirection += Vector3.new(0, dir.Y * speed, 0)
+			end
+		end
+	end
+
+	local bodyVelocity = ghostPart:FindFirstChildOfClass("BodyVelocity")
+	if bodyVelocity then
+		bodyVelocity.Velocity = moveDirection
+	end
 end
 
 local function teleportAndGhost()
-    if isGhostMode then
-        humanoidRootPart.CFrame = ghostPart and CFrame.new(ghostPart.Position + Vector3.new(0, 3, 0)) or CFrame.new(0, 100, 0)
-        character.Humanoid.WalkSpeed = 16
-        character.Humanoid.JumpPower = 50
+	if isGhostMode then
+		humanoidRootPart.CFrame = ghostPart and CFrame.new(ghostPart.Position + Vector3.new(0, 3, 0)) or CFrame.new(0, 100, 0)
+		character.Humanoid.WalkSpeed = 16
+		character.Humanoid.JumpPower = 50
 
-        for _, obj in pairs(character:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
-                obj.Transparency = 0
-            elseif obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
-                obj.Handle.Transparency = 0
-            elseif obj:IsA("SpecialMesh") and obj.Parent:IsA("Part") then
-                obj.Parent.Transparency = 0
-            end
-        end
+		for _, obj in pairs(character:GetDescendants()) do
+			if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
+				obj.Transparency = 0
+			elseif obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
+				obj.Handle.Transparency = 0
+			elseif obj:IsA("SpecialMesh") and obj.Parent:IsA("Part") then
+				obj.Parent.Transparency = 0
+			end
+		end
 
-        -- Mantener HumanoidRootPart invisible
-        if humanoidRootPart then
-            humanoidRootPart.Transparency = 1
-        end
+		if humanoidRootPart then
+			humanoidRootPart.Transparency = 1
+		end
 
-        camera.CameraSubject = character:FindFirstChildOfClass("Humanoid") or character
-        camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = character:FindFirstChildOfClass("Humanoid") or character
+		camera.CameraType = Enum.CameraType.Custom
 
-        if ghostPart then ghostPart:Destroy() ghostPart = nil end
-        if platform then platform:Destroy() platform = nil end
-        isGhostMode = false
-    else
-        lastPosition = humanoidRootPart.CFrame
-        local teleportPosition = Vector3.new(math.random(-1000, 1000), 100, math.random(-1000, 1000))
-        createPlatform(teleportPosition)
-        humanoidRootPart.CFrame = CFrame.new(teleportPosition)
-        createGhostPart(lastPosition)
-        character.Humanoid.WalkSpeed = 0
-        character.Humanoid.JumpPower = 0
+		if ghostPart then ghostPart:Destroy() ghostPart = nil end
+		if platform then platform:Destroy() platform = nil end
+		isGhostMode = false
+	else
+		lastPosition = humanoidRootPart.CFrame
+		local teleportPosition = Vector3.new(math.random(-1000, 1000), 100, math.random(-1000, 1000))
+		createPlatform(teleportPosition)
+		humanoidRootPart.CFrame = CFrame.new(teleportPosition)
+		createGhostPart(lastPosition)
+		character.Humanoid.WalkSpeed = 0
+		character.Humanoid.JumpPower = 0
 
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 1
-            elseif part:IsA("Decal") then
-                part.Transparency = 0
-            end
-        end
+		for _, part in pairs(character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Transparency = 1
+			elseif part:IsA("Decal") then
+				part.Transparency = 0
+			end
+		end
 
-        isGhostMode = true
-    end
+		isGhostMode = true
+	end
 end
 
 -- // Manejo de respawn
 player.CharacterAdded:Connect(function(char)
-    character = char
-    humanoidRootPart = char:WaitForChild("HumanoidRootPart")
+	character = char
+	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
 
-    if isGhostMode then
-        if ghostPart then ghostPart:Destroy() ghostPart = nil end
-        if platform then platform:Destroy() platform = nil end
-        camera.CameraSubject = character:WaitForChild("Humanoid")
-        camera.CameraType = Enum.CameraType.Custom
-        isGhostMode = false
-    end
+	if isGhostMode then
+		if ghostPart then ghostPart:Destroy() ghostPart = nil end
+		if platform then platform:Destroy() platform = nil end
+		camera.CameraSubject = character:WaitForChild("Humanoid")
+		camera.CameraType = Enum.CameraType.Custom
+		isGhostMode = false
+	end
 end)
 
 -- // Toggle de invincibilidad Rayfield
 MainTab:CreateToggle({
-    Name = "Fantasma",
-    CurrentValue = false,
-    Flag = "InvincibilityToggle",
-    Callback = function(Value)
-        if Value and not isGhostMode then
-            teleportAndGhost()
-        elseif not Value and isGhostMode then
-            teleportAndGhost()
-        end
-    end,
+	Name = "Fantasma",
+	CurrentValue = false,
+	Flag = "InvincibilityToggle",
+	Callback = function(Value)
+		if Value and not isGhostMode then
+			teleportAndGhost()
+		elseif not Value and isGhostMode then
+			teleportAndGhost()
+		end
+	end,
 })
 
 -- // Loop de movimiento
 RunService.Heartbeat:Connect(function()
-    updateGhostPartMovement()
+	updateGhostPartMovement()
 end)
-
 
 
 
