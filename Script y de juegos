@@ -248,6 +248,14 @@ loadstring(game:HttpGet("https://orbitsc.net/bfnf"))()
 })
 
  boton= Juegostab:CreateButton({
+   Name = "Xhub(Murder Mystery 2)",
+   Callback = function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/zdkjaime/Xhub/refs/heads/main/MainHub'))()
+   end,
+})
+
+
+ boton= Juegostab:CreateButton({
    Name = "AutoFarm Pelotas(Murder Mystery 2)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/beachball-farm.lua"))()
