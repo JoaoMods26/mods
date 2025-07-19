@@ -248,12 +248,21 @@ loadstring(game:HttpGet("https://orbitsc.net/bfnf"))()
 })
 
  boton= Juegostab:CreateButton({
+   Name = "AutoFarm Pelotas(Murder Mystery 2)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/beachball-farm.lua"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
    Name = "Natural disaster",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
 
    end,
 })
+
 
  boton= Juegostab:CreateButton({
    Name = "Jailbreak",
