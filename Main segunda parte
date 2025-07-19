@@ -1,5 +1,4 @@
 -- // Fantasma
-
 -- // Servicios
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
@@ -177,6 +176,14 @@ local function teleportAndGhost()
 			humanoidRootPart.Transparency = 1
 		end
 
+		-- 🔧 Ocultar CollisionPart si existe
+		local collisionPart = workspace:FindFirstChild("CollisionPart")
+		if collisionPart then
+			collisionPart.Transparency = 1
+			collisionPart.CanCollide = false
+			collisionPart.Anchored = false
+		end
+
 		camera.CameraSubject = character:FindFirstChildOfClass("Humanoid") or character
 		camera.CameraType = Enum.CameraType.Custom
 
@@ -256,6 +263,8 @@ MainTab:CreateToggle({
 RunService.Heartbeat:Connect(function()
 	updateGhostPartMovement()
 end)
+
+
 
 
 
