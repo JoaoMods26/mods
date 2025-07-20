@@ -150,20 +150,22 @@ end
 		dropdownFrame.Visible = not dropdownFrame.Visible
 	end)
 
-	local rainbowToggle = Instance.new("TextButton", frame)
-	rainbowToggle.Size = UDim2.new(0.35, -10, 0, 25)
-	rainbowToggle.Position = UDim2.new(0.65, 5, 0, 110)
-	rainbowToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	rainbowToggle.TextColor3 = Color3.new(1, 1, 1)
-	rainbowToggle.Text = "🌈 Modo Rainbow: OFF"
-	rainbowToggle.TextScaled = true
-	Instance.new("UICorner", rainbowToggle)
+local fijarToggle = Instance.new("TextButton", frame)
+fijarToggle.Size = UDim2.new(0.35, -10, 0, 25)
+fijarToggle.Position = UDim2.new(0.65, 5, 0, 140)
+fijarToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+fijarToggle.TextColor3 = Color3.new(1, 1, 1)
+fijarToggle.Text = "📌 Fijar: OFF"
+fijarToggle.TextScaled = true
+Instance.new("UICorner", fijarToggle)
 
-	local isRainbow = false
-	rainbowToggle.MouseButton1Click:Connect(function()
-		isRainbow = not isRainbow
-		rainbowToggle.Text = isRainbow and "🌈 Modo Rainbow: ON" or "🌈 Modo Rainbow: OFF"
-	end)
+local fijarNotificacion = false
+fijarToggle.MouseButton1Click:Connect(function()
+	fijarNotificacion = not fijarNotificacion
+	fijarToggle.Text = fijarNotificacion and "📌 Fijar: ON" or "📌 Fijar: OFF"
+end)
+
+
 
 	local colorR = Instance.new("TextBox", frame)
 	colorR.Size = UDim2.new(0.2, -10, 0, 25)
@@ -195,43 +197,48 @@ end
 	boton.TextColor3 = Color3.new(1,1,1)
 	Instance.new("UICorner", boton)
 
-	boton.MouseButton1Click:Connect(function()
-		local encabezado = encabezadoBox.Text
-		if encabezado == "" then return end
-		local mensaje = cajaMensaje.Text
-		local duracion = tonumber(duracionBox.Text) or 6
-		local posicion = posicionDropdown.Text
-		local r = tonumber(colorR.Text) or 109
-		local g = tonumber(colorG.Text) or 89
-		local b = tonumber(colorB.Text) or 122
+boton.MouseButton1Click:Connect(function()
+    local encabezado = encabezadoBox.Text
+    if encabezado == "" then return end
+    local mensaje = cajaMensaje.Text
+    local duracion = tonumber(duracionBox.Text) or 6
+    local posicion = posicionDropdown.Text
+    local r = tonumber(colorR.Text) or 109
+    local g = tonumber(colorG.Text) or 89
+    local b = tonumber(colorB.Text) or 122
 
-		local data = {
-			encabezado = encabezado,
-			mensaje = mensaje,
-			duracion = duracion,
-			posicion = posicion,
-			color = {r,g,b},
-			rainbow = isRainbow,
-			timestamp = os.time(),
-			key = claveSeguridad
-		}
+    local data = {
+        encabezado = encabezado,
+        mensaje = mensaje,
+        duracion = duracion,
+        posicion = posicion,
+        color = {r,g,b},
+        timestamp = os.time(),
+        key = claveSeguridad,
+        fijar = fijarNotificacion -- ⬅️ NUEVO
+    }
+    local jsonData = HttpService:JSONEncode(data)
+    local request = (syn and syn.request) or (http and http.request) or request
+    if request then
+        request({
+            Url = firebaseURL,
+            Method = "PUT",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = jsonData
+        })
+        if not fijarNotificacion then
+            task.delay(duracion, function()
+                request({Url = firebaseURL, Method = "DELETE"})
+            end)
+        end
+    end
+end)
 
-		local jsonData = HttpService:JSONEncode(data)
-		local request = (syn and syn.request) or (http and http.request) or request
-		if request then
-			request({
-				Url = firebaseURL,
-				Method = "PUT",
-				Headers = { ["Content-Type"] = "application/json" },
-				Body = jsonData
-			})
-			task.delay(duracion, function()
-				request({Url = firebaseURL, Method = "DELETE"})
-			end)
-		end
-	end)
 
-    
+
+
+
+    ---BOton clave 
 game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if input.KeyCode == Enum.KeyCode.L then 
