@@ -912,3 +912,79 @@ MainTab:CreateToggle({
 
 
 
+
+------Cargar guardar posicion
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local savedCFrame = nil
+local systemEnabled = false 
+
+MainTab:CreateToggle({
+    Name = "Activar Guardar/Cargar",
+    CurrentValue = false,
+    Flag = "ToggleSistemaPos",
+    Callback = function(value)
+        systemEnabled = value
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Guardar Posición",
+    Callback = function()
+        if not systemEnabled then
+            Rayfield:Notify({
+                Title = "Sistema Desactivado",
+                Content = "Activa el toggle para usar Guardar Posición.",
+                Duration = 3,
+            })
+            return
+        end
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            savedCFrame = rootPart.CFrame
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Cargar Posición",
+    Callback = function()
+        if not systemEnabled then
+            Rayfield:Notify({
+                Title = "Sistema Desactivado",
+                Content = "Activa el toggle para usar Cargar Posición.",
+                Duration = 3,
+            })
+            return
+        end
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if savedCFrame and rootPart then
+            rootPart.CFrame = savedCFrame
+        end
+    end,
+})
+
+MainTab:CreateKeybind({
+    Name = "Cargar Posición",
+    CurrentKeybind = "Q", 
+    HoldToInteract = false,
+    Flag = "KeybindTP",
+    Callback = function()
+        if not systemEnabled then return end
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if savedCFrame and rootPart then
+            rootPart.CFrame = savedCFrame
+        end
+    end,
+})
+
+
+
+
