@@ -2899,7 +2899,7 @@ local nuevoCargado = false
 local antiguoCargado = false
 
 AimbotTab:CreateButton({
-    Name = "Cargar Aimbot Nuevo",
+    Name = "Cargar Aimbot Nuevo -Pc",
     Callback = function()
         if nuevoCargado then return end -- impedir doble click
 
@@ -2915,7 +2915,7 @@ AimbotTab:CreateButton({
 })
 
 AimbotTab:CreateButton({
-    Name = "Cargar Aimbot Antiguo",
+    Name = "Cargar Aimbot Antiguo -Celular/PC",
     Callback = function()
         if antiguoCargado then return end -- impedir doble click
 
