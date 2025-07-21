@@ -184,8 +184,7 @@ end)
  boton= Juegostab:CreateButton({
    Name = "Jmods99 (99 Noches en el Bosque)",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/hdkk5grs"))()
-
+loadstring(game:HttpGet("https://rawscripts.net/raw/99-Nights-in-the-Forest-ALIENS-Jmods-99-45686"))()
    end,
 })
 
