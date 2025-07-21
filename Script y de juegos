@@ -182,6 +182,14 @@ end)
 })
 
  boton= Juegostab:CreateButton({
+   Name = "Jmods99 (99 Noches en el Bosque)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/hdkk5grs"))()
+
+   end,
+})
+
+ boton= Juegostab:CreateButton({
    Name = "Blox Fuit Super OP",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
