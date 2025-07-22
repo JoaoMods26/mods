@@ -392,6 +392,14 @@ loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/
 })
 
  boton= Juegostab:CreateButton({
+   Name = "Arbixhub(Steal a Brainrot)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Youifpg/Steal-a-Brainrot-op/refs/heads/main/Arbixhub-obfuscated.lua"))()
+   end,
+})
+
+
+ boton= Juegostab:CreateButton({
    Name = "Super ring mod(Natural disaster)",
    Callback = function()
 loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
