@@ -10,9 +10,16 @@ loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/
    end,
 })
  Button2 = TPTab:CreateButton({
-   Name = "Dex",
+   Name = "Dex (Pc)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+   end,
+})
+
+ Button2 = TPTab:CreateButton({
+   Name = "Dex (Celular)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastebin.com/raw/9z8KQF8N"))()
    end,
 })
 
