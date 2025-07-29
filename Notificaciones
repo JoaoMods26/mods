@@ -41,7 +41,7 @@ for _, gui in ipairs(CoreGui:GetChildren()) do
 	end
 end
 
-local firebaseURL = "https://notificaciones-aa833-default-rtdb.firebaseio.com/.json"
+local firebaseURL = "https://notificaciones-aa833-default-rtdb.firebaseio.com/Notificacion.json"
 -----https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json
 
 local claveSeguridad = "JMODS2024"
