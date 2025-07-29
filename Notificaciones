@@ -41,7 +41,9 @@ for _, gui in ipairs(CoreGui:GetChildren()) do
 	end
 end
 
-local firebaseURL = "https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json"
+local firebaseURL = "https://notificaciones-aa833-default-rtdb.firebaseio.com/.json"
+-----https://chatrobloxxd-default-rtdb.firebaseio.com/Notificacion.json
+
 local claveSeguridad = "JMODS2024"
 local ultimoTimestamp = 0
 local posicionesDisponibles = {"Arriba izquierda", "Arriba Derecha", "Abajo izquierda", "Abajo derecha", "En medio"}
