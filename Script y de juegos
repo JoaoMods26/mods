@@ -2,6 +2,13 @@
 
 TPTab = _G.Window:CreateTab("Scripts", nil) -- Title, Image
 
+ Button2 = TPTab:CreateButton({
+   Name = "Script-Jmods(Buscador de scripts)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/sapoqluwu/Jbuscador/refs/heads/main/Jbuscador"))()
+   end,
+})
+
 Button1 = TPTab:CreateButton({
    Name = "Infinite Yield",
    Callback = function()
