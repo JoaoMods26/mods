@@ -246,9 +246,9 @@ loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e
 
 
  boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(Lurk hack)",
+   Name = "Steal a Brainrot(dofug)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/egor2078f/lurkhackv4/refs/heads/main/main.lua", true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/heads/main/dofug.txt"))()
    end,
 })
 
