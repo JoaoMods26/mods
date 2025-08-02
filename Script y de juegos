@@ -254,6 +254,15 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/h
 
 
  boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(onliengamerop)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a-brainrot/refs/heads/main/Protected_3771863424757750.lua.txt"))()
+   end,
+})
+
+
+
+ boton= Juegostab:CreateButton({
    Name = "Breaking Point",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
