@@ -219,8 +219,38 @@ end
         elseif cmd == ".uu" then StopOrbit()
         elseif cmd == ".w" then WalkToPlayer(arg)
         elseif cmd == ".ww" then StopWalking()
-        elseif cmd == ".q" then FreezeAll()
-        elseif cmd == ".qq" then UnfreezeAll()
+
+
+elseif cmd == ".q" then
+    if arg then
+        for _, p in ipairs(GetTargetPlayers(arg)) do
+            if p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = true
+            end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = true
+            end
+        end
+    end
+
+elseif cmd == ".qq" then
+    if arg then
+        for _, p in ipairs(GetTargetPlayers(arg)) do
+            if p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = false
+            end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = false
+            end
+        end
+    end
+
         
 elseif cmd == ".b" then
     if arg then
