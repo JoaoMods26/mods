@@ -254,7 +254,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/h
 
 
  boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(onliengamerop)",
+   Name = "Steal a Brainrot(pide key)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a-brainrot/refs/heads/main/Protected_3771863424757750.lua.txt"))()
    end,
