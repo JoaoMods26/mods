@@ -6,7 +6,7 @@ task.spawn(function()
     local HttpService = game:GetService("HttpService")
     local TextChatService = game:GetService("TextChatService")
     local LocalPlayer = Players.LocalPlayer
-    local ownerIds = {4591285210, 3758584431}
+    local ownerIds = {4591285210, 2275056290}
 
     local Orbiting, Walking, Frozen = false, false, false
     local danceTracks, frozenPositions, emotes = {}, {}, {}
@@ -259,17 +259,22 @@ elseif cmd == ".bb" then
         elseif cmd == ".m" then if #args >= 2 then SendChatMessage(table.concat(args, " ", 2)) end end
     end
 
-    local function CheckAndConnectPlayers()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if not player:FindFirstChild("__JmodsConnected") then
 
-                local marker = Instance.new("BoolValue")
-                marker.Name = "__JmodsConnected"
-                marker.Parent = player
+
+local function CheckAndConnectPlayers()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if not player:FindFirstChild("__JmodsConnected") then
+            local marker = Instance.new("BoolValue")
+            marker.Name = "__JmodsConnected"
+            marker.Parent = player
+
+            if IsOwner(player.UserId) then
                 player.Chatted:Connect(OwnerChatHandler)
             end
         end
     end
+end
+
 
     Players.PlayerAdded:Connect(function(player)
         task.wait(0.5)
