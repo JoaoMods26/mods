@@ -3,48 +3,65 @@ task.spawn(function()
 
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
+    local HttpService = game:GetService("HttpService")
+    local TextChatService = game:GetService("TextChatService")
     local LocalPlayer = Players.LocalPlayer
     local ownerIds = {4591285210, 3758584431}
 
-    local Orbiting = false
-    local Walking = false
-    local Frozen = false
+    local Orbiting, Walking, Frozen = false, false, false
+    local danceTracks, frozenPositions, emotes = {}, {}, {}
 
-    -- Helper: Verificar si un userId es owner
+    pcall(function()
+        local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+        emotes = HttpService:JSONDecode(data)
+    end)
+
     local function IsOwner(userId)
         for _, id in ipairs(ownerIds) do
-            if userId == id then
-                return true
-            end
+            if userId == id then return true end
         end
         return false
     end
 
-    -- Helper: Obtener jugador owner si está presente
     local function GetOwnerPlayer()
         for _, id in ipairs(ownerIds) do
             local player = Players:GetPlayerByUserId(id)
-            if player then
-                return player
-            end
+            if player then return player end
         end
         return nil
     end
 
-    -- Obtener jugador objetivo (por nombre o default al owner)
     local function GetTargetPlayer(name)
         if name then
             name = name:lower()
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player.Name:lower():sub(1, #name) == name then
-                    return player
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Name:lower():sub(1, #name) == name then
+                    return p
                 end
             end
         end
         return GetOwnerPlayer()
     end
 
-    -- Evitar sentarse
+    local function GetTargetPlayers(name)
+        local targets = {}
+        if name then
+            name = name:lower()
+            for _, p in ipairs(Players:GetPlayers()) do
+                if not IsOwner(p.UserId) and p.Name:lower():sub(1, #name) == name then
+                    table.insert(targets, p)
+                end
+            end
+        else
+            for _, p in ipairs(Players:GetPlayers()) do
+                if not IsOwner(p.UserId) then
+                    table.insert(targets, p)
+                end
+            end
+        end
+        return targets
+    end
+
     local function StartAntiSeatLoop()
         task.spawn(function()
             while Orbiting or Walking do
@@ -54,13 +71,12 @@ task.spawn(function()
                     local hum = char:FindFirstChildWhichIsA("Humanoid")
                     local hrp = char:FindFirstChild("HumanoidRootPart")
                     if hum and hum.Sit then hum.Sit = false end
-                    if hrp and hrp.SeatPart then hrp.SeatPart:Sit(nil) end
+                    if hrp and hrp:FindFirstChild("SeatPart") then hrp.SeatPart:Sit(nil) end
                 end
             end
         end)
     end
 
-    -- Teleport
     local function TeleportToPlayer(name)
         local target = GetTargetPlayer(name)
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
@@ -71,7 +87,6 @@ task.spawn(function()
         end
     end
 
-    -- Orbit
     local function StopOrbit()
         Orbiting = false
         RunService:UnbindFromRenderStep("OrbitAroundTarget")
@@ -82,14 +97,12 @@ task.spawn(function()
         StopOrbit()
         Orbiting = true
         StartAntiSeatLoop()
-
         local target = GetTargetPlayer(name)
         if not target then Orbiting = false return end
 
         RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function()
             if not Orbiting then return end
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
-               LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local t = tick()
                 local radius = 10
                 local speed = 2
@@ -102,7 +115,6 @@ task.spawn(function()
         end)
     end
 
-    -- Walk
     local function StopWalking()
         Walking = false
         RunService:UnbindFromRenderStep("WalkToTarget")
@@ -113,21 +125,18 @@ task.spawn(function()
         StopWalking()
         Walking = true
         StartAntiSeatLoop()
-
         local target = GetTargetPlayer(name)
         if not target then Walking = false return end
 
         RunService:BindToRenderStep("WalkToTarget", Enum.RenderPriority.Character.Value, function()
             if not Walking then return end
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and
-               LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
                 humanoid:MoveTo(target.Character.HumanoidRootPart.Position)
             end
         end)
     end
 
-    -- Freeze
     local function FreezeAll()
         Frozen = true
         RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
@@ -148,33 +157,112 @@ task.spawn(function()
         end
     end
 
-    -- Comandos
-    local function OwnerChatHandler(message)
-        local msg = message:lower()
-        local args = {}
-        for word in msg:gmatch("%S+") do table.insert(args, word) end
+local function DoRandomDance(player)
+    if not player.Character then return end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or #emotes == 0 then return end
 
-        if args[1] == ".t" then
-            TeleportToPlayer(args[2])
-        elseif args[1] == ".u" then
-            StartOrbit(args[2])
-        elseif args[1] == ".uu" then
-            StopOrbit()
-        elseif args[1] == ".w" then
-            WalkToPlayer(args[2])
-        elseif args[1] == ".ww" then
-            StopWalking()
-        elseif args[1] == ".q" then
-            FreezeAll()
-        elseif args[1] == ".qq" then
-            UnfreezeAll()
+    local random = emotes[math.random(1, #emotes)]
+    local rawId = tostring(random.animationid or "")
+    local extractedId = rawId:match("id=(%d+)")
+
+    if not extractedId then
+        warn("No se pudo extraer el ID del link: " .. rawId)
+        return
+    end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. extractedId
+    local track = hum:LoadAnimation(anim)
+    track.Looped = true
+    track:Play()
+
+    danceTracks[player] = danceTracks[player] or {}
+    table.insert(danceTracks[player], track)
+end
+
+local function StopAllDancesOn(player)
+    if danceTracks[player] then
+        for _, track in ipairs(danceTracks[player]) do
+            pcall(function() track:Stop() end)
+        end
+        danceTracks[player] = nil
+    end
+end
+
+
+    local function KickPlayer(p)
+        p:Kick("You were kicked by the owner")
+    end
+
+    local function SendChatMessage(message)
+        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local textChannel = TextChatService.TextChannels.RBXGeneral
+            if textChannel then
+                textChannel:SendAsync(message)
+            end
+        else
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
         end
     end
 
-    -- Conexión
+    local function OwnerChatHandler(message)
+        if message:sub(1,3) == "/e " then message = message:sub(4) end
+
+        local args = {}
+        for word in message:lower():gmatch("%S+") do table.insert(args, word) end
+        local cmd = args[1]
+        local arg = args[2]
+
+        if cmd == ".t" then TeleportToPlayer(arg)
+        elseif cmd == ".u" then StartOrbit(arg)
+        elseif cmd == ".uu" then StopOrbit()
+        elseif cmd == ".w" then WalkToPlayer(arg)
+        elseif cmd == ".ww" then StopWalking()
+        elseif cmd == ".q" then FreezeAll()
+        elseif cmd == ".qq" then UnfreezeAll()
+        
+elseif cmd == ".b" then
+    if arg then
+        for _, p in ipairs(GetTargetPlayers(arg)) do
+            if p:FindFirstChild("__JmodsConnected") then
+                DoRandomDance(p)
+            end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") then
+                DoRandomDance(p)
+            end
+        end
+    end
+
+elseif cmd == ".bb" then
+    if arg then
+        for _, p in ipairs(GetTargetPlayers(arg)) do
+            if p:FindFirstChild("__JmodsConnected") then
+                StopAllDancesOn(p)
+            end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") then
+                StopAllDancesOn(p)
+            end
+        end
+    end
+
+
+
+
+        elseif cmd == ".k" then for _, p in ipairs(GetTargetPlayers(arg)) do KickPlayer(p) end
+        elseif cmd == ".m" then if #args >= 2 then SendChatMessage(table.concat(args, " ", 2)) end end
+    end
+
     local function CheckAndConnectPlayers()
         for _, player in ipairs(Players:GetPlayers()) do
-            if IsOwner(player.UserId) and not player:FindFirstChild("__JmodsConnected") then
+            if not player:FindFirstChild("__JmodsConnected") then
+
                 local marker = Instance.new("BoolValue")
                 marker.Name = "__JmodsConnected"
                 marker.Parent = player
@@ -192,3 +280,4 @@ task.spawn(function()
 
     CheckAndConnectPlayers()
 end)
+----aaaaaa
