@@ -77,8 +77,16 @@ loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
  })
  
 
+
+ Button6 = TPTab:CreateButton({
+   Name = "Proyect Segma v4 (similar a GhostHub)",
+   Callback = function()
+loadstring(game:HttpGet("https://pastefy.app/a2VxTbDs/raw"))()
+   end,
+})
+
  Button5 = TPTab:CreateButton({
-   Name = "GhostHub",
+   Name = "GhostHub ("Mantenimiento")",
    Callback = function()
 loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
    end,
@@ -111,6 +119,9 @@ loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
 loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
    end,
 })
+
+
+
 
 
  Button6 = TPTab:CreateButton({
