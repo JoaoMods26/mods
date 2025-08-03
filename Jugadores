@@ -548,7 +548,7 @@ end
 -- Sliders para órbita (ya existentes)
 JugadoresTab:CreateSlider({
     Name = "Velocidad de Órbita",
-    Range = {1, 200},
+    Range = {0, 200},
     Increment = 1,
     Suffix = "vel",
     CurrentValue = orbitSpeed,
