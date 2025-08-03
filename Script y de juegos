@@ -273,6 +273,16 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a
 
 
 
+
+ boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(Dolfinhub)",
+   Callback = function()
+loadstring(game:HttpGet('https://pastefy.app/8XQTsrZK/raw'))()
+   end,
+})
+
+
+
  boton= Juegostab:CreateButton({
    Name = "Breaking Point",
    Callback = function()
