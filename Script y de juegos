@@ -2,184 +2,175 @@
 
 TPTab = _G.Window:CreateTab("Scripts", nil) -- Title, Image
 
- Button2 = TPTab:CreateButton({
+local Button1 = TPTab:CreateButton({
    Name = "Script-Jmods(Buscador de scripts)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/sapoqluwu/Jbuscador/refs/heads/main/Jbuscador"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/sapoqluwu/Jbuscador/refs/heads/main/Jbuscador"))()
    end,
 })
 
-Button1 = TPTab:CreateButton({
+local Button2 = TPTab:CreateButton({
    Name = "Infinite Yield",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
-
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
    end,
 })
- Button2 = TPTab:CreateButton({
+
+local Button3 = TPTab:CreateButton({
    Name = "Dex (Pc)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
    end,
 })
 
- Button2 = TPTab:CreateButton({
+local Button4 = TPTab:CreateButton({
    Name = "Dex (Celular)",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/9z8KQF8N"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/9z8KQF8N"))()
    end,
 })
 
- Button2 = TPTab:CreateButton({
+local Button5 = TPTab:CreateButton({
    Name = "Fe Invicible G para activar",
    Callback = function()
-loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
+       loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
    end,
 })
 
-
- Button3 = TPTab:CreateButton({
+local Button6 = TPTab:CreateButton({
    Name = "FLing(Kawaii op)",
    Callback = function()
-pcall(function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-FREAKY-FLING/main/kawaii_freaky_fling.lua",true))()
-end)
+       pcall(function()
+           loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-FREAKY-FLING/main/kawaii_freaky_fling.lua", true))()
+       end)
    end,
 })
 
-
- Button3 = TPTab:CreateButton({
+local Button7 = TPTab:CreateButton({
    Name = "AFEM (Animaciones R15)",
    Callback = function()
-loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
+       loadstring(game:HttpGet("https://yarhm.mhi.im/scr?channel=afem", false))()
    end,
 })
 
- Button3 = TPTab:CreateButton({
+local Button8 = TPTab:CreateButton({
    Name = "Remote Spy (Octo spy)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Octo-Spy/refs/heads/main/Main.lua", true))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Octo-Spy/refs/heads/main/Main.lua", true))()
    end,
 })
 
- Button4 = TPTab:CreateButton({
+local Button9 = TPTab:CreateButton({
    Name = "Fly universal",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
    end,
 })
 
- Button5 = TPTab:CreateButton({
-    Name = "Teclado (Movil)",
-    Callback = function()
-        loadstring(game:HttpGet("https://gist.githubusercontent.com/RedZenXYZ/4d80bfd70ee27000660e4bfa7509c667/raw/da903c570249ab3c0c1a74f3467260972c3d87e6/KeyBoard%2520From%2520Ohio%2520Fr%2520Fr"))()
-    end,
- })
- 
+local Button10 = TPTab:CreateButton({
+   Name = "Teclado (Movil)",
+   Callback = function()
+       loadstring(game:HttpGet("https://gist.githubusercontent.com/RedZenXYZ/4d80bfd70ee27000660e4bfa7509c667/raw/da903c570249ab3c0c1a74f3467260972c3d87e6/KeyBoard%2520From%2520Ohio%2520Fr%2520Fr"))()
+   end,
+})
 
-
- Button6 = TPTab:CreateButton({
+local Button11 = TPTab:CreateButton({
    Name = "Proyect Segma v4 (similar a GhostHub)",
    Callback = function()
-loadstring(game:HttpGet("https://pastefy.app/a2VxTbDs/raw"))()
+       loadstring(game:HttpGet("https://pastefy.app/a2VxTbDs/raw"))()
    end,
 })
 
- Button5 = TPTab:CreateButton({
-   Name = "GhostHub ("Mantenimiento")",
+local Button12 = TPTab:CreateButton({
+   Name = 'GhostHub ("Mantenimiento")',
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
    end,
 })
 
- Button6 = TPTab:CreateButton({
+local Button13 = TPTab:CreateButton({
    Name = "venox (Necesita key)",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/venoxcc/venoxV1/main/main.lua'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/venoxcc/venoxV1/main/main.lua'))()
    end,
 })
 
- Button6 = TPTab:CreateButton({
+local Button14 = TPTab:CreateButton({
    Name = "Latin hub(Muchas cosas no funcionan)",
    Callback = function()
-loadstring(game:HttpGet('https://pastebin.com/raw/YYQyEvZm'))()
+       loadstring(game:HttpGet('https://pastebin.com/raw/YYQyEvZm'))()
    end,
 })
 
-Button6 = TPTab:CreateButton({
+local Button15 = TPTab:CreateButton({
    Name = "Emotes R15",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/eCpipCTH"))()
    end,
 })
 
- Button6 = TPTab:CreateButton({
+local Button16 = TPTab:CreateButton({
    Name = "c00lkidd Gui (solo lo ves tu)",
    Callback = function()
-loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
+       loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-k00pkid6660-gui-v8-16987"))()
    end,
 })
 
-
-
-
-
- Button6 = TPTab:CreateButton({
+local Button17 = TPTab:CreateButton({
    Name = "TALENTLESS (Auto piano)",
    Callback = function()
-pcall(function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/TALENTLESS/main/TALENTLESS", true))()
-end)
+       pcall(function()
+           loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/TALENTLESS/main/TALENTLESS", true))()
+       end)
    end,
 })
 
-
- Button6 = TPTab:CreateButton({
+local Button18 = TPTab:CreateButton({
    Name = "HitBox Expander Gui",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))()
    end,
 })
 
-Button6 = TPTab:CreateButton({
+local Button19 = TPTab:CreateButton({
    Name = "WISL hub",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/wisl884/wisl-i-Universal-Project1/refs/heads/main/Wisl'i%20Universal%20Project%20new%20UI.lua", true))()
    end,
 })
 
-
- Button3 = TPTab:CreateButton({
+local Button20 = TPTab:CreateButton({
    Name = "Black hole(Kawaii op)",
    Callback = function()
-pcall(function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-AURA/main/kawaii_aura.lua", true))()
-end)
+       pcall(function()
+           loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/KAWAII-AURA/main/kawaii_aura.lua", true))()
+       end)
    end,
 })
 
-
- Button6 = TPTab:CreateButton({
+local Button21 = TPTab:CreateButton({
    Name = "Alquimia hub",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/HFxuxs9U"))()
    end,
 })
 
- Button6 = TPTab:CreateButton({
+local Button22 = TPTab:CreateButton({
    Name = "Shaders pshade",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/randomstring0/pshade-ultimate/refs/heads/main/src/cd.lua'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/randomstring0/pshade-ultimate/refs/heads/main/src/cd.lua'))()
    end,
 })
 
-
-Button6 = TPTab:CreateButton({
+local Button23 = TPTab:CreateButton({
    Name = "Subir FPS",
    Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/8YZ2cc6V"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/8YZ2cc6V"))()
    end,
 })
+
+
+
 
 
 
