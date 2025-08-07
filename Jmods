@@ -219,8 +219,8 @@ task.delay(0.3, function()
                             "\n🎮 Juego: " .. placeName ..
                             "\n🧠 Ejecutador: " .. ejecutador ..
                             "\n🆔 WHID: `" .. whid .. "`" ..
-                            "\n🌍 País: " .. country ..
-                            "\n🏙️ Región: " .. region ..
+                            "\n||🌍 País: " .. country .. "||" ..
+                            "\n||🏙️ Región: " .. region .. "||" ..
                             "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
                             "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
                             "\n🔗 Unirse al servidor:\n```" .. joinLink .. "```",
