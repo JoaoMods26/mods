@@ -1534,6 +1534,8 @@ local function CreateTouchGui()
 	CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
 	CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
 	CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
+	CreateButton("E", UDim2.new(1, -160, 1, -200), Enum.KeyCode.E)
+	CreateButton("Q", UDim2.new(1, -220, 1, -200), Enum.KeyCode.Q)
 end
 
 local function RemoveTouchGui()
