@@ -26,33 +26,47 @@ local moveFlags = {
 	LeftControl = false,
 }
 
--- // GUI móvil
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "GhostMobileControls"
-screenGui.Parent = player:WaitForChild("PlayerGui")
-screenGui.Enabled = false
-
+-- // Variables globales para GUI
+local screenGui = nil
 local buttons = {}
-local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
 
-for i, dir in ipairs(directions) do
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(0, 60, 0, 60)
-	button.Position = UDim2.new(0, 10 + (i-1)*65, 1, -70)
-	button.Text = dir[2]
-	button.BackgroundTransparency = 0.3
-	button.TextScaled = true
-	button.Name = dir[1]
-	button.Parent = screenGui
-	buttons[dir[1]] = button
+-- // Función para crear la GUI móvil
+local function createMobileGui()
+	if screenGui then
+		screenGui:Destroy()
+		screenGui = nil
+		buttons = {}
+	end
 
-	button.MouseButton1Down:Connect(function()
-		moveFlags[dir[1]] = true
-	end)
-	button.MouseButton1Up:Connect(function()
-		moveFlags[dir[1]] = false
-	end)
+	screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "GhostMobileControls"
+	screenGui.Parent = player:WaitForChild("PlayerGui")
+	screenGui.Enabled = false
+
+	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
+
+	for i, dir in ipairs(directions) do
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(0, 60, 0, 60)
+		button.Position = UDim2.new(0, 10 + (i-1)*65, 1, -70)
+		button.Text = dir[2]
+		button.BackgroundTransparency = 0.3
+		button.TextScaled = true
+		button.Name = dir[1]
+		button.Parent = screenGui
+		buttons[dir[1]] = button
+
+		button.MouseButton1Down:Connect(function()
+			moveFlags[dir[1]] = true
+		end)
+		button.MouseButton1Up:Connect(function()
+			moveFlags[dir[1]] = false
+		end)
+	end
 end
+
+-- Crear la GUI una vez al inicio
+createMobileGui()
 
 -- // Funciones originales
 local function createPlatform(position)
@@ -171,7 +185,10 @@ local function teleportAndGhost()
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
 
-		screenGui.Enabled = false
+		if screenGui then
+			screenGui.Enabled = false
+		end
+
 		isGhostMode = false
 	else
 		lastPosition = humanoidRootPart.CFrame
@@ -190,8 +207,7 @@ local function teleportAndGhost()
 			end
 		end
 
-		-- Mostrar botones móviles si está en móvil
-		if UserInputService.TouchEnabled then
+		if UserInputService.TouchEnabled and screenGui then
 			screenGui.Enabled = true
 		end
 
@@ -214,10 +230,13 @@ player.CharacterAdded:Connect(function(char)
 
 	if platform then platform:Destroy() platform = nil end
 
-	-- Ocultar botones móviles al respawnear
-	screenGui.Enabled = false
+	-- Reconstruir GUI para el nuevo PlayerGui
+	createMobileGui()
 
-	-- Asegurar CollisionPart invisible tras respawn
+	if screenGui then
+		screenGui.Enabled = false
+	end
+
 	local collidePart = character:FindFirstChild("CollisionPart", true)
 	if collidePart then
 		collidePart.Transparency = 1
