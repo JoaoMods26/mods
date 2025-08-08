@@ -1428,24 +1428,57 @@ MainTab:CreateSlider({
 
 
 
-local StarterGui = game:GetService("StarterGui")
+-- Servicios
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 local freecamEnabled = false
-local moveDirection = Vector3.zero
 local camRotation = Vector2.new()
-local camPosition = Vector3.zero
-local speed = 1.5
-local keysHeld = {}
-local toggleActive = false
+local camPosition = Vector3.new()
+local speed = 15
 local sensitivity = 0.005
+local keysHeld = {}
 
 local lastTouchPosition = nil
-local guiFrames = nil -- los botones de movimiento
+local guiFrames = nil
+local toggleActive = false  -- **AÑADIDO: estado del toggle**
 
--- Congelar personaje
+
+-- Manejar cuando muere el humanoid para desactivar freecam
+local function SetupCharacter(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	-- Cuando muere, desactivar freecam para evitar bugs
+	humanoid.Died:Connect(function()
+		if freecamEnabled then
+			DisableFreecam()
+		end
+	end)
+end
+
+-- Cuando el personaje respawnea
+player.CharacterAdded:Connect(function(char)
+	SetupCharacter(char)
+	
+	local humanoid = char:WaitForChild("Humanoid")
+	
+	if freecamEnabled then
+		FreezeCharacter()
+	end
+end)
+
+
+-- Si ya hay personaje, hacer setup
+if player.Character then
+	SetupCharacter(player.Character)
+end
+
+
+
+-- Congelar / descongelar personaje
 local function FreezeCharacter()
 	local char = player.Character
 	if char then
@@ -1458,7 +1491,7 @@ local function FreezeCharacter()
 	end
 end
 
--- Restaurar personaje
+
 local function UnfreezeCharacter()
 	local char = player.Character
 	if char then
@@ -1471,40 +1504,38 @@ local function UnfreezeCharacter()
 	end
 end
 
--- Crear GUI táctil
+-- Crear GUI táctil (móvil)
 local function CreateTouchGui()
+	if guiFrames then return end
 	guiFrames = Instance.new("ScreenGui")
-	guiFrames.Name = "MobileMovementGui"
+	guiFrames.Name = "FreecamMobileGui"
 	guiFrames.ResetOnSpawn = false
 	guiFrames.Parent = player:WaitForChild("PlayerGui")
 
-	local function CreateButton(name, position, keycode)
-		local button = Instance.new("TextButton")
-		button.Name = name
-		button.Size = UDim2.new(0, 60, 0, 60)
-		button.Position = position
-		button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		button.Text = name
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.TextScaled = true
-		button.Parent = guiFrames
+	local function CreateButton(name, pos, keycode)
+		local btn = Instance.new("TextButton")
+		btn.Name = name
+		btn.Size = UDim2.new(0, 60, 0, 60)
+		btn.Position = pos
+		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		btn.Text = name
+		btn.TextScaled = true
+		btn.Parent = guiFrames
 
-		button.MouseButton1Down:Connect(function()
+		btn.MouseButton1Down:Connect(function()
 			keysHeld[keycode] = true
 		end)
-		button.MouseButton1Up:Connect(function()
+		btn.MouseButton1Up:Connect(function()
 			keysHeld[keycode] = false
 		end)
 	end
 
-	-- Crear los botones
 	CreateButton("W", UDim2.new(0, 100, 1, -200), Enum.KeyCode.W)
 	CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
 	CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
 	CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
 end
 
--- Destruir GUI táctil
 local function RemoveTouchGui()
 	if guiFrames then
 		guiFrames:Destroy()
@@ -1512,10 +1543,98 @@ local function RemoveTouchGui()
 	end
 end
 
--- Teclas presionadas
+-- Calcular vector de movimiento
+local function CalculateMoveVector()
+	local moveVec = Vector3.zero
+	if keysHeld[Enum.KeyCode.W] then moveVec += Vector3.new(0, 0, -1) end
+	if keysHeld[Enum.KeyCode.S] then moveVec += Vector3.new(0, 0, 1) end
+	if keysHeld[Enum.KeyCode.A] then moveVec += Vector3.new(-1, 0, 0) end
+	if keysHeld[Enum.KeyCode.D] then moveVec += Vector3.new(1, 0, 0) end
+	if keysHeld[Enum.KeyCode.E] then moveVec += Vector3.new(0, 1, 0) end
+	if keysHeld[Enum.KeyCode.Q] then moveVec += Vector3.new(0, -1, 0) end
+	return moveVec
+end
+
+local renderConn = nil
+
+local function EnableFreecam()
+	if freecamEnabled then return end
+	freecamEnabled = true
+    
+
+	camera = workspace.CurrentCamera or camera
+	camera.CameraType = Enum.CameraType.Scriptable
+	camPosition = camera.CFrame.Position
+
+	local _, yaw = camera.CFrame:ToOrientation()
+	local pitch = math.asin(-camera.CFrame.LookVector.Y)
+	camRotation = Vector2.new(pitch, yaw)
+
+	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	UserInputService.MouseIconEnabled = false
+
+	FreezeCharacter()
+
+	if UserInputService.TouchEnabled then
+		CreateTouchGui()
+	end
+
+	renderConn = RunService.RenderStepped:Connect(function(dt)
+		if not freecamEnabled or not camera then return end
+
+		if not UserInputService.TouchEnabled then
+			local delta = UserInputService:GetMouseDelta()
+			camRotation = camRotation + Vector2.new(-delta.Y, -delta.X) * sensitivity
+			camRotation = Vector2.new(math.clamp(camRotation.X, -math.pi/2, math.pi/2), camRotation.Y)
+		end
+
+		local yawCF = CFrame.Angles(0, camRotation.Y, 0)
+		local pitchCF = CFrame.Angles(camRotation.X, 0, 0)
+		local moveVec = CalculateMoveVector()
+
+		if moveVec.Magnitude > 0 then
+			moveVec = yawCF:VectorToWorldSpace(moveVec.Unit) * speed
+			camPosition += moveVec * dt
+		end
+
+		camera.CFrame = CFrame.new(camPosition) * yawCF * pitchCF
+	end)
+end
+
+local function DisableFreecam()
+    if not freecamEnabled then return end
+    freecamEnabled = false
+
+    if renderConn then
+        renderConn:Disconnect()
+        renderConn = nil
+    end
+
+    camera.CameraType = Enum.CameraType.Custom
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+
+    UnfreezeCharacter()
+    RemoveTouchGui()
+    keysHeld = {}
+
+    -- Forzar cámara para seguir al personaje actual (para evitar quedar estancada)
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            camera.CameraSubject = humanoid
+        end
+    end
+end
+
+
+-- Eventos de entrada para teclas de movimiento
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if not gpe and freecamEnabled then
-		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
+		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or
+		   input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or
+		   input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
 			keysHeld[input.KeyCode] = true
 		end
 	end
@@ -1523,13 +1642,15 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
 	if freecamEnabled then
-		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
+		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or
+		   input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or
+		   input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
 			keysHeld[input.KeyCode] = false
 		end
 	end
 end)
 
--- Capturar movimiento de cámara con Touch
+-- Eventos Touch para móvil
 UserInputService.TouchMoved:Connect(function(input, gpe)
 	if freecamEnabled and not gpe then
 		if lastTouchPosition then
@@ -1547,75 +1668,7 @@ UserInputService.TouchEnded:Connect(function(input, gpe)
 	end
 end)
 
--- Calcular hacia dónde moverse
-local function CalculateMoveVector()
-	local moveVec = Vector3.zero
-
-	if keysHeld[Enum.KeyCode.W] then moveVec = moveVec + Vector3.new(0, 0, -1) end
-	if keysHeld[Enum.KeyCode.S] then moveVec = moveVec + Vector3.new(0, 0, 1) end
-	if keysHeld[Enum.KeyCode.A] then moveVec = moveVec + Vector3.new(-1, 0, 0) end
-	if keysHeld[Enum.KeyCode.D] then moveVec = moveVec + Vector3.new(1, 0, 0) end
-	if keysHeld[Enum.KeyCode.E] then moveVec = moveVec + Vector3.new(0, 1, 0) end
-	if keysHeld[Enum.KeyCode.Q] then moveVec = moveVec + Vector3.new(0, -1, 0) end
-
-	return moveVec
-end
-
-local function EnableFreecam()
-	if not freecamEnabled then
-		freecamEnabled = true
-		camera.CameraType = Enum.CameraType.Scriptable
-		camPosition = camera.CFrame.Position
-
-		local _, yaw = camera.CFrame:ToOrientation()
-		local pitch = math.asin(-camera.CFrame.LookVector.Y)
-		camRotation = Vector2.new(pitch, yaw)
-
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-		UserInputService.MouseIconEnabled = false
-
-		FreezeCharacter()
-
-		if UserInputService.TouchEnabled then
-			CreateTouchGui()
-		end
-
-		RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, function(dt)
-			if not UserInputService.TouchEnabled then
-				local delta = UserInputService:GetMouseDelta()
-				camRotation = camRotation + Vector2.new(-delta.Y, -delta.X) * sensitivity
-				camRotation = Vector2.new(math.clamp(camRotation.X, -math.pi/2, math.pi/2), camRotation.Y)
-			end
-
-			local yawCF = CFrame.Angles(0, camRotation.Y, 0)
-			local pitchCF = CFrame.Angles(camRotation.X, 0, 0)
-			local moveVec = CalculateMoveVector()
-
-			if moveVec.Magnitude > 0 then
-				moveVec = (yawCF * pitchCF):VectorToWorldSpace(moveVec.Unit) * speed
-				camPosition = camPosition + moveVec
-			end
-
-			camera.CFrame = yawCF * pitchCF + camPosition
-		end)
-	end
-end
-
-local function DisableFreecam()
-	if freecamEnabled then
-		freecamEnabled = false
-		RunService:UnbindFromRenderStep("Freecam")
-		camera.CameraType = Enum.CameraType.Custom
-
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		UserInputService.MouseIconEnabled = true
-
-		UnfreezeCharacter()
-		RemoveTouchGui()
-	end
-end
-
--- Toggle de cámara
+-- Integración Rayfield (solo llamamos funciones, no lógica interna)
 MainTab:CreateToggle({
 	Name = "Camara libre",
 	CurrentValue = false,
@@ -1630,14 +1683,14 @@ MainTab:CreateToggle({
 	end,
 })
 
--- Keybind de activación
+
 MainTab:CreateKeybind({
 	Name = "Bind Camara Libre",
 	CurrentKeybind = "P",
 	HoldToInteract = false,
 	Flag = "CamaraLKeybind",
 	Callback = function()
-		if toggleActive then
+		if toggleActive then -- solo si toggle visible está activo
 			if freecamEnabled then
 				DisableFreecam()
 			else
@@ -1647,7 +1700,8 @@ MainTab:CreateKeybind({
 	end,
 })
 
--- Slider de sensibilidad
+
+
 MainTab:CreateSlider({
 	Name = "Sensibilidad de cámara",
 	Range = {0.001, 0.049},
@@ -1660,17 +1714,15 @@ MainTab:CreateSlider({
 	end,
 })
 
-
--- Slider de velocidad
 MainTab:CreateSlider({
 	Name = "Velocidad de camara",
-	Range = {0.1, 10},
+	Range = {0.1, 100},
 	Increment = 0.1,
 	Suffix = "Velocidad",
-	CurrentValue =  speed,
+	CurrentValue = speed,
 	Flag = "speed",
 	Callback = function(Value)
-		 speed  = Value
+		speed = Value
 	end,
 })
 
