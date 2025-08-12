@@ -94,13 +94,14 @@ local function setupUI_R15()
 	})
 
 	task.spawn(function()
-		local success, emotes = pcall(function()
-			local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+		-- Primero cargar desde la primer API
+		local success1, emotes1 = pcall(function()
+			local raw = game:HttpGet("https://pastebin.com/raw/h4981hMA")
 			return HttpService:JSONDecode(raw)
 		end)
 
-		if success then
-			for _, emote in ipairs(emotes) do
+		if success1 and emotes1 then
+			for _, emote in ipairs(emotes1) do
 				if emote.name and emote.animationid then
 					AnimacionesTab:CreateButton({
 						Name = emote.name,
@@ -116,11 +117,44 @@ local function setupUI_R15()
 					})
 				end
 			end
+
+			-- Luego cargar la segunda API
+			local success2, emotes2 = pcall(function()
+				local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
+				return HttpService:JSONDecode(raw)
+			end)
+
+			if success2 and emotes2 then
+				for _, emote in ipairs(emotes2) do
+					if emote.name and emote.animationid then
+						AnimacionesTab:CreateButton({
+							Name = emote.name,
+							Callback = function()
+								local humanoid = getHumanoid()
+								if humanoid then
+									for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+										track:Stop()
+									end
+									safePlayAnim(emote.animationid)
+								end
+							end
+						})
+					end
+				end
+			else
+				warn("❌ Error al cargar emotes R15 desde pastebin:", emotes1)
+			end
 		else
-			warn("❌ Error al cargar emotes R15:", emotes)
+			warn("❌ Error al cargar emotes R15 desde GitHub:", emotes2)
 		end
 	end)
 end
+
+
+
+
+
+
 
 -- Botones para animaciones R6
 local function setupUI_R6()
