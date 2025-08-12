@@ -46,6 +46,13 @@ local Button6 = TPTab:CreateButton({
    end,
 })
 
+local Button24 = TPTab:CreateButton({
+   Name = "AnimacionSpoofer Jmods",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-AnimSpoofer-Jmods-48380"))()       
+   end,
+})
+
 local Button7 = TPTab:CreateButton({
    Name = "AFEM (Animaciones R15)",
    Callback = function()
