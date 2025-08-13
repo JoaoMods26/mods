@@ -3164,7 +3164,8 @@ HitboxTab:CreateSlider({
 
 
 ----Temas---
-themesTab = Window:CreateTab("temas", nil)
+----Temas---
+themesTab = Window:CreateTab("Configs ⚙️", nil)
 Section = themesTab:CreateSection("Cambia el tema")
 
 -- Función para crear botones rápido
@@ -3201,6 +3202,110 @@ ColorPicker = themesTab:CreateColorPicker({
         -- Opcionalmente podrías guardar colores también, pero sería más complicado
     end
 })
+
+
+local HttpService = game:GetService("HttpService")
+
+local HttpFunc = (syn and syn.request) or http_request or request
+if not HttpFunc then
+    warn("⚠ No se encontró ninguna función HTTP compatible. Traducción desactivada.")
+end
+
+local function TranslateText(text, targetLang)
+    if not text or text == "" then
+        return text
+    end
+
+    if targetLang == "es_original" then
+        return text
+    end
+
+    local translated = text
+    local success, err = pcall(function()
+        local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" .. targetLang .. "&dt=t&q=" .. HttpService:UrlEncode(text)
+        local response = HttpFunc({Url = url, Method = "GET"})
+        if response and response.Body then
+            local match = string.match(response.Body, "%[%[%[\"(.-)\"")
+            if match then
+                translated = match
+            end
+        end
+    end)
+    if not success then warn("[TranslateText] Error:", err) end
+    return translated
+end
+
+local OriginalTexts = {}
+
+local JmodsUI = game.CoreGui:FindFirstChild("HiddenUI")
+if JmodsUI then
+    JmodsUI = JmodsUI:FindFirstChild("Rayfield")
+end
+
+if not JmodsUI then
+    warn("⚠ No se encontró la GUI de Jmods Universal en CoreGui.HiddenUI.Rayfield")
+end
+
+--Idiomas
+local idiomas = {
+    ["🇪🇨 Español 🇲🇽"] = "es_original", -- devuelve textos originales con bandera de México
+    ["English 🇺🇸"] = "en",
+    ["Português 🇧🇷"] = "pt",
+}
+
+local savedLang = shared.JmodsLanguage
+
+Section = themesTab:CreateSection("Idiomas")
+
+local ignoreButtons = {}
+
+for name, code in pairs(idiomas) do
+    local btn = themesTab:CreateButton({
+        Name = name,
+        Callback = function()
+            if JmodsUI then
+                TranslateUI(JmodsUI, code)
+                shared.JmodsLanguage = code
+            end
+        end
+    })
+    ignoreButtons[btn] = true
+end
+
+function TranslateUI(parent, lang)
+    if not parent then return end
+    for _, obj in pairs(parent:GetDescendants()) do
+        if (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) 
+           and not ignoreButtons[obj] then
+            -- Guardar el texto original si no existe
+            if OriginalTexts[obj] == nil then
+                OriginalTexts[obj] = obj.Text
+            end
+
+            task.spawn(function()
+                local newText
+                local baseText = OriginalTexts[obj] -- siempre usar texto original
+
+                if lang == "es_original" then
+                    newText = baseText
+                else
+                    newText = TranslateText(baseText, lang)
+                end
+
+                if newText and typeof(newText) == "string" then
+                    obj.Text = newText
+                end
+            end)
+        end
+    end
+end
+
+-- Aplicar iniciar
+if savedLang and JmodsUI then
+    TranslateUI(JmodsUI, savedLang)
+end
+
+
 
 
 
