@@ -123,7 +123,9 @@ task.spawn(function()
     local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_contador.json"
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
 
-    local SECRET_KEY = "unu"
+    local SECRET_KEY = "uwu"
+    local PING_INTERVAL = 10 -- segundos
+    local TIMEOUT = 30      -- si no hay ping en 30s, se elimina del contador
 
     local rawreq = (syn and syn.request) or http_request or request
     local function doRequest(opts)
@@ -164,60 +166,44 @@ task.spawn(function()
         })
     end
 
-    getgenv().JmodsRegistrado = getgenv().JmodsRegistrado or {}
+    local lastCount = 0
 
-    local function updatePlayers(deltaUserId, add)
+    local function updatePing()
         local cur = fbRead()
         if type(cur) ~= "table" then
-            -- Si no existe nada, crear estructura inicial
             cur = { players = {}, key = SECRET_KEY }
         end
         cur.key = SECRET_KEY
         cur.players = cur.players or {}
 
-        local changed = false
+        local now = os.time()
+        local uidStr = tostring(LocalPlayer.UserId)
+        cur.players[uidStr] = now -- actualizar timestamp del jugador actual
 
-        if add then
-            if not cur.players[tostring(deltaUserId)] then
-                cur.players[tostring(deltaUserId)] = true
-                changed = true
-            end
-        else
-            if cur.players[tostring(deltaUserId)] then
-                cur.players[tostring(deltaUserId)] = nil
-                changed = true
+        -- Limpiar jugadores que no han hecho ping recientemente
+        for id, ts in pairs(cur.players) do
+            if now - ts > TIMEOUT then
+                cur.players[id] = nil
             end
         end
 
-        if changed then
-            local count = 0
-            for _ in pairs(cur.players) do count = count + 1 end
+        -- Contar jugadores activos
+        local count = 0
+        for _ in pairs(cur.players) do count = count + 1 end
 
-            local saved = fbWrite(cur)
-            if saved then
-                sendDiscord(count)
-                print("Firebase actualizado. Jugadores activos: "..count)
-            else
-                warn("No se pudo escribir en Firebase")
-            end
+        local saved = fbWrite(cur)
+        if saved and count ~= lastCount then
+            lastCount = count
+            sendDiscord(count)
+            print("Jugadores activos:", count)
         end
     end
 
-    -- Registrar jugador si no estaba registrado en esta sesión
-    if not getgenv().JmodsRegistrado[LocalPlayer.UserId] then
-        getgenv().JmodsRegistrado[LocalPlayer.UserId] = true
-        updatePlayers(LocalPlayer.UserId, true)
+    -- Loop de ping periódico
+    while true do
+        pcall(updatePing)
+        task.wait(PING_INTERVAL)
     end
-
-    local function leave()
-        if getgenv().JmodsRegistrado[LocalPlayer.UserId] then
-            getgenv().JmodsRegistrado[LocalPlayer.UserId] = nil
-            updatePlayers(LocalPlayer.UserId, false)
-        end
-    end
-
-    game.OnClose = leave
-    LocalPlayer.OnTeleport:Connect(leave)
 end)
 
 
