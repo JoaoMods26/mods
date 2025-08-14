@@ -118,22 +118,17 @@ task.spawn(function()
     
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
     local LocalPlayer = Players.LocalPlayer
     
     local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_players.json"
-    local webhookURL = "https://dis" .. "cord.com/ap" .. "i/webh" .. "ooks/1405653236655853648/j4L_uKUTHuZ_J9ilv6MpK7HaHjV5K_VRQ2CgxGLJw42noNdd1LX8zWihl5C04IXtHuQo"
+    local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
     
     local SECRET_KEY = "uwu"
     local HEARTBEAT_INTERVAL = 45
-    local TIMEOUT_THRESHOLD = 120
-    
-    -- 🔥 AGREGAR ESTAS LÍNEAS:
     local MY_USER_ID = tostring(LocalPlayer.UserId)
+    
     local sessionKey = "JmodsSession_" .. MY_USER_ID
-    if getgenv()[sessionKey] then
-        return
-    end
+    if getgenv()[sessionKey] then return end
     getgenv()[sessionKey] = true
     
     local rawreq = (syn and syn.request) or http_request or request
@@ -157,18 +152,11 @@ task.spawn(function()
             Method = "GET",
             Headers = { ["Content-Type"] = "application/json" }
         })
-        
         if not r then return {} end
         local body = r.Body or r.body
         if not body or body == "null" or body == "" then return {} end
-        
-        local ok, data = pcall(function() 
-            return HttpService:JSONDecode(body) 
-        end)
-        
-        if ok and type(data) == "table" then 
-            return data 
-        end
+        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+        if ok and type(data) == "table" then return data end
         return {}
     end
     
@@ -181,166 +169,100 @@ task.spawn(function()
         })
     end
     
-    local function sendDiscord(activeCount, playersList, changeType)
+    local function sendDiscord(activeCount, playersList, action, playerName)
         local playerNames = {}
         for userId, data in pairs(playersList) do
             if data and data.name then
-                table.insert(playerNames, data.name)
+                if data.name == playerName and action then
+                    if action == "join" then
+                        table.insert(playerNames, "→ " .. data.name .. " (NUEVO)")
+                    else
+                        table.insert(playerNames, "• " .. data.name)
+                    end
+                else
+                    table.insert(playerNames, "• " .. data.name)
+                end
             end
         end
         
-        -- 🎨 Emojis según el cambio
         local emoji = "👥"
-        if changeType == "join" then
+        local message_action = ""
+        if action == "join" then
             emoji = "✅"
-        elseif changeType == "leave" then 
+            message_action = "**" .. playerName .. " se conectó**\n"
+        elseif action == "leave" then
             emoji = "❌"
-        elseif changeType == "cleanup" then
-            emoji = "🧹"
+            message_action = "**" .. playerName .. " se desconectó**\n"
         end
         
         local message = string.format(
-            "%s **Jugadores activos con Jmods: %d**\n```\n%s\n```", 
+            "%s %s👥 **Total activos: %d**\n```\n%s\n```\n*%s*", 
             emoji,
+            message_action,
             activeCount,
-            #playerNames > 0 and table.concat(playerNames, "\n") or "Ninguno"
+            #playerNames > 0 and table.concat(playerNames, "\n") or "Ninguno conectado",
+            os.date("Actualizado: %H:%M:%S")
         )
         
         doRequest({
             Url = webhookURL,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({ content = message })
+            Body = HttpService:JSONEncode({ content = message, username = "Jmods Counter" })
         })
     end
     
     local function updateHeartbeat()
         local playersData = fbRead()
         local currentTime = os.time()
-        
-        -- local cleanedData, removedCount = cleanupPlayers(playersData)
-        
-        local wasNew = playersData[MY_USER_ID] == nil  -- 🔧 Cambio aquí
-        playersData[MY_USER_ID] = {  -- 🔧 Cambio aquí
+        local wasNew = playersData[MY_USER_ID] == nil
+        playersData[MY_USER_ID] = {
             name = LocalPlayer.Name,
             displayName = LocalPlayer.DisplayName,
             userId = LocalPlayer.UserId,
             lastHeartbeat = currentTime,
             key = SECRET_KEY
         }
-        
-        local success = fbWrite(playersData)  -- 🔧 Cambio aquí
-        if success then
+        local success = fbWrite(playersData)
+        if success and wasNew then
             local activeCount = 0
-            for _ in pairs(playersData) do  -- 🔧 Cambio aquí
-                activeCount = activeCount + 1
-            end
-            
-            
-            -- Solo notificar si soy nuevo
-            if wasNew then
-                sendDiscord(activeCount, playersData, "join")  -- 🔧 Cambio aquí
-            end
-        else
+            for _ in pairs(playersData) do activeCount = activeCount + 1 end
+            sendDiscord(activeCount, playersData, "join", LocalPlayer.Name)
         end
     end
     
-    -- 🔧 CAMBIAR ESTA FUNCIÓN TAMBIÉN:
     local function handlePlayerLeave()
         local playersData = fbRead()
-        
-        if playersData[MY_USER_ID] then  -- 🔧 Cambio aquí
-            playersData[MY_USER_ID] = nil  -- 🔧 Cambio aquí
+        if playersData[MY_USER_ID] then
+            playersData[MY_USER_ID] = nil
             local success = fbWrite(playersData)
-            
             if success then
                 local activeCount = 0
-                for _ in pairs(playersData) do
-                    activeCount = activeCount + 1
-                end
-                
-                sendDiscord(activeCount, playersData, "leave")
+                for _ in pairs(playersData) do activeCount = activeCount + 1 end
+                sendDiscord(activeCount, playersData, "leave", LocalPlayer.Name)
             end
         end
-        
         getgenv()[sessionKey] = nil
-    end
-    
-    local function globalCleanup()
-        local playersData = fbRead()
-        local currentTime = os.time()
-        local cleaned = {}
-        local removedCount = 0
-        
-        for userId, data in pairs(playersData) do
-            if data and data.lastHeartbeat then
-                local timeSinceHeartbeat = currentTime - data.lastHeartbeat
-                -- Timeout de 5 minutos para limpieza global
-                if timeSinceHeartbeat <= 300 then
-                    cleaned[userId] = data
-                else
-                    removedCount = removedCount + 1
-                end
-            end
-        end
-        
-        if removedCount > 0 then
-            fbWrite(cleaned)
-            local newCount = 0
-            for _ in pairs(cleaned) do newCount = newCount + 1 end
-            sendDiscord(newCount, cleaned, "cleanup")
-        end
     end
     
     updateHeartbeat()
     
-    local heartbeatConnection = task.spawn(function()
-        while true do
+    task.spawn(function()
+        while LocalPlayer.Parent and getgenv()[sessionKey] do
             task.wait(HEARTBEAT_INTERVAL)
-            if LocalPlayer.Parent and getgenv()[sessionKey] then
+            if LocalPlayer.Parent and game:GetService("Players"):FindFirstChild(LocalPlayer.Name) then
                 updateHeartbeat()
             else
+                handlePlayerLeave()
                 break
             end
         end
     end)
     
-    -- 🧹 Limpieza global cada 3 minutos
-    task.spawn(function()
-        while getgenv()[sessionKey] do
-            task.wait(180) -- 3 minutos
-            if getgenv()[sessionKey] then
-                globalCleanup()
-            end
-        end
-    end)
-    
     local function setupLeaveHandlers()
-        pcall(function()
-            game.OnClose = handlePlayerLeave
-        end)
-        
-        pcall(function()
-            LocalPlayer.OnTeleport:Connect(handlePlayerLeave)
-        end)
-        
-        pcall(function()
-            LocalPlayer.AncestryChanged:Connect(function()
-                if not LocalPlayer.Parent then
-                    handlePlayerLeave()
-                end
-            end)
-        end)
-        
-        task.spawn(function()
-            while LocalPlayer.Parent and getgenv()[sessionKey] do
-                task.wait(HEARTBEAT_INTERVAL + 15)
-                if not game:GetService("Players"):FindFirstChild(LocalPlayer.Name) then
-                    handlePlayerLeave()
-                    break
-                end
-            end
-        end)
+        pcall(function() game.OnClose = handlePlayerLeave end)
+        pcall(function() LocalPlayer.OnTeleport:Connect(handlePlayerLeave) end)
+        pcall(function() LocalPlayer.AncestryChanged:Connect(function() if not LocalPlayer.Parent then handlePlayerLeave() end end) end)
     end
     
     setupLeaveHandlers()
@@ -348,24 +270,34 @@ task.spawn(function()
     getgenv().JmodsStatus = function()
         local data = fbRead()
         local currentTime = os.time()
-        
         local count = 0
-        for userId, playerData in pairs(data) do
-            count = count + 1
-            local timeAgo = currentTime - (playerData.lastHeartbeat or 0)
-            local isMine = userId == MY_USER_ID and " (YO)" or ""
-            
-            print(string.format("  %d. %s%s - Hace %d segundos", 
-                count, 
-                playerData.name or "Desconocido",
-                isMine,
-                timeAgo
-            ))
-        end
+        for userId, playerData in pairs(data) do count = count + 1 end
         return data
     end
     
+    getgenv().JmodsManualCleanup = function()
+        local data = fbRead()
+        local currentTime = os.time()
+        local toRemove = {}
+        for userId, playerData in pairs(data) do
+            if playerData.lastHeartbeat and (currentTime - playerData.lastHeartbeat > 300) then
+                table.insert(toRemove, userId)
+            end
+        end
+        getgenv().JmodsToClean = toRemove
+    end
+    
+    getgenv().JmodsConfirmCleanup = function()
+        if not getgenv().JmodsToClean then return end
+        local data = fbRead()
+        for _, userId in ipairs(getgenv().JmodsToClean) do
+            data[userId] = nil
+        end
+        fbWrite(data)
+        getgenv().JmodsToClean = nil
+    end
 end)
+
 
 
 
