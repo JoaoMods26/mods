@@ -125,8 +125,8 @@ task.spawn(function()
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
     
     local SECRET_KEY = "uwu"
-    local HEARTBEAT_INTERVAL = 130
-    local TIMEOUT_THRESHOLD = 60 
+local HEARTBEAT_INTERVAL = 45
+local TIMEOUT_THRESHOLD = 120
     
     local rawreq = (syn and syn.request) or http_request or request
     local function doRequest(opts)
