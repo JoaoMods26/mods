@@ -113,7 +113,108 @@ LoadSavedTheme()
 
 
 ----
+task.spawn(function()
+    repeat task.wait() until game:IsLoaded()
 
+    local HttpService = game:GetService("HttpService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+
+    -- Firebase y Webhook (webhook disfrazado)
+    local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_contador.json"
+    local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
+
+    -- 🔑 Clave secreta (debe coincidir con las reglas de Firebase)
+    local SECRET_KEY = "uwu"
+
+    -- Wrapper de request (exploit > HttpService)
+    local rawreq = (syn and syn.request) or http_request or request
+    local function doRequest(opts)
+        if rawreq then
+            local ok, res = pcall(rawreq, opts)
+            if ok then return res end
+            warn("Request (exploit) falló:", res)
+            return nil
+        else
+            -- Fallback a HttpService:RequestAsync (solo en servidor)
+            local ok, res = pcall(function()
+                return HttpService:RequestAsync(opts)
+            end)
+            if ok then return res end
+            warn("RequestAsync bloqueado o falló:", res)
+            return nil
+        end
+    end
+
+    local function fbRead()
+        local r = doRequest({
+            Url = firebaseURL,
+            Method = "GET",
+            Headers = { ["Content-Type"] = "application/json" }
+        })
+        if not r then return nil end
+        local body = r.Body or r.body
+        if not body or body == "null" or body == "" then return nil end
+        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+        if ok then return data end
+        return nil
+    end
+
+    local function fbWrite(tbl)
+        return doRequest({
+            Url = firebaseURL,
+            Method = "PUT",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(tbl)
+        })
+    end
+
+    local function sendDiscord(count)
+        doRequest({
+            Url = webhookURL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({ content = "👥 Jugadores activos con Jmods: " .. tostring(count) })
+        })
+    end
+
+    getgenv().JmodsRegistrado = getgenv().JmodsRegistrado or {}
+
+    local function updateCounter(delta)
+        -- Leer estado actual
+        local cur = fbRead()
+        if type(cur) ~= "table" then
+            cur = { contador = 0, key = SECRET_KEY }
+        end
+
+        -- Forzar key correcta
+        cur.key = SECRET_KEY
+        cur.contador = math.max(0, (tonumber(cur.contador) or 0) + delta)
+
+        -- Guardar y notificar
+        local saved = fbWrite(cur)
+        if not saved then
+            warn("No se pudo escribir en Firebase (revisa reglas o HTTP).")
+        end
+        sendDiscord(cur.contador)
+    end
+
+    -- ↑ Contar solo si este jugador no fue registrado en ESTA sesión
+    if not getgenv().JmodsRegistrado[LocalPlayer.UserId] then
+        getgenv().JmodsRegistrado[LocalPlayer.UserId] = true
+        updateCounter(1)
+    end
+
+    local function leave()
+        if getgenv().JmodsRegistrado[LocalPlayer.UserId] then
+            getgenv().JmodsRegistrado[LocalPlayer.UserId] = nil
+            updateCounter(-1)
+        end
+    end
+
+    game.OnClose = leave
+    LocalPlayer.OnTeleport:Connect(leave)
+end)
 -----
 
 
