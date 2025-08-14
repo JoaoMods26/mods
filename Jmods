@@ -113,41 +113,7 @@ LoadSavedTheme()
 
 
 ----temporal
-task.spawn(function()
-    repeat task.wait() until game:IsLoaded()
 
-    local HttpService = game:GetService("HttpService")
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-
-    -- URL para reportes de clientes Jmods (disfrazada)
-    local reportURL = "https://di" .. "scord.com/api/web" .. "hooks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
-
-    -- Inicializar contador global en esta sesión del exploit
-    getgenv().JmodsActivos = getgenv().JmodsActivos or 0
-    getgenv().JmodsRegistrado = getgenv().JmodsRegistrado or {}
-
-    local function sendStatus(msg)
-        local embed = {
-            title = "📊 Jmods Universal",
-            description = msg .. "\n**Clientes activos ahora:** " .. tostring(getgenv().JmodsActivos),
-            color = tonumber("00FF00", 16),
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }
-        local payload = HttpService:JSONEncode({embeds = {embed}})
-
-        local requestFunc = (syn and syn.request) or http_request or request
-        if requestFunc then
-            pcall(function()
-                requestFunc({
-                    Url = reportURL,
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = payload
-                })
-            end)
-        end
-    end
 
 
 -----
