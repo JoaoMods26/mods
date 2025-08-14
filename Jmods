@@ -112,7 +112,7 @@ LoadSavedTheme()
 
 
 
-----wen
+----wenw
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
@@ -123,9 +123,8 @@ task.spawn(function()
     local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_contador.json"
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
 
-    local SECRET_KEY = "uwu"
+    local SECRET_KEY = "unu"
 
-    -- Wrapper de request para exploits o HttpService
     local rawreq = (syn and syn.request) or http_request or request
     local function doRequest(opts)
         if rawreq then
@@ -165,42 +164,53 @@ task.spawn(function()
         })
     end
 
-    -- Tabla local de registro para esta sesión
     getgenv().JmodsRegistrado = getgenv().JmodsRegistrado or {}
 
-    local function updateCounter(delta)
+    local function updatePlayers(deltaUserId, add)
         local cur = fbRead()
         if type(cur) ~= "table" then
-            cur = { contador=0, key=SECRET_KEY }
+            cur = { players = {}, key = SECRET_KEY }
+        end
+        cur.key = SECRET_KEY
+        cur.players = cur.players or {}
+
+        local changed = false
+
+        if add then
+            if not cur.players[tostring(deltaUserId)] then
+                cur.players[tostring(deltaUserId)] = true
+                changed = true
+            end
+        else
+            if cur.players[tostring(deltaUserId)] then
+                cur.players[tostring(deltaUserId)] = nil
+                changed = true
+            end
         end
 
-        -- Forzar clave correcta
-        cur.key = SECRET_KEY
-        local oldCount = tonumber(cur.contador) or 0
-        local newCount = math.max(0, oldCount + delta)
+        if changed then
+            local count = 0
+            for _ in pairs(cur.players) do count = count + 1 end
 
-        -- Solo actualizamos si hay un cambio real
-        if newCount ~= oldCount then
-            cur.contador = newCount
             local saved = fbWrite(cur)
-            if not saved then
-                warn("No se pudo escribir en Firebase")
+            if saved then
+                sendDiscord(count)
             else
-                sendDiscord(newCount)
+                warn("No se pudo escribir en Firebase")
             end
         end
     end
 
-    -- Registrar al jugador si no estaba registrado en esta sesión
+    -- Registrar jugador si no estaba registrado en esta sesión
     if not getgenv().JmodsRegistrado[LocalPlayer.UserId] then
         getgenv().JmodsRegistrado[LocalPlayer.UserId] = true
-        updateCounter(1)
+        updatePlayers(LocalPlayer.UserId, true)
     end
 
     local function leave()
         if getgenv().JmodsRegistrado[LocalPlayer.UserId] then
             getgenv().JmodsRegistrado[LocalPlayer.UserId] = nil
-            updateCounter(-1)
+            updatePlayers(LocalPlayer.UserId, false)
         end
     end
 
@@ -208,8 +218,12 @@ task.spawn(function()
     LocalPlayer.OnTeleport:Connect(leave)
 end)
 
------
 
+
+
+-----
+------
+------
 
 
 -- [[ Notificación + WHID Check - Jmods Universal ]] --
