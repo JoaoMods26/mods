@@ -115,114 +115,222 @@ LoadSavedTheme()
 ----temporal
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
-
+    
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
     local LocalPlayer = Players.LocalPlayer
-
-    local path = "https://activossd-default-rtdb.firebaseio.com/jmods_contador/players/" .. uid .. ".json"
+    
+    local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_players.json"
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
-
+    
     local SECRET_KEY = "uwu"
-    local PING_INTERVAL = 10 -- segundos
-    local TIMEOUT = 30      -- si no hay ping en 30s, se elimina del contador
-
+    local HEARTBEAT_INTERVAL = 130
+    local TIMEOUT_THRESHOLD = 60 
+    
     local rawreq = (syn and syn.request) or http_request or request
     local function doRequest(opts)
         if rawreq then
             local ok, res = pcall(rawreq, opts)
             if ok then return res end
-            warn("Request falló:", res)
+            return nil
+        else
+            local ok, res = pcall(function()
+                return HttpService:RequestAsync(opts)
+            end)
+            if ok then return res end
             return nil
         end
-        local ok, res = pcall(function()
-            return HttpService:RequestAsync(opts)
-        end)
-        if ok then return res end
-        warn("RequestAsync falló:", res)
-        return nil
     end
-
+    
     local function fbRead()
-        local r = doRequest({Url=firebaseURL, Method="GET", Headers={["Content-Type"]="application/json"}})
-        if not r then return nil end
+        local r = doRequest({
+            Url = firebaseURL,
+            Method = "GET",
+            Headers = { ["Content-Type"] = "application/json" }
+        })
+        
+        if not r then return {} end
         local body = r.Body or r.body
-        if not body or body == "null" or body == "" then return nil end
-        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
-        if ok then return data end
-        return nil
+        if not body or body == "null" or body == "" then return {} end
+        
+        local ok, data = pcall(function() 
+            return HttpService:JSONDecode(body) 
+        end)
+        
+        if ok and type(data) == "table" then 
+            return data 
+        end
+        return {}
     end
-
-    local function fbWritePatch(uid)
-        local path = "jmods_contador/players/" .. uid .. ".json"
+    
+    local function fbWrite(tbl)
         return doRequest({
-            Url = "https://activossd-default-rtdb.firebaseio.com/" .. path,
+            Url = firebaseURL,
             Method = "PUT",
-            Headers = {["Content-Type"]="application/json"},
-            Body = HttpService:JSONEncode({timestamp=os.time()})
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(tbl)
         })
     end
-
-    local function fbCleanup()
-        local cur = fbRead()
-        if type(cur) ~= "table" then return 0 end
-        cur.players = cur.players or {}
-
-        local now = os.time()
-        local changed = false
-
-        for id, data in pairs(cur.players) do
-            if type(data) == "table" and data.timestamp then
-                if now - data.timestamp > TIMEOUT then
-                    cur.players[id] = nil
-                    changed = true
-                end
-            else
-                cur.players[id] = nil
-                changed = true
+    
+    local function sendDiscord(activeCount, playersList)
+        local playerNames = {}
+        for userId, data in pairs(playersList) do
+            if data and data.name then
+                table.insert(playerNames, data.name)
             end
         end
-
-        -- Guardar de nuevo toda la rama si hubo cambios
-        if changed then
-            doRequest({
-                Url = firebaseURL,
-                Method = "PATCH",
-                Headers = {["Content-Type"]="application/json"},
-                Body = HttpService:JSONEncode({players = cur.players, key = SECRET_KEY})
-            })
+        
+        local message = string.format(
+            "👥 **Jugadores activos con Jmods: %d**\n```\n%s\n```", 
+            activeCount,
+            #playerNames > 0 and table.concat(playerNames, "\n") or "Ninguno"
+        )
+        
+        doRequest({
+            Url = webhookURL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({ content = message })
+        })
+    end
+    
+    local function cleanupPlayers(playersData)
+        local currentTime = os.time()
+        local cleaned = {}
+        local removedCount = 0
+        
+        for userId, data in pairs(playersData) do
+            if data and data.lastHeartbeat then
+                local timeSinceHeartbeat = currentTime - data.lastHeartbeat
+                if timeSinceHeartbeat <= TIMEOUT_THRESHOLD then
+                    cleaned[userId] = data
+                else
+                    removedCount = removedCount + 1
+                end
+            end
         end
-
+        
+        return cleaned, removedCount
+    end
+    
+    local function updateHeartbeat()
+        local playersData = fbRead()
+        local currentTime = os.time()
+        
+        local cleanedData, removedCount = cleanupPlayers(playersData)
+        
+        local wasNew = cleanedData[tostring(LocalPlayer.UserId)] == nil
+        cleanedData[tostring(LocalPlayer.UserId)] = {
+            name = LocalPlayer.Name,
+            displayName = LocalPlayer.DisplayName,
+            userId = LocalPlayer.UserId,
+            lastHeartbeat = currentTime,
+            key = SECRET_KEY
+        }
+        
+        local success = fbWrite(cleanedData)
+        if success then
+            local activeCount = 0
+            for _ in pairs(cleanedData) do
+                activeCount = activeCount + 1
+            end
+            
+            
+            if wasNew or removedCount > 0 then
+                sendDiscord(activeCount, cleanedData)
+            end
+        else
+        end
+    end
+    
+    local function handlePlayerLeave()
+        local playersData = fbRead()
+        local userId = tostring(LocalPlayer.UserId)
+        
+        if playersData[userId] then
+            playersData[userId] = nil
+            local success = fbWrite(playersData)
+            
+            if success then
+                local activeCount = 0
+                for _ in pairs(playersData) do
+                    activeCount = activeCount + 1
+                end
+                
+                sendDiscord(activeCount, playersData)
+            end
+        end
+    end
+    
+    
+    updateHeartbeat()
+    
+    local heartbeatConnection = task.spawn(function()
+        while true do
+            task.wait(HEARTBEAT_INTERVAL)
+            if LocalPlayer.Parent then -- Verificar que el jugador siga conectado
+                updateHeartbeat()
+            else
+                break
+            end
+        end
+    end)
+    
+    local function setupLeaveHandlers()
+        -- Método 1: game.OnClose
+        pcall(function()
+            game.OnClose = handlePlayerLeave
+        end)
+        
+        -- Método 2: LocalPlayer.OnTeleport
+        pcall(function()
+            LocalPlayer.OnTeleport:Connect(handlePlayerLeave)
+        end)
+        
+        -- Método 3: Detectar cuando LocalPlayer es removido
+        pcall(function()
+            LocalPlayer.AncestryChanged:Connect(function()
+                if not LocalPlayer.Parent then
+                    handlePlayerLeave()
+                end
+            end)
+        end)
+        
+        task.spawn(function()
+            local lastHeartbeat = tick()
+            while LocalPlayer.Parent do
+                task.wait(5)
+                if tick() - lastHeartbeat > TIMEOUT_THRESHOLD + 10 then
+                    -- Heartbeat perdido por mucho tiempo, probablemente desconectado
+                    handlePlayerLeave()
+                    break
+                end
+                lastHeartbeat = tick()
+            end
+        end)
+    end
+    
+    setupLeaveHandlers()
+    
+    
+    getgenv().JmodsStatus = function()
+        local data = fbRead()
         local count = 0
-        for _ in pairs(cur.players) do count = count + 1 end
-        return count
-    end
-
-    local lastCount = 0
-
-    while true do
-        local uidStr = tostring(LocalPlayer.UserId)
-        -- Actualizar su propio ping
-        fbWritePatch(uidStr)
-
-        -- Limpiar jugadores inactivos y obtener count
-        local count = fbCleanup()
-
-        -- Enviar webhook solo si cambia
-        if count ~= lastCount then
-            lastCount = count
-            doRequest({
-                Url = webhookURL,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = HttpService:JSONEncode({ content = "👥 Jugadores activos con Jmods: " .. tostring(count) })
-            })
-            print("Jugadores activos:", count)
+        for userId, playerData in pairs(data) do
+            count = count + 1
+            print(string.format("  %d. %s (%s) - Último heartbeat: %s", 
+                count, 
+                playerData.name or "Desconocido",
+                userId,
+                playerData.lastHeartbeat and os.date("%H:%M:%S", playerData.lastHeartbeat) or "Nunca"
+            ))
         end
-
-        task.wait(PING_INTERVAL)
+        return data
     end
+    
 end)
+
 
 
 
