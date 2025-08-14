@@ -112,7 +112,7 @@ LoadSavedTheme()
 
 
 
-----wenw22222
+----temporal
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
@@ -153,58 +153,77 @@ task.spawn(function()
         return nil
     end
 
-    local function fbWrite(tbl)
-        return doRequest({Url=firebaseURL, Method="PUT", Headers={["Content-Type"]="application/json"}, Body=HttpService:JSONEncode(tbl)})
+    local function fbWritePatch(uid)
+        local path = "jmods_contador/players/" .. uid .. ".json"
+        return doRequest({
+            Url = "https://activossd-default-rtdb.firebaseio.com/" .. path,
+            Method = "PUT",
+            Headers = {["Content-Type"]="application/json"},
+            Body = HttpService:JSONEncode({timestamp=os.time()})
+        })
     end
 
-    local function sendDiscord(count)
-        doRequest({
-            Url = webhookURL,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({ content = "👥 Jugadores activos con Jmods: " .. tostring(count) })
-        })
+    local function fbCleanup()
+        local cur = fbRead()
+        if type(cur) ~= "table" then return 0 end
+        cur.players = cur.players or {}
+
+        local now = os.time()
+        local changed = false
+
+        for id, data in pairs(cur.players) do
+            if type(data) == "table" and data.timestamp then
+                if now - data.timestamp > TIMEOUT then
+                    cur.players[id] = nil
+                    changed = true
+                end
+            else
+                cur.players[id] = nil
+                changed = true
+            end
+        end
+
+        -- Guardar de nuevo toda la rama si hubo cambios
+        if changed then
+            doRequest({
+                Url = firebaseURL,
+                Method = "PATCH",
+                Headers = {["Content-Type"]="application/json"},
+                Body = HttpService:JSONEncode({players = cur.players, key = SECRET_KEY})
+            })
+        end
+
+        local count = 0
+        for _ in pairs(cur.players) do count = count + 1 end
+        return count
     end
 
     local lastCount = 0
 
-    local function updatePing()
-        local cur = fbRead()
-        if type(cur) ~= "table" then
-            cur = { players = {}, key = SECRET_KEY }
-        end
-        cur.key = SECRET_KEY
-        cur.players = cur.players or {}
-
-        local now = os.time()
+    while true do
         local uidStr = tostring(LocalPlayer.UserId)
-        cur.players[uidStr] = now -- actualizar timestamp del jugador actual
+        -- Actualizar su propio ping
+        fbWritePatch(uidStr)
 
-        -- Limpiar jugadores que no han hecho ping recientemente
-        for id, ts in pairs(cur.players) do
-            if now - ts > TIMEOUT then
-                cur.players[id] = nil
-            end
-        end
+        -- Limpiar jugadores inactivos y obtener count
+        local count = fbCleanup()
 
-        -- Contar jugadores activos
-        local count = 0
-        for _ in pairs(cur.players) do count = count + 1 end
-
-        local saved = fbWrite(cur)
-        if saved and count ~= lastCount then
+        -- Enviar webhook solo si cambia
+        if count ~= lastCount then
             lastCount = count
-            sendDiscord(count)
+            doRequest({
+                Url = webhookURL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({ content = "👥 Jugadores activos con Jmods: " .. tostring(count) })
+            })
             print("Jugadores activos:", count)
         end
-    end
 
-    -- Loop de ping periódico
-    while true do
-        pcall(updatePing)
         task.wait(PING_INTERVAL)
     end
 end)
+
 
 
 
