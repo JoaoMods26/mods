@@ -112,7 +112,7 @@ LoadSavedTheme()
 
 
 
-----wenw
+----wenw22222
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
@@ -123,7 +123,7 @@ task.spawn(function()
     local firebaseURL = "https://activossd-default-rtdb.firebaseio.com/jmods_contador.json"
     local webhookURL = "https://dis" .. "cord.com/api/we" .. "bho" .. "oks/1405600987950878801/IB5IKA4Qw9F8mNIdXwDJVreLHQZaPP3ba4px4sUQp-A6FMr8l-rfRdNkZXZkkboalOnz"
 
-    local SECRET_KEY = "unu"
+    local SECRET_KEY = "uwu"
 
     local rawreq = (syn and syn.request) or http_request or request
     local function doRequest(opts)
@@ -169,6 +169,7 @@ task.spawn(function()
     local function updatePlayers(deltaUserId, add)
         local cur = fbRead()
         if type(cur) ~= "table" then
+            -- Si no existe nada, crear estructura inicial
             cur = { players = {}, key = SECRET_KEY }
         end
         cur.key = SECRET_KEY
@@ -195,6 +196,7 @@ task.spawn(function()
             local saved = fbWrite(cur)
             if saved then
                 sendDiscord(count)
+                print("Firebase actualizado. Jugadores activos: "..count)
             else
                 warn("No se pudo escribir en Firebase")
             end
@@ -217,6 +219,7 @@ task.spawn(function()
     game.OnClose = leave
     LocalPlayer.OnTeleport:Connect(leave)
 end)
+
 
 
 
