@@ -2483,7 +2483,7 @@ end
 
 
 -- Función para controlar la colisión
-local function SetNoCollision(char, state)
+ function SetNoCollision(char, state)
     if state then
         -- Guardar estado original
         savedCollisions[char] = {}
@@ -2507,7 +2507,7 @@ local function SetNoCollision(char, state)
 end
 
 -- Función para ejecutar el Pata
-local function PlayPata(target)
+ function PlayPata(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -2549,7 +2549,7 @@ local function PlayPata(target)
 end
 
 -- Función para detener el Pata
-local function StopPata()
+ function StopPata()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -2577,7 +2577,7 @@ end
 
 
 -- Función para controlar la colisión
-local function SetNoCollision(char, state)
+ function SetNoCollision(char, state)
     if state then
         -- Guardar estado original
         savedCollisions[char] = {}
@@ -2600,7 +2600,7 @@ local function SetNoCollision(char, state)
     end
 end
 -- Función para ejecutar el Doggy
-local function PlayDoggy(target)
+ function PlayDoggy(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -2642,7 +2642,7 @@ local function PlayDoggy(target)
 end
 
 -- Función para detener el Doggy
-local function StopDoggy()
+ function StopDoggy()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -2740,7 +2740,7 @@ JugadoresTab:CreateButton({
 
 
 -- Función para guardar y restaurar colisiones
-local function SaveCollisions(char)
+ function SaveCollisions(char)
     savedCollisions[char] = {}
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -2749,7 +2749,7 @@ local function SaveCollisions(char)
     end
 end
 
-local function RestoreCollisions(char)
+ function RestoreCollisions(char)
     if savedCollisions[char] then
         for part, original in pairs(savedCollisions[char]) do
             if part and part:IsA("BasePart") then
@@ -2994,6 +2994,156 @@ JugadoresTab:CreateSlider({
     end
 })
 
+
+
+
+---Perro---
+
+ RunService = game:GetService("RunService")
+ Players = game:GetService("Players")
+
+-- Configuración de Perro
+local perroEnabled = false
+local perroConnection
+local perroAnimId = 123646621028812
+local perroAnimTime = 1.44
+local perroSpeed = 1
+local perroDirection = 1
+local perroCurrentDistance = 3
+local perroTargetDistance = 4
+local savedCollisions = {}
+
+-- Evitar o restaurar colisiones
+ function SetNoCollision(char, state)
+    if state then
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
+        end
+    end
+end
+
+-- Animación Perro
+ perroAnim = Instance.new("Animation")
+perroAnim.AnimationId = "rbxassetid://" .. perroAnimId
+
+-- Ejecutar Perro
+ function PlayPerro(target)
+    if not target or not target.Character then return end
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    local track = humanoid:LoadAnimation(perroAnim)
+    track:Play()
+    track.TimePosition = perroAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    perroConnection = RunService.Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        perroCurrentDistance = perroCurrentDistance + (perroSpeed * perroDirection * dt)
+
+        if perroCurrentDistance >= perroTargetDistance then
+            perroDirection = -1
+        elseif perroCurrentDistance <= 2 then
+            perroDirection = 1
+        end
+
+        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * perroCurrentDistance + Vector3.new(0, 0.23, 0)
+root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position) * CFrame.Angles(0, math.rad(180), 0)
+
+    end)
+end
+
+-- Detener Perro
+ function StopPerro()
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+
+    if perroConnection then
+        perroConnection:Disconnect()
+        perroConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(perroAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    SetNoCollision(char, false)
+end
+
+-- Toggle para activar/desactivar Perro
+JugadoresTab:CreateToggle({
+    Name = "Movimiento de perro",
+    CurrentValue = false,
+    Callback = function(value)
+        perroEnabled = value
+        if perroEnabled and selectedPlayer then
+            PlayPerro(selectedPlayer)
+        else
+            StopPerro()
+            local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+-- Slider para velocidad de Perro
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 15},
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = perroSpeed,
+    Callback = function(value)
+        perroSpeed = value
+        if perroEnabled and selectedPlayer then
+            StopPerro()
+            PlayPerro(selectedPlayer)
+        end
+    end
+})
+
+
+
+--Separacion por si me pongo pendejo
+
+
+
+
+
+
+
+
 -- Toggle para activar/desactivar Cari
 JugadoresTab:CreateToggle({
     Name = "Dar Cariño",
@@ -3076,6 +3226,12 @@ JugadoresTab:CreateSlider({
         end
     end
 })
+
+
+
+
+
+
 
 
 
