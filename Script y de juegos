@@ -9,6 +9,13 @@ local Button1 = TPTab:CreateButton({
    end,
 })
 
+local Button24 = TPTab:CreateButton({
+   Name = "AnimacionSpoofer Jmods",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-AnimSpoofer-Jmods-48380"))()       
+   end,
+})
+
 local Button2 = TPTab:CreateButton({
    Name = "Infinite Yield",
    Callback = function()
@@ -16,19 +23,13 @@ local Button2 = TPTab:CreateButton({
    end,
 })
 
-local Button3 = TPTab:CreateButton({
-   Name = "Dex (Pc)",
+local Button9 = TPTab:CreateButton({
+   Name = "Fly universal",
    Callback = function()
-       loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+       loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
    end,
 })
 
-local Button4 = TPTab:CreateButton({
-   Name = "Dex (Celular)",
-   Callback = function()
-       loadstring(game:HttpGet("https://pastebin.com/raw/9z8KQF8N"))()
-   end,
-})
 
 local Button5 = TPTab:CreateButton({
    Name = "Fe Invicible G para activar",
@@ -46,12 +47,6 @@ local Button6 = TPTab:CreateButton({
    end,
 })
 
-local Button24 = TPTab:CreateButton({
-   Name = "AnimacionSpoofer Jmods",
-   Callback = function()
-loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-AnimSpoofer-Jmods-48380"))()       
-   end,
-})
 
 local Button7 = TPTab:CreateButton({
    Name = "AFEM (Animaciones R15)",
@@ -60,6 +55,21 @@ local Button7 = TPTab:CreateButton({
    end,
 })
 
+local Button3 = TPTab:CreateButton({
+   Name = "Dex (Pc)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+   end,
+})
+
+local Button4 = TPTab:CreateButton({
+   Name = "Dex (Celular)",
+   Callback = function()
+       loadstring(game:HttpGet("https://pastebin.com/raw/9z8KQF8N"))()
+   end,
+})
+
+
 local Button8 = TPTab:CreateButton({
    Name = "Remote Spy (Octo spy)",
    Callback = function()
@@ -67,12 +77,6 @@ local Button8 = TPTab:CreateButton({
    end,
 })
 
-local Button9 = TPTab:CreateButton({
-   Name = "Fly universal",
-   Callback = function()
-       loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
-   end,
-})
 
 local Button10 = TPTab:CreateButton({
    Name = "Teclado (Movil)",
