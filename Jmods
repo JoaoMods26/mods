@@ -3154,7 +3154,7 @@ AimbotTab:CreateButton({
 
 
 
---[[
+
 ----Hitbox Espander---- 
 ---- Hitbox Expander Optimizado sin Noclip ----
 local Players = game:GetService("Players")
@@ -3292,7 +3292,6 @@ HitboxTab:CreateSlider({
 })
 
 
---]]
 
 ----Server hop
 _G.Window = Window
