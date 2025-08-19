@@ -2651,62 +2651,120 @@ JugadoresTab:CreateToggle({
 
 
 local sitToggle = false
-local sitConnection
 local isSitting = false
+local originalStats = {}
+
+local function clearAlign(localChar)
+    if not localChar then return end
+    local root = localChar:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    for _, v in ipairs(root:GetChildren()) do
+        if v:IsA("AlignPosition") or v:IsA("AlignOrientation") or v:IsA("Attachment") then
+            v:Destroy()
+        end
+    end
+end
 
 JugadoresTab:CreateToggle({
-    Name = "Sentarse en la cabesa",
+    Name = "Sentarse en la cabeza",
     Default = false,
     Callback = function(state)
-        local localChar = game.Players.LocalPlayer.Character
-        local humanoid = localChar and localChar:FindFirstChildOfClass("Humanoid")
+        local player = game.Players.LocalPlayer
+        if not player then return end
+        local localChar = player.Character
+        if not localChar then return end
 
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        local root = localChar:FindFirstChild("HumanoidRootPart")
+
+        if not humanoid or not root then return end
         sitToggle = state
 
-        if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") and humanoid then
+        -- ACTIVAR
+        if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
             local head = selectedPlayer.Character.Head
+            if not head then return end
 
+            -- guardar stats originales
+            originalStats = {
+                WalkSpeed = humanoid.WalkSpeed,
+                JumpPower = humanoid.JumpPower,
+                JumpHeight = humanoid.JumpHeight
+            }
+
+            clearAlign(localChar)
+
+            -- TP inmediato arriba de la cabeza
+            root.CFrame = head.CFrame * CFrame.new(0, 1, 0)
+
+            -- Bloquear totalmente
             humanoid.Sit = true
             humanoid.WalkSpeed = 0
             humanoid.JumpPower = 0
             humanoid.JumpHeight = 0
+            humanoid:ChangeState(Enum.HumanoidStateType.Seated)
 
-            local voddyPosition = head.Position + Vector3.new(0, 1, 0)
-            localChar.HumanoidRootPart.CFrame = CFrame.new(voddyPosition)
+            -- Desactivar salto/caída
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
 
-            localChar.HumanoidRootPart.Anchored = true
-            wait(0.01)
-            localChar.HumanoidRootPart.Anchored = false
+            -- Crear attachments
+            local rootAttachment = Instance.new("Attachment", root)
+            local headAttachment = Instance.new("Attachment", head)
+            headAttachment.Position = Vector3.new(0, 1, 0)
 
-            sitConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-                    local headPos = selectedPlayer.Character.Head.Position
-                    localChar.HumanoidRootPart.CFrame = CFrame.new(headPos + Vector3.new(0, 1, 0))
-                end
-            end)
+            local alignPos = Instance.new("AlignPosition")
+            alignPos.Attachment0 = rootAttachment
+            alignPos.Attachment1 = headAttachment
+            alignPos.RigidityEnabled = true
+            alignPos.Responsiveness = math.huge
+            alignPos.MaxForce = math.huge
+            alignPos.Parent = root
+
+            local alignOri = Instance.new("AlignOrientation")
+            alignOri.Attachment0 = rootAttachment
+            alignOri.Attachment1 = headAttachment
+            alignOri.RigidityEnabled = true
+            alignOri.Responsiveness = math.huge
+            alignOri.MaxTorque = math.huge
+            alignOri.Parent = root
 
             isSitting = true
-        elseif not sitToggle and humanoid then
-            if sitConnection then
-                sitConnection:Disconnect()
-                sitConnection = nil
+
+        -- DESACTIVAR
+        elseif not sitToggle then
+            clearAlign(localChar)
+
+            if humanoid then
+                -- restaurar stats originales si existen
+                if originalStats.WalkSpeed then
+                    humanoid.WalkSpeed = originalStats.WalkSpeed
+                    humanoid.JumpPower = originalStats.JumpPower
+                    humanoid.JumpHeight = originalStats.JumpHeight
+                else
+                    humanoid.WalkSpeed = 16
+                    humanoid.JumpPower = 50
+                    humanoid.JumpHeight = 7.2
+                end
+
+                humanoid.Sit = false
+                humanoid:ChangeState(Enum.HumanoidStateType.Standing)
+
+                -- reactivar salto/caída
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
             end
 
-            local originalPosition = localChar.HumanoidRootPart.Position
-            localChar.HumanoidRootPart.Anchored = true
-            wait(0.01)
-            localChar.HumanoidRootPart.Anchored = false
-            localChar.HumanoidRootPart.CFrame = CFrame.new(originalPosition)
-
-            humanoid.Sit = false
-            humanoid.WalkSpeed = 16
-            humanoid.JumpPower = 50
-            humanoid.JumpHeight = 7.2
+            if root then
+                -- levantar un poco para evitar trabarse
+                root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
+            end
 
             isSitting = false
         end
     end
 })
+
 
 
 
