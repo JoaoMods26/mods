@@ -2732,38 +2732,46 @@ JugadoresTab:CreateToggle({
             isSitting = true
 
         -- DESACTIVAR
-        elseif not sitToggle then
-            clearAlign(localChar)
+elseif not sitToggle then
+    if localChar and localChar.Parent then
+        clearAlign(localChar)
 
-            if humanoid then
-                -- restaurar stats originales si existen
-                if originalStats.WalkSpeed then
-                    humanoid.WalkSpeed = originalStats.WalkSpeed
-                    humanoid.JumpPower = originalStats.JumpPower
-                    humanoid.JumpHeight = originalStats.JumpHeight
-                else
-                    humanoid.WalkSpeed = 16
-                    humanoid.JumpPower = 50
-                    humanoid.JumpHeight = 7.2
-                end
+        if humanoid and humanoid.Parent then
+            -- restaurar stats originales si existen
+            if originalStats.WalkSpeed then
+                humanoid.WalkSpeed = originalStats.WalkSpeed
+                humanoid.JumpPower = originalStats.JumpPower
+                humanoid.JumpHeight = originalStats.JumpHeight
+            else
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+                humanoid.JumpHeight = 7.2
+            end
 
+            if humanoid.Health > 0 then
                 humanoid.Sit = false
-                humanoid:ChangeState(Enum.HumanoidStateType.Standing)
-
-                -- reactivar salto/caída
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Standing) end)
             end
 
-            if root then
-                -- levantar un poco para evitar trabarse
+            -- reactivar salto/caída
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        end
+
+        if root and root.Parent then
+            -- levantar un poco para evitar trabarse
+            pcall(function()
                 root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
-            end
-
-            isSitting = false
+            end)
         end
     end
+
+    isSitting = false
+end
+
+    end
 })
+
 
 
 
