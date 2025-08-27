@@ -273,6 +273,15 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/h
 
 
  boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(Lennon hub ESP)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Klevis123-1/Lennon-hub-leaked/refs/heads/main/Lennon.txt"))()
+   end,
+})
+
+
+
+ boton= Juegostab:CreateButton({
    Name = "Steal a Brainrot(pide key)",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a-brainrot/refs/heads/main/Protected_3771863424757750.lua.txt"))()
