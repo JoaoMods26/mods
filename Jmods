@@ -1083,25 +1083,26 @@ FlySpeedSlider = MainTab:CreateSlider({
 
 
 
----Zoon sin limite--
+---Zoom sin límite---
 
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+
 local CameraMaxZoom = 4000  
 local DefaultMaxZoom = LocalPlayer.CameraMaxZoomDistance  -- Guardar el valor original
-
 local ZoomUnlocked = false
 
 local function ToggleZoom(state)
     ZoomUnlocked = state
-
     if ZoomUnlocked then
+        DefaultMaxZoom = LocalPlayer.CameraMaxZoomDistance -- guardar valor real del juego
         LocalPlayer.CameraMaxZoomDistance = CameraMaxZoom
     else
-        LocalPlayer.CameraMaxZoomDistance = DefaultMaxZoom
+        LocalPlayer.CameraMaxZoomDistance = DefaultMaxZoom or 128 -- valor por defecto Roblox
     end
 end
 
--- Crear el Toggle en Rayfield
+-- Toggle en Rayfield
 ZoomToggle = MainTab:CreateToggle({
     Name = "Zoom sin limite",
     CurrentValue = false,
@@ -1109,6 +1110,7 @@ ZoomToggle = MainTab:CreateToggle({
         ToggleZoom(state)
     end
 })
+
 
 -----Fog-----
 
