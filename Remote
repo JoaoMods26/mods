@@ -142,6 +142,7 @@ task.spawn(function()
     end
 
     local function FreezeAll()
+        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se congela
         Frozen = true
         RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
             if not Frozen then return end
@@ -153,6 +154,7 @@ task.spawn(function()
     end
 
     local function UnfreezeAll()
+        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se descongela
         Frozen = false
         RunService:UnbindFromRenderStep("FreezePlayers")
         local char = LocalPlayer.Character
@@ -202,72 +204,75 @@ task.spawn(function()
     local function SendChatMessage(message)
         local success = false
         
-        -- Método 1: TextChatService (nuevo sistema de chat)
+        -- Método 1: TextChatService (nuevo sistema de chat) - MÁS DIRECTO
         pcall(function()
             if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                local textChannels = TextChatService:WaitForChild("TextChannels", 1)
+                local textChannels = TextChatService.TextChannels
                 if textChannels then
-                    local generalChannel = textChannels:FindFirstChild("RBXGeneral") or textChannels:FindFirstChild("RBXTeam") or textChannels:GetChildren()[1]
-                    if generalChannel and generalChannel:IsA("TextChannel") then
+                    local generalChannel = textChannels.RBXGeneral
+                    if generalChannel then
                         generalChannel:SendAsync(message)
                         success = true
+                        return
+                    end
+                    -- Fallback para otros canales
+                    for _, channel in pairs(textChannels:GetChildren()) do
+                        if channel:IsA("TextChannel") then
+                            channel:SendAsync(message)
+                            success = true
+                            break
+                        end
                     end
                 end
             end
         end)
 
-        -- Método 2: Sistema de chat clásico (fallback)
+        -- Método 2: Sistema de chat clásico (MÁS DIRECTO)
         if not success then
             pcall(function()
-                local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-                if chatEvents then
-                    local sayMessageRequest = chatEvents:FindFirstChild("SayMessageRequest")
-                    if sayMessageRequest then
-                        sayMessageRequest:FireServer(message, "All")
-                        success = true
+                local success2 = false
+                -- Intento 1: ReplicatedStorage directo
+                if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
+                    local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
+                    if chatEvents:FindFirstChild("SayMessageRequest") then
+                        chatEvents.SayMessageRequest:FireServer(message, "All")
+                        success2 = true
                     end
                 end
-            end)
-        end
-
-        -- Método 3: Sistema personalizado/alternativo (para juegos con sistemas custom)
-        if not success then
-            pcall(function()
-                -- Buscar eventos de chat alternativos comunes
-                local possibleChatEvents = {
-                    "ChatServiceRunner",
-                    "ChatService",
-                    "CustomChatService",
-                    "GameChatService"
-                }
                 
-                for _, eventName in ipairs(possibleChatEvents) do
-                    local chatService = ReplicatedStorage:FindFirstChild(eventName)
-                    if chatService then
-                        for _, child in ipairs(chatService:GetChildren()) do
-                            if child.Name:lower():find("say") or child.Name:lower():find("message") or child.Name:lower():find("chat") then
-                                child:FireServer(message)
-                                success = true
-                                break
+                -- Intento 2: Buscar eventos alternativos
+                if not success2 then
+                    for _, child in pairs(ReplicatedStorage:GetChildren()) do
+                        if child.Name:lower():find("chat") then
+                            for _, subChild in pairs(child:GetChildren()) do
+                                if subChild:IsA("RemoteEvent") and (subChild.Name:lower():find("say") or subChild.Name:lower():find("message")) then
+                                    subChild:FireServer(message, "All")
+                                    success2 = true
+                                    break
+                                end
                             end
+                            if success2 then break end
                         end
-                        if success then break end
                     end
                 end
+                success = success2
             end)
         end
 
-        -- Método 4: Chat por GUI (último recurso)
+        -- Método 3: Directo con game.Players.LocalPlayer (último recurso)
         if not success then
             pcall(function()
-                StarterGui:SetCore("ChatMakeSystemMessage", {
-                    Text = "[SYSTEM]: " .. message,
-                    Color = Color3.fromRGB(255, 255, 255),
-                    Font = Enum.Font.SourceSansBold,
-                    FontSize = Enum.FontSize.Size18
-                })
+                -- Simular escribir en chat usando el método más básico
+                local player = game.Players.LocalPlayer
+                if player and player.Character then
+                    -- Crear burbuja temporal
+                    game:GetService("Chat"):Chat(player.Character.Head, message, Enum.ChatColor.White)
+                    success = true
+                end
             end)
         end
+        
+        return success
     end
 
     -- Sistema mejorado de detección de comandos usando múltiples métodos
@@ -345,32 +350,30 @@ task.spawn(function()
         elseif cmd == ".ww" then StopWalking()
 
         elseif cmd == ".q" then
-            if arg then
-                for _, p in ipairs(GetTargetPlayers(arg)) do
-                    if p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        p.Character.HumanoidRootPart.Anchored = true
+            if not IsOwner(LocalPlayer.UserId) then
+                -- Si hay un argumento (nombre), verificar si aplica a este jugador
+                if arg then
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        FreezeAll()
                     end
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        p.Character.HumanoidRootPart.Anchored = true
-                    end
+                else
+                    -- Sin argumento = congelar todos los seguidores
+                    FreezeAll()
                 end
             end
 
         elseif cmd == ".qq" then
-            if arg then
-                for _, p in ipairs(GetTargetPlayers(arg)) do
-                    if p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        p.Character.HumanoidRootPart.Anchored = false
+            if not IsOwner(LocalPlayer.UserId) then
+                -- Si hay un argumento (nombre), verificar si aplica a este jugador
+                if arg then
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        UnfreezeAll()
                     end
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        p.Character.HumanoidRootPart.Anchored = false
-                    end
+                else
+                    -- Sin argumento = descongelar todos los seguidores
+                    UnfreezeAll()
                 end
             end
         
@@ -438,6 +441,6 @@ task.spawn(function()
     CheckAndConnectPlayers()
     SetupCommandDetection()
 
-   --- print("Sistema de administración cargado correctamente")
-   --- print("Comandos: /e .comando - Funciona con cualquier sistema de chataa")
+    print("Sistema de administración cargado correctamente")
+    print("Comandos: /e .comando - Funciona con cualquier sistema de chat")
 end)
