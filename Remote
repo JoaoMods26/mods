@@ -10,10 +10,12 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
     local ownerIds = {4591285210, 2275056290}
 
-    local Orbiting, Walking, Frozen = false, false, false
+    local Orbiting, Walking, Frozen, EmoteSync = false, false, false, false
     local danceTracks, frozenPositions, emotes = {}, {}, {}
     local lastCommandTime = 0
     local commandCooldown = 0.5
+    local emoteSyncConnection = nil
+    local targetForEmoteSync = nil
 
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
@@ -195,8 +197,93 @@ task.spawn(function()
         end
     end
 
-    local function KickPlayer(p)
-        p:Kick("You were kicked by the owner")
+    local function StopEmoteSync()
+        EmoteSync = false
+        targetForEmoteSync = nil
+        if emoteSyncConnection then
+            emoteSyncConnection:Disconnect()
+            emoteSyncConnection = nil
+        end
+        RunService:UnbindFromRenderStep("EmoteSyncDetector")
+    end
+
+    local function StartEmoteSync(name)
+        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se sincroniza
+        
+        StopEmoteSync()
+        EmoteSync = true
+        targetForEmoteSync = GetOwnerPlayer()
+        
+        if not targetForEmoteSync then 
+            EmoteSync = false 
+            return 
+        end
+        
+        -- Verificar si debe aplicarse solo a jugador específico
+        if name then
+            local playerName = LocalPlayer.Name:lower()
+            if not (playerName:sub(1, #name) == name:lower()) then
+                EmoteSync = false
+                return
+            end
+        end
+        -- Si no hay nombre especificado, TODOS los seguidores (que tengan el script) se sincronizan
+        
+        local lastAnimationId = ""
+        
+        RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
+            if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
+                return 
+            end
+            
+            local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
+            local myCharacter = LocalPlayer.Character
+            local myHumanoid = myCharacter and myCharacter:FindFirstChildOfClass("Humanoid")
+            
+            if not targetHumanoid or not myHumanoid then return end
+            
+            -- Obtener animaciones del target (owner)
+            local targetAnimator = targetHumanoid:FindFirstChildOfClass("Animator")
+            if not targetAnimator then return end
+            
+            -- Buscar animaciones activas del target
+            for _, track in pairs(targetAnimator:GetPlayingAnimationTracks()) do
+                if track.Animation then
+                    local animId = track.Animation.AnimationId
+                    
+                    -- Verificar si es una nueva animación y no es una animación de caminar/correr/saltar
+                    if animId ~= lastAnimationId and not animId:find("walk") and not animId:find("run") and not animId:find("jump") then
+                        lastAnimationId = animId
+                        
+                        -- Detener animaciones actuales del seguidor
+                        local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
+                        if myAnimator then
+                            for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
+                                if myTrack.Animation and not myTrack.Animation.AnimationId:find("walk") and not myTrack.Animation.AnimationId:find("run") and not myTrack.Animation.AnimationId:find("jump") then
+                                    myTrack:Stop()
+                                end
+                            end
+                        end
+                        
+                        -- Aplicar la misma animación al seguidor
+                        pcall(function()
+                            local newAnim = Instance.new("Animation")
+                            newAnim.AnimationId = animId
+                            local newTrack = myHumanoid:LoadAnimation(newAnim)
+                            newTrack.Looped = track.Looped
+                            newTrack.Priority = track.Priority
+                            newTrack:Play()
+                            
+                            -- Sincronizar posición de tiempo si es posible
+                            if track.TimePosition > 0 then
+                                newTrack.TimePosition = track.TimePosition
+                            end
+                        end)
+                        break
+                    end
+                end
+            end
+        end)
     end
 
     -- NUEVO SISTEMA DE CHAT MEJORADO (basado en el primer script)
@@ -366,6 +453,16 @@ task.spawn(function()
                 end
             end
 
+        elseif cmd == ".p" then
+            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                StartEmoteSync(arg)
+            end
+
+        elseif cmd == ".pp" then
+            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                StopEmoteSync()
+            end
+
         elseif cmd == ".k" then 
             if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
                 if arg then
@@ -397,7 +494,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistemaaaa
+    -- Inicializar sistema
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
