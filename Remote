@@ -587,7 +587,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistemaaaaaaa
+    -- Inicializar sistema nuclear xd
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
