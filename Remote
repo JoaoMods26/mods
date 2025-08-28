@@ -438,6 +438,6 @@ task.spawn(function()
     CheckAndConnectPlayers()
     SetupCommandDetection()
 
-    print("Sistema de administración cargado correctamente")
-    print("Comandos: /e .comando - Funciona con cualquier sistema de chataa")
+   --- print("Sistema de administración cargado correctamente")
+   --- print("Comandos: /e .comando - Funciona con cualquier sistema de chataa")
 end)
