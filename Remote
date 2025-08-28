@@ -12,6 +12,7 @@ task.spawn(function()
 
     local Orbiting, Walking, Frozen, EmoteSync = false, false, false, false
     local danceTracks, frozenPositions, emotes = {}, {}, {}
+    local emoteSyncTracks = {} -- Nueva tabla para trackear emotes sincronizados
     local lastCommandTime = 0
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
@@ -200,6 +201,17 @@ task.spawn(function()
     local function StopEmoteSync()
         EmoteSync = false
         targetForEmoteSync = nil
+        
+        -- Detener y limpiar todas las animaciones sincronizadas activas
+        for _, track in pairs(emoteSyncTracks) do
+            pcall(function()
+                if track and track.IsPlaying then
+                    track:Stop()
+                end
+            end)
+        end
+        emoteSyncTracks = {} -- Limpiar la tabla
+        
         if emoteSyncConnection then
             emoteSyncConnection:Disconnect()
             emoteSyncConnection = nil
@@ -289,9 +301,20 @@ task.spawn(function()
                         
                         lastAnimationId = animId
                         
-                        -- Detener animaciones actuales del seguidor (excepto básicas)
+                        -- LIMPIAR COMPLETAMENTE todas las animaciones de emote previas del seguidor
                         local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
                         if myAnimator then
+                            -- Detener todas las animaciones sincronizadas anteriores
+                            for _, oldTrack in pairs(emoteSyncTracks) do
+                                pcall(function()
+                                    if oldTrack and oldTrack.IsPlaying then
+                                        oldTrack:Stop()
+                                    end
+                                end)
+                            end
+                            emoteSyncTracks = {} -- Limpiar tabla
+                            
+                            -- También detener cualquier otra animación de emote que esté corriendo
                             for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
                                 if myTrack.Animation and not isBasicAnimation(myTrack.Animation.AnimationId, myTrack) then
                                     myTrack:Stop()
@@ -299,7 +322,10 @@ task.spawn(function()
                             end
                         end
                         
-                        -- Aplicar la misma animación al seguidor
+                        -- Pequeña pausa para asegurar que las animaciones anteriores se detengan
+                        task.wait(0.1)
+                        
+                        -- Aplicar la nueva animación al seguidor
                         pcall(function()
                             local newAnim = Instance.new("Animation")
                             newAnim.AnimationId = animId
@@ -311,6 +337,9 @@ task.spawn(function()
                             
                             newTrack:Play()
                             
+                            -- Agregar el track a la tabla de tracking para poder detenerlo después
+                            table.insert(emoteSyncTracks, newTrack)
+                            
                             -- Sincronizar posición de tiempo si es posible
                             if track.TimePosition > 0 then
                                 newTrack.TimePosition = track.TimePosition
@@ -320,6 +349,16 @@ task.spawn(function()
                             if track.Looped then
                                 newTrack.Looped = true
                             end
+                            
+                            -- Limpiar tracks que ya terminaron automáticamente
+                            newTrack.Ended:Connect(function()
+                                for i, t in ipairs(emoteSyncTracks) do
+                                    if t == newTrack then
+                                        table.remove(emoteSyncTracks, i)
+                                        break
+                                    end
+                                end
+                            end)
                         end)
                         break
                     end
@@ -536,7 +575,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistema
+    -- Inicializar sistemaaaaaaa
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
