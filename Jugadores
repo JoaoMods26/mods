@@ -1,5 +1,5 @@
 ----JUGADORES---
-JugadoresTab = _G.Window:CreateTab("Jugadores")
+JugadoresTab = Window:CreateTab("Jugadores")
 JugadoresTab:CreateSection("Acciones")
 
 
@@ -26,7 +26,6 @@ local doggyCurrentDistance = 2.7
 local doggyTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local pataEnabled = false
 local pataConnection
 local pataAnimId = 18526288497
@@ -37,7 +36,6 @@ local pataCurrentDistance = 3
 local pataTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local cariEnabled = false
 local cariConnection
 local cariAnimId = 15679624464
@@ -48,7 +46,6 @@ local cariCurrentDistance = 2.7
 local cariTargetDistance = 4
 
 -- Variables globales necesarias
-local selectedPlayer = nil
 local wataEnabled = false
 local wataConnection
 local wataAnimId = 12992262118
@@ -259,20 +256,10 @@ local function findPlayerByPartialName(name)
     end
 end
 
--- Función para encontrar jugador por nombre parcial o DisplayName
-local function findPlayerByPartialName(name)
-    name = name:lower()
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        local usernameMatch = player.Name:lower():sub(1, #name) == name
-        local displaynameMatch = player.DisplayName:lower():sub(1, #name) == name
-        if usernameMatch or displaynameMatch then
-            return player
-        end
-    end
-end
+
 
 -- Función para controlar la colisión
-local function SetNoCollision(char, state)
+ function SetNoCollision(char, state)
     if state then
         -- Guardar estado original
         savedCollisions[char] = {}
@@ -296,7 +283,7 @@ local function SetNoCollision(char, state)
 end
 
 -- Función para ejecutar el Pata
-local function PlayPata(target)
+ function PlayPata(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -338,7 +325,7 @@ local function PlayPata(target)
 end
 
 -- Función para detener el Pata
-local function StopPata()
+ function StopPata()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -366,7 +353,7 @@ end
 
 
 -- Función para controlar la colisión
-local function SetNoCollision(char, state)
+ function SetNoCollision(char, state)
     if state then
         -- Guardar estado original
         savedCollisions[char] = {}
@@ -389,7 +376,7 @@ local function SetNoCollision(char, state)
     end
 end
 -- Función para ejecutar el Doggy
-local function PlayDoggy(target)
+ function PlayDoggy(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -431,7 +418,7 @@ local function PlayDoggy(target)
 end
 
 -- Función para detener el Doggy
-local function StopDoggy()
+ function StopDoggy()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -484,32 +471,36 @@ JugadoresTab:CreateInput({
 })
 
 
--- Espectar
-JugadoresTab:CreateButton({
+
+local espectando = false
+local cameraSubjectBackup
+
+JugadoresTab:CreateToggle({
     Name = "Espectar",
-    Callback = function()
-        if selectedPlayer then
-            game.Workspace.CurrentCamera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+    CurrentValue = false,
+    Callback = function(Value)
+        local camera = workspace.CurrentCamera
+        local localPlayer = game.Players.LocalPlayer
+
+        if Value then
+            if selectedPlayer and selectedPlayer.Character then
+                cameraSubjectBackup = camera.CameraSubject
+                camera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                espectando = true
+            end
+        else
+            if localPlayer and localPlayer.Character then
+                camera.CameraSubject = localPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                espectando = false
+
+            end
         end
     end
 })
 
--- Restaurar vista
-JugadoresTab:CreateButton({
-    Name = "Restaurar Vista",
-    Callback = function()
-        local player = game.Players.LocalPlayer
-        if player and player.Character then
-            workspace.CurrentCamera.CameraSubject = player.Character:FindFirstChildWhichIsA("Humanoid")
-            Rayfield:Notify({
-                Title = "Vista Restaurada",
-                Content = "Has vuelto a la vista normal.",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end
-})
+
+
+
 
 -- Teleportarse
 JugadoresTab:CreateButton({
@@ -525,7 +516,7 @@ JugadoresTab:CreateButton({
 
 
 -- Función para guardar y restaurar colisiones
-local function SaveCollisions(char)
+ function SaveCollisions(char)
     savedCollisions[char] = {}
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -534,7 +525,7 @@ local function SaveCollisions(char)
     end
 end
 
-local function RestoreCollisions(char)
+ function RestoreCollisions(char)
     if savedCollisions[char] then
         for part, original in pairs(savedCollisions[char]) do
             if part and part:IsA("BasePart") then
@@ -548,7 +539,7 @@ end
 -- Sliders para órbita (ya existentes)
 JugadoresTab:CreateSlider({
     Name = "Velocidad de Órbita",
-    Range = {0, 200},
+    Range = {1, 200},
     Increment = 1,
     Suffix = "vel",
     CurrentValue = orbitSpeed,
@@ -604,12 +595,7 @@ JugadoresTab:CreateToggle({
                 end
             end
 
-            Rayfield:Notify({
-                Title = "Órbita Activada",
-                Content = "Orbitando a " .. selectedPlayer.Name,
-                Duration = 3,
-                Image = 4483362458
-            })
+
         elseif not orbitEnabled then
             local localChar = game.Players.LocalPlayer.Character
             if localChar and localChar:FindFirstChild("HumanoidRootPart") then
@@ -620,87 +606,147 @@ JugadoresTab:CreateToggle({
                 RestoreCollisions(localChar)
             end
 
-            Rayfield:Notify({
-                Title = "Órbita Desactivada",
-                Content = "Has dejado de orbitar.",
-                Duration = 3,
-                Image = 4483362458
-            })
+
         end
     end
 })
--- Botón para Sentarse de manera segura
-JugadoresTab:CreateButton({
-    Name = "Sentarse en la cabesa(puedes salir volando)",
-    Callback = function()
-        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-            local localChar = game.Players.LocalPlayer.Character
+
+
+
+
+
+
+
+local sitToggle = false
+local isSitting = false
+local originalStats = {}
+
+local function clearAlign(localChar)
+    if not localChar then return end
+    local root = localChar:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    for _, v in ipairs(root:GetChildren()) do
+        if v:IsA("AlignPosition") or v:IsA("AlignOrientation") or v:IsA("Attachment") then
+            v:Destroy()
+        end
+    end
+end
+
+JugadoresTab:CreateToggle({
+    Name = "Sentarse en la cabeza",
+    Default = false,
+    Callback = function(state)
+        local player = game.Players.LocalPlayer
+        if not player then return end
+        local localChar = player.Character
+        if not localChar then return end
+
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        local root = localChar:FindFirstChild("HumanoidRootPart")
+
+        if not humanoid or not root then return end
+        sitToggle = state
+
+        -- ACTIVAR
+        if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
             local head = selectedPlayer.Character.Head
+            if not head then return end
 
-            if not isSitting then
-                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
-                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                    humanoid.Sit = true
+            -- guardar stats originales
+            originalStats = {
+                WalkSpeed = humanoid.WalkSpeed,
+                JumpPower = humanoid.JumpPower,
+                JumpHeight = humanoid.JumpHeight
+            }
 
-                    -- Posicionar al personaje en la cabeza del jugador seleccionado
-                    local sitPosition = head.Position + Vector3.new(0, 1, 0)
-                    localChar.HumanoidRootPart.CFrame = CFrame.new(sitPosition)
+            clearAlign(localChar)
 
-                    -- Anclar al personaje brevemente para evitar que se mueva o vuele
-                    localChar.HumanoidRootPart.Anchored = true
-                    wait(0.01)  -- Anclar por un pequeño tiempo
-                    localChar.HumanoidRootPart.Anchored = false
+            -- TP inmediato arriba de la cabeza
+            root.CFrame = head.CFrame * CFrame.new(0, 1, 0)
 
-                    -- Conectar un Heartbeat para mantener al personaje sentado en la cabeza del jugador
-                    sitConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-                            local headPos = selectedPlayer.Character.Head.Position
-                            localChar.HumanoidRootPart.CFrame = CFrame.new(headPos + Vector3.new(0, 1, 0))
-                        end
-                    end)
+            -- Bloquear totalmente
+            humanoid.Sit = true
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+            humanoid.JumpHeight = 0
+            humanoid:ChangeState(Enum.HumanoidStateType.Seated)
 
-                    isSitting = true
-                    Rayfield:Notify({
-                        Title = "Headsit Activado",
-                        Content = "Sentado sobre " .. selectedPlayer.Name,
-                        Duration = 3,
-                        Image = 4483362458
-                    })
-                end
+            -- Desactivar salto/caída
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+
+            -- Crear attachments
+            local rootAttachment = Instance.new("Attachment", root)
+            local headAttachment = Instance.new("Attachment", head)
+            headAttachment.Position = Vector3.new(0, 1, 0)
+
+            local alignPos = Instance.new("AlignPosition")
+            alignPos.Attachment0 = rootAttachment
+            alignPos.Attachment1 = headAttachment
+            alignPos.RigidityEnabled = true
+            alignPos.Responsiveness = math.huge
+            alignPos.MaxForce = math.huge
+            alignPos.Parent = root
+
+            local alignOri = Instance.new("AlignOrientation")
+            alignOri.Attachment0 = rootAttachment
+            alignOri.Attachment1 = headAttachment
+            alignOri.RigidityEnabled = true
+            alignOri.Responsiveness = math.huge
+            alignOri.MaxTorque = math.huge
+            alignOri.Parent = root
+
+            isSitting = true
+
+        -- DESACTIVAR
+elseif not sitToggle then
+    if localChar and localChar.Parent then
+        clearAlign(localChar)
+
+        if humanoid and humanoid.Parent then
+            -- restaurar stats originales si existen
+            if originalStats.WalkSpeed then
+                humanoid.WalkSpeed = originalStats.WalkSpeed
+                humanoid.JumpPower = originalStats.JumpPower
+                humanoid.JumpHeight = originalStats.JumpHeight
             else
-                -- Anclar al jugador por 0.01 segundos antes de levantarse
-                if localChar and localChar:FindFirstChildOfClass("Humanoid") then
-                    local originalPosition = localChar.HumanoidRootPart.Position
-                    -- Anclar durante 0.01 segundos
-                    localChar.HumanoidRootPart.Anchored = true
-                    wait(0.01)
-                    localChar.HumanoidRootPart.Anchored = false
-                    localChar.HumanoidRootPart.CFrame = CFrame.new(originalPosition)
-                    
-                    localChar:FindFirstChildOfClass("Humanoid").Sit = false
-                end
-                if sitConnection then
-                    sitConnection:Disconnect()
-                    sitConnection = nil
-                end
-                isSitting = false
-                Rayfield:Notify({
-                    Title = "Headsit Desactivado",
-                    Content = "Te has levantado y la posición ha sido restaurada.",
-                    Duration = 3,
-                    Image = 4483362458
-                })
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+                humanoid.JumpHeight = 7.2
             end
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Jugador no válido o sin cabeza.",
-                Duration = 3,
-                Image = 4483362458
-            })
+
+            if humanoid.Health > 0 then
+                humanoid.Sit = false
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Standing) end)
+            end
+
+            -- reactivar salto/caída
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        end
+
+        if root and root.Parent then
+            -- levantar un poco para evitar trabarse
+            pcall(function()
+                root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
+            end)
         end
     end
+
+    isSitting = false
+end
+
+    end
 })
+
+
+
+
+
+
+
+
+
 
 
 
@@ -732,7 +778,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Doggy
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = doggySpeed,
@@ -776,7 +822,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Pata
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 10}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = pataSpeed,
@@ -789,6 +835,156 @@ JugadoresTab:CreateSlider({
         end
     end
 })
+
+
+
+
+---Perro---
+
+ RunService = game:GetService("RunService")
+ Players = game:GetService("Players")
+
+-- Configuración de Perro
+local perroEnabled = false
+local perroConnection
+local perroAnimId = 123646621028812
+local perroAnimTime = 1.44
+local perroSpeed = 1
+local perroDirection = 1
+local perroCurrentDistance = 3
+local perroTargetDistance = 4
+local savedCollisions = {}
+
+-- Evitar o restaurar colisiones
+ function SetNoCollision(char, state)
+    if state then
+        savedCollisions[char] = {}
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedCollisions[char][part] = part.CanCollide
+                part.CanCollide = false
+            end
+        end
+    else
+        if savedCollisions[char] then
+            for part, original in pairs(savedCollisions[char]) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = original
+                end
+            end
+            savedCollisions[char] = nil
+        end
+    end
+end
+
+-- Animación Perro
+ perroAnim = Instance.new("Animation")
+perroAnim.AnimationId = "rbxassetid://" .. perroAnimId
+
+-- Ejecutar Perro
+ function PlayPerro(target)
+    if not target or not target.Character then return end
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
+    if not humanoid or not root or not targetRoot then return end
+
+    local track = humanoid:LoadAnimation(perroAnim)
+    track:Play()
+    track.TimePosition = perroAnimTime
+    track:AdjustSpeed(0)
+
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    SetNoCollision(char, true)
+
+    perroConnection = RunService.Heartbeat:Connect(function(dt)
+        if not targetRoot.Parent then return end
+
+        perroCurrentDistance = perroCurrentDistance + (perroSpeed * perroDirection * dt)
+
+        if perroCurrentDistance >= perroTargetDistance then
+            perroDirection = -1
+        elseif perroCurrentDistance <= 2 then
+            perroDirection = 1
+        end
+
+        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * perroCurrentDistance + Vector3.new(0, 0.23, 0)
+root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position) * CFrame.Angles(0, math.rad(180), 0)
+
+    end)
+end
+
+-- Detener Perro
+ function StopPerro()
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+
+    if perroConnection then
+        perroConnection:Disconnect()
+        perroConnection = nil
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        for _, track in humanoid:GetPlayingAnimationTracks() do
+            if tostring(track.Animation.AnimationId):find(tostring(perroAnimId)) then
+                track:Stop()
+            end
+        end
+    end
+
+    SetNoCollision(char, false)
+end
+
+-- Toggle para activar/desactivar Perro
+JugadoresTab:CreateToggle({
+    Name = "Movimiento de perro",
+    CurrentValue = false,
+    Callback = function(value)
+        perroEnabled = value
+        if perroEnabled and selectedPlayer then
+            PlayPerro(selectedPlayer)
+        else
+            StopPerro()
+            local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+})
+
+-- Slider para velocidad de Perro
+JugadoresTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {1, 15},
+    Increment = 0.1,
+    Suffix = "vel",
+    CurrentValue = perroSpeed,
+    Callback = function(value)
+        perroSpeed = value
+        if perroEnabled and selectedPlayer then
+            StopPerro()
+            PlayPerro(selectedPlayer)
+        end
+    end
+})
+
+
+
+--Separacion por si me pongo pendejo
+
+
+
+
+
+
+
 
 -- Toggle para activar/desactivar Cari
 JugadoresTab:CreateToggle({
@@ -817,7 +1013,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Cari
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = cariSpeed,
@@ -859,7 +1055,7 @@ JugadoresTab:CreateToggle({
 -- Slider para ajustar la velocidad del movimiento Wata
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
+    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
     Increment = 0.1,
     Suffix = "vel",
     CurrentValue = wataSpeed,
@@ -872,3 +1068,5 @@ JugadoresTab:CreateSlider({
         end
     end
 })
+
+
