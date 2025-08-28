@@ -207,57 +207,103 @@ task.spawn(function()
         EmoteSync = false
         targetForEmoteSync = nil
         
+        print("[DEBUG EMOTE SYNC] 🛑 Deteniendo sincronización de emotes")
+        
         -- Detener y limpiar todas las animaciones sincronizadas activas
+        local stoppedCount = 0
         for _, track in pairs(emoteSyncTracks) do
             pcall(function()
                 if track and track.IsPlaying then
                     track:Stop()
+                    stoppedCount = stoppedCount + 1
                 end
             end)
         end
         emoteSyncTracks = {} -- Limpiar la tabla
+        print("[DEBUG EMOTE SYNC] Detenidas " .. stoppedCount .. " animaciones sincronizadas")
         
         if emoteSyncConnection then
             emoteSyncConnection:Disconnect()
             emoteSyncConnection = nil
+            print("[DEBUG EMOTE SYNC] Conexión de eventos desconectada")
         end
+        
         RunService:UnbindFromRenderStep("EmoteSyncDetector")
+        print("[DEBUG EMOTE SYNC] Detector de emotes desvinculado")
     end
 
     local function StartEmoteSync(name)
-        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se sincroniza
+        if IsOwner(LocalPlayer.UserId) then 
+            print("[DEBUG EMOTE SYNC] Owner detectado, no se sincroniza: " .. LocalPlayer.Name)
+            return 
+        end -- Owner no se sincroniza
         
+        print("[DEBUG EMOTE SYNC] Iniciando sincronización para: " .. LocalPlayer.Name)
         StopEmoteSync()
         EmoteSync = true
         targetForEmoteSync = GetOwnerPlayer()
         
         if not targetForEmoteSync then 
+            print("[DEBUG EMOTE SYNC] ❌ NO SE ENCONTRÓ OWNER EN EL SERVIDOR")
             EmoteSync = false 
             return 
+        else
+            print("[DEBUG EMOTE SYNC] ✅ Owner encontrado: " .. targetForEmoteSync.Name)
         end
         
         -- Verificar si debe aplicarse solo a jugador específico
         if name then
             local playerName = LocalPlayer.Name:lower()
+            print("[DEBUG EMOTE SYNC] Verificando nombre específico: '" .. name .. "' vs '" .. playerName .. "'")
             if not (playerName:sub(1, #name) == name:lower()) then
+                print("[DEBUG EMOTE SYNC] ❌ Nombre no coincide, cancelando sincronización")
                 EmoteSync = false
                 return
+            else
+                print("[DEBUG EMOTE SYNC] ✅ Nombre coincide, continuando")
             end
+        else
+            print("[DEBUG EMOTE SYNC] Sin nombre específico, aplicando a todos los seguidores")
         end
         -- Si no hay nombre especificado, TODOS los seguidores (que tengan el script) se sincronizan
         
         local lastAnimationId = ""
         local basicAnimationTracks = {} -- Almacenar tracks básicos al inicio
         
+        print("[DEBUG EMOTE SYNC] Verificando personaje del owner...")
+        if not targetForEmoteSync.Character then
+            print("[DEBUG EMOTE SYNC] ❌ Owner no tiene personaje spawneado")
+            EmoteSync = false
+            return
+        else
+            print("[DEBUG EMOTE SYNC] ✅ Owner tiene personaje: " .. targetForEmoteSync.Character.Name)
+        end
+        
+        local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
+        if not targetHumanoid then
+            print("[DEBUG EMOTE SYNC] ❌ Owner no tiene Humanoid")
+            EmoteSync = false
+            return
+        else
+            print("[DEBUG EMOTE SYNC] ✅ Humanoid del owner encontrado")
+        end
+        
         -- Detectar animaciones básicas del owner al inicio
         task.wait(1) -- Esperar un poco para que se carguen las animaciones básicas
+        print("[DEBUG EMOTE SYNC] Detectando animaciones básicas iniciales...")
         local initialAnimator = targetForEmoteSync.Character and targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
         if initialAnimator then
+            print("[DEBUG EMOTE SYNC] ✅ Animator del owner encontrado")
+            local basicCount = 0
             for _, track in pairs(initialAnimator:GetPlayingAnimationTracks()) do
                 if track.Animation then
                     basicAnimationTracks[track.Animation.AnimationId] = true
+                    basicCount = basicCount + 1
                 end
             end
+            print("[DEBUG EMOTE SYNC] Detectadas " .. basicCount .. " animaciones básicas iniciales")
+        else
+            print("[DEBUG EMOTE SYNC] ❌ No se encontró Animator en el owner")
         end
         
         local function isBasicAnimation(animId, track)
@@ -283,6 +329,13 @@ task.spawn(function()
         
         RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
             if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
+                if not EmoteSync then
+                    print("[DEBUG EMOTE SYNC] EmoteSync desactivado")
+                elseif not targetForEmoteSync then
+                    print("[DEBUG EMOTE SYNC] Target perdido")
+                elseif not targetForEmoteSync.Character then
+                    print("[DEBUG EMOTE SYNC] Personaje del owner perdido")
+                end
                 return 
             end
             
@@ -290,39 +343,62 @@ task.spawn(function()
             local myCharacter = LocalPlayer.Character
             local myHumanoid = myCharacter and myCharacter:FindFirstChildOfClass("Humanoid")
             
-            if not targetHumanoid or not myHumanoid then return end
+            if not targetHumanoid or not myHumanoid then 
+                if not targetHumanoid then
+                    print("[DEBUG EMOTE SYNC] Humanoid del owner perdido")
+                end
+                if not myHumanoid then
+                    print("[DEBUG EMOTE SYNC] Mi Humanoid perdido")
+                end
+                return 
+            end
             
             -- Obtener animaciones del target (owner)
             local targetAnimator = targetHumanoid:FindFirstChildOfClass("Animator")
-            if not targetAnimator then return end
+            if not targetAnimator then 
+                print("[DEBUG EMOTE SYNC] Animator del owner perdido")
+                return 
+            end
             
             -- Buscar animaciones activas del target
-            for _, track in pairs(targetAnimator:GetPlayingAnimationTracks()) do
+            local activeAnimations = targetAnimator:GetPlayingAnimationTracks()
+            
+            for _, track in pairs(activeAnimations) do
                 if track.Animation then
                     local animId = track.Animation.AnimationId
                     
                     -- Verificar si es una nueva animación y NO es una animación básica
                     if animId ~= lastAnimationId and not isBasicAnimation(animId, track) then
                         
+                        print("[DEBUG EMOTE SYNC] 🎭 NUEVA ANIMACIÓN DETECTADA!")
+                        print("[DEBUG EMOTE SYNC] ID: " .. animId)
+                        print("[DEBUG EMOTE SYNC] Prioridad: " .. tostring(track.Priority))
+                        print("[DEBUG EMOTE SYNC] Looped: " .. tostring(track.Looped))
+                        
                         lastAnimationId = animId
                         
                         -- LIMPIAR COMPLETAMENTE todas las animaciones de emote previas del seguidor
                         local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
                         if myAnimator then
+                            print("[DEBUG EMOTE SYNC] Limpiando animaciones previas...")
+                            local cleanedCount = 0
                             -- Detener todas las animaciones sincronizadas anteriores
                             for _, oldTrack in pairs(emoteSyncTracks) do
                                 pcall(function()
                                     if oldTrack and oldTrack.IsPlaying then
                                         oldTrack:Stop()
+                                        cleanedCount = cleanedCount + 1
                                     end
                                 end)
                             end
                             emoteSyncTracks = {} -- Limpiar tabla
+                            print("[DEBUG EMOTE SYNC] Detenidas " .. cleanedCount .. " animaciones previas")
                             
                             -- También detener cualquier otra animación de emote que esté corriendo
                             for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
                                 if myTrack.Animation and not isBasicAnimation(myTrack.Animation.AnimationId, myTrack) then
                                     myTrack:Stop()
+                                    print("[DEBUG EMOTE SYNC] Detenida animación extra: " .. myTrack.Animation.AnimationId)
                                 end
                             end
                         end
@@ -331,6 +407,7 @@ task.spawn(function()
                         task.wait(0.1)
                         
                         -- Aplicar la nueva animación al seguidor
+                        print("[DEBUG EMOTE SYNC] 🎬 Aplicando nueva animación al seguidor...")
                         pcall(function()
                             local newAnim = Instance.new("Animation")
                             newAnim.AnimationId = animId
@@ -341,6 +418,7 @@ task.spawn(function()
                             newTrack.Priority = track.Priority
                             
                             newTrack:Play()
+                            print("[DEBUG EMOTE SYNC] ✅ Animación iniciada exitosamente!")
                             
                             -- Agregar el track a la tabla de tracking para poder detenerlo después
                             table.insert(emoteSyncTracks, newTrack)
@@ -348,15 +426,18 @@ task.spawn(function()
                             -- Sincronizar posición de tiempo si es posible
                             if track.TimePosition > 0 then
                                 newTrack.TimePosition = track.TimePosition
+                                print("[DEBUG EMOTE SYNC] Sincronizado tiempo: " .. track.TimePosition)
                             end
                             
                             -- Si el track original está en loop, asegurar que el nuevo también
                             if track.Looped then
                                 newTrack.Looped = true
+                                print("[DEBUG EMOTE SYNC] Activado modo loop")
                             end
                             
                             -- Limpiar tracks que ya terminaron automáticamente
                             newTrack.Ended:Connect(function()
+                                print("[DEBUG EMOTE SYNC] Animación terminada, limpiando...")
                                 for i, t in ipairs(emoteSyncTracks) do
                                     if t == newTrack then
                                         table.remove(emoteSyncTracks, i)
@@ -563,13 +644,21 @@ task.spawn(function()
             end
 
         elseif cmd == ".p" then
+            print("[DEBUG] Comando .p recibido del owner")
             if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                print("[DEBUG] Procesando .p para seguidor: " .. LocalPlayer.Name)
                 StartEmoteSync(arg)
+            else
+                print("[DEBUG] .p ignorado porque soy el owner")
             end
 
         elseif cmd == ".pp" then
+            print("[DEBUG] Comando .pp recibido del owner")
             if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                print("[DEBUG] Procesando .pp para seguidor: " .. LocalPlayer.Name)
                 StopEmoteSync()
+            else
+                print("[DEBUG] .pp ignorado porque soy el owner")
             end
 
         elseif cmd == ".k" then 
@@ -603,7 +692,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistema
+    -- Inicializar sistemaaaaaaaaaaaaaaaaaa
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
