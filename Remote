@@ -173,7 +173,6 @@ task.spawn(function()
         local extractedId = rawId:match("id=(%d+)")
 
         if not extractedId then
-            warn("No se pudo extraer el ID del link: " .. rawId)
             return
         end
 
@@ -200,79 +199,41 @@ task.spawn(function()
         p:Kick("You were kicked by the owner")
     end
 
-    -- Sistema mejorado de envío de mensajes que funciona con cualquier chat
+    -- NUEVO SISTEMA DE CHAT MEJORADO (basado en el primer script)
     local function SendChatMessage(message)
-        local success = false
-        
-        -- Método 1: TextChatService (nuevo sistema de chat) - MÁS DIRECTO
+        -- Método 1: TextChatService (nuevo sistema de chat)
         pcall(function()
-            if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                local textChannels = TextChatService.TextChannels
-                if textChannels then
-                    local generalChannel = textChannels.RBXGeneral
-                    if generalChannel then
-                        generalChannel:SendAsync(message)
-                        success = true
-                        return
-                    end
-                    -- Fallback para otros canales
-                    for _, channel in pairs(textChannels:GetChildren()) do
-                        if channel:IsA("TextChannel") then
-                            channel:SendAsync(message)
-                            success = true
-                            break
-                        end
-                    end
+            local textChannel = TextChatService:FindFirstChild("TextChannels")
+            if textChannel then
+                local generalChannel = textChannel:FindFirstChild("RBXGeneral")
+                if generalChannel then
+                    -- El mensaje aparecerá como enviado por el jugador local
+                    generalChannel:SendAsync(message, LocalPlayer)
+                    return
                 end
             end
         end)
 
-        -- Método 2: Sistema de chat clásico (MÁS DIRECTO)
-        if not success then
-            pcall(function()
-                local success2 = false
-                -- Intento 1: ReplicatedStorage directo
-                if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
-                    local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
-                    if chatEvents:FindFirstChild("SayMessageRequest") then
-                        chatEvents.SayMessageRequest:FireServer(message, "All")
-                        success2 = true
-                    end
+        -- Método 2: Sistema de chat clásico (DefaultChatSystemChatEvents)
+        pcall(function()
+            if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
+                local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
+                if chatEvents:FindFirstChild("SayMessageRequest") then
+                    chatEvents.SayMessageRequest:FireServer(message, "All")
+                    return
                 end
-                
-                -- Intento 2: Buscar eventos alternativos
-                if not success2 then
-                    for _, child in pairs(ReplicatedStorage:GetChildren()) do
-                        if child.Name:lower():find("chat") then
-                            for _, subChild in pairs(child:GetChildren()) do
-                                if subChild:IsA("RemoteEvent") and (subChild.Name:lower():find("say") or subChild.Name:lower():find("message")) then
-                                    subChild:FireServer(message, "All")
-                                    success2 = true
-                                    break
-                                end
-                            end
-                            if success2 then break end
-                        end
-                    end
-                end
-                success = success2
-            end)
-        end
+            end
+        end)
 
-        -- Método 3: Directo con game.Players.LocalPlayer (último recurso)
-        if not success then
-            pcall(function()
-                -- Simular escribir en chat usando el método más básico
-                local player = game.Players.LocalPlayer
-                if player and player.Character then
-                    -- Crear burbuja temporal
-                    game:GetService("Chat"):Chat(player.Character.Head, message, Enum.ChatColor.White)
-                    success = true
-                end
-            end)
-        end
-        
-        return success
+        -- Método 3: Mostrar mensaje del sistema como fallback
+        pcall(function()
+            StarterGui:SetCore("ChatMakeSystemMessage", {
+                Text = message,
+                Color = Color3.fromRGB(255, 255, 0),
+                Font = Enum.Font.GothamBold,
+                FontSize = Enum.FontSize.Size18
+            })
+        end)
     end
 
     -- Sistema mejorado de detección de comandos usando múltiples métodos
@@ -378,38 +339,45 @@ task.spawn(function()
             end
         
         elseif cmd == ".b" then
-            if arg then
-                for _, p in ipairs(GetTargetPlayers(arg)) do
-                    if p:FindFirstChild("__JmodsConnected") then
-                        DoRandomDance(p)
+            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                if arg then
+                    -- Si hay argumento, verificar si el nombre del jugador local coincide
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        DoRandomDance(LocalPlayer)
                     end
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") then
-                        DoRandomDance(p)
-                    end
+                else
+                    -- Sin argumento = bailar si eres seguidor
+                    DoRandomDance(LocalPlayer)
                 end
             end
 
         elseif cmd == ".bb" then
-            if arg then
-                for _, p in ipairs(GetTargetPlayers(arg)) do
-                    if p:FindFirstChild("__JmodsConnected") then
-                        StopAllDancesOn(p)
+            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                if arg then
+                    -- Si hay argumento, verificar si el nombre del jugador local coincide
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        StopAllDancesOn(LocalPlayer)
                     end
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if not IsOwner(p.UserId) and p:FindFirstChild("__JmodsConnected") then
-                        StopAllDancesOn(p)
-                    end
+                else
+                    -- Sin argumento = parar baile si eres seguidor
+                    StopAllDancesOn(LocalPlayer)
                 end
             end
 
         elseif cmd == ".k" then 
-            for _, p in ipairs(GetTargetPlayers(arg)) do 
-                KickPlayer(p) 
+            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+                if arg then
+                    -- Si hay argumento, verificar si el nombre del jugador local coincide
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        KickPlayer(LocalPlayer)
+                    end
+                else
+                    -- Sin argumento = kickear si eres seguidor
+                    KickPlayer(LocalPlayer)
+                end
             end
             
         elseif cmd == ".m" then 
@@ -421,26 +389,15 @@ task.spawn(function()
     end
 
     local function CheckAndConnectPlayers()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if not player:FindFirstChild("__JmodsConnected") then
-                local marker = Instance.new("BoolValue")
-                marker.Name = "__JmodsConnected"
-                marker.Parent = player
-            end
+        -- Solo marcar al jugador local como conectado si ejecuta el script
+        if not LocalPlayer:FindFirstChild("__JmodsConnected") then
+            local marker = Instance.new("BoolValue")
+            marker.Name = "__JmodsConnected"
+            marker.Parent = LocalPlayer
         end
     end
 
-    Players.PlayerAdded:Connect(function(player)
-        task.wait(0.5)
-        if IsOwner(player.UserId) then
-            CheckAndConnectPlayers()
-        end
-    end)
-
-    -- Inicializar sistema
+    -- Inicializar sistemaaaa
     CheckAndConnectPlayers()
     SetupCommandDetection()
-
-    print("Sistema de administración cargado correctamente")
-    print("Comandos: /e .comando - Funciona con cualquier sistema de chat")
 end)
