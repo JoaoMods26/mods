@@ -17,11 +17,6 @@ task.spawn(function()
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
     local targetForEmoteSync = nil
-    
-    -- Sistema de monitoreo de chat público
-    local lastCheckedMessages = {}
-    local chatHistory = {}
-    local maxChatHistory = 50
 
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
@@ -207,160 +202,106 @@ task.spawn(function()
         EmoteSync = false
         targetForEmoteSync = nil
         
-        print("[DEBUG EMOTE SYNC] 🛑 Deteniendo sincronización de emotes")
-        
         -- Detener y limpiar todas las animaciones sincronizadas activas
-        local stoppedCount = 0
         for _, track in pairs(emoteSyncTracks) do
             pcall(function()
                 if track and track.IsPlaying then
                     track:Stop()
-                    stoppedCount = stoppedCount + 1
                 end
             end)
         end
         emoteSyncTracks = {} -- Limpiar la tabla
-        print("[DEBUG EMOTE SYNC] Detenidas " .. stoppedCount .. " animaciones sincronizadas")
         
         if emoteSyncConnection then
             emoteSyncConnection:Disconnect()
             emoteSyncConnection = nil
-            print("[DEBUG EMOTE SYNC] Conexión de eventos desconectada")
         end
-        
         RunService:UnbindFromRenderStep("EmoteSyncDetector")
-        print("[DEBUG EMOTE SYNC] Detector de emotes desvinculado")
     end
 
     local function StartEmoteSync(name)
-        if IsOwner(LocalPlayer.UserId) then 
-            print("[DEBUG EMOTE SYNC] Owner detectado, no se sincroniza: " .. LocalPlayer.Name)
-            return 
-        end -- Owner no se sincroniza
+        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se sincroniza
         
-        print("[DEBUG EMOTE SYNC] Iniciando sincronización para: " .. LocalPlayer.Name)
         StopEmoteSync()
         EmoteSync = true
         targetForEmoteSync = GetOwnerPlayer()
         
         if not targetForEmoteSync then 
-            print("[DEBUG EMOTE SYNC] ❌ NO SE ENCONTRÓ OWNER EN EL SERVIDOR")
             EmoteSync = false 
             return 
-        else
-            print("[DEBUG EMOTE SYNC] ✅ Owner encontrado: " .. targetForEmoteSync.Name)
         end
         
         -- Verificar si debe aplicarse solo a jugador específico
         if name then
             local playerName = LocalPlayer.Name:lower()
-            print("[DEBUG EMOTE SYNC] Verificando nombre específico: '" .. name .. "' vs '" .. playerName .. "'")
             if not (playerName:sub(1, #name) == name:lower()) then
-                print("[DEBUG EMOTE SYNC] ❌ Nombre no coincide, cancelando sincronización")
                 EmoteSync = false
                 return
-            else
-                print("[DEBUG EMOTE SYNC] ✅ Nombre coincide, continuando")
             end
-        else
-            print("[DEBUG EMOTE SYNC] Sin nombre específico, aplicando a todos los seguidores")
         end
         -- Si no hay nombre especificado, TODOS los seguidores (que tengan el script) se sincronizan
         
         local lastAnimationId = ""
-        local basicAnimationTracks = {} -- Almacenar tracks básicos al inicio
+        local basicAnimationIds = {} -- Solo IDs detectados dinámicamente como básicos
         
-        print("[DEBUG EMOTE SYNC] Verificando personaje del owner...")
-        if not targetForEmoteSync.Character then
-            print("[DEBUG EMOTE SYNC] ❌ Owner no tiene personaje spawneado")
-            EmoteSync = false
-            return
-        else
-            print("[DEBUG EMOTE SYNC] ✅ Owner tiene personaje: " .. targetForEmoteSync.Character.Name)
-        end
-        
-        local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
-        if not targetHumanoid then
-            print("[DEBUG EMOTE SYNC] ❌ Owner no tiene Humanoid")
-            EmoteSync = false
-            return
-        else
-            print("[DEBUG EMOTE SYNC] ✅ Humanoid del owner encontrado")
-        end
-        
-        -- Detectar animaciones básicas del owner al inicio
-        task.wait(1) -- Esperar un poco para que se carguen las animaciones básicas
-        print("[DEBUG EMOTE SYNC] Detectando animaciones básicas iniciales...")
+        -- Detectar animaciones básicas del owner al inicio (capturar su estado inicial)
+        task.wait(1) -- Esperar a que se carguen las animaciones básicas
         local initialAnimator = targetForEmoteSync.Character and targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
         if initialAnimator then
-            print("[DEBUG EMOTE SYNC] ✅ Animator del owner encontrado")
-            local basicCount = 0
             for _, track in pairs(initialAnimator:GetPlayingAnimationTracks()) do
                 if track.Animation then
-                    basicAnimationTracks[track.Animation.AnimationId] = true
-                    basicCount = basicCount + 1
+                    local animId = track.Animation.AnimationId
+                    -- Marcar como básica cualquier animación que YA esté corriendo al inicio
+                    -- Estas son las animaciones de movimiento/idle que el usuario tiene por defecto
+                    basicAnimationIds[animId] = true
+                    print("Animación básica detectada:", animId) -- Debug opcional
                 end
             end
-            print("[DEBUG EMOTE SYNC] Detectadas " .. basicCount .. " animaciones básicas iniciales")
-        else
-            print("[DEBUG EMOTE SYNC] ❌ No se encontró Animator en el owner")
         end
         
+        -- Esperar un poco más y capturar animaciones que se activen al caminar/moverse
+        task.spawn(function()
+            task.wait(3) -- Esperar más tiempo para capturar animaciones de movimiento
+            if targetForEmoteSync and targetForEmoteSync.Character then
+                local animator = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                        if track.Animation then
+                            local animId = track.Animation.AnimationId
+                            -- Si es una animación que no habíamos visto antes y tiene prioridad básica,
+                            -- probablemente sea una animación de movimiento que se activó después
+                            if not basicAnimationIds[animId] and (track.Priority == Enum.AnimationPriority.Core or track.Priority == Enum.AnimationPriority.Idle) then
+                                basicAnimationIds[animId] = true
+                                print("Animación básica tardía detectada:", animId) -- Debug opcional
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
         local function isBasicAnimation(animId, track)
-            -- Lista de animaciones básicas conocidas de Roblox (walking, running, idle, etc.)
-            local basicAnimIds = {
-                "rbxasset://animations/walk.xml",
-                "rbxasset://animations/run.xml", 
-                "rbxasset://animations/idle.xml",
-                "rbxasset://animations/jump.xml",
-                "rbxasset://animations/fall.xml",
-                "rbxasset://animations/climb.xml",
-                "rbxasset://animations/swim.xml"
-            }
-            
-            -- Verificar si es una animación básica específica
-            for _, basicId in ipairs(basicAnimIds) do
-                if animId:find(basicId) then
-                    return true
-                end
-            end
-            
-            -- Si ya la detectamos como básica al inicio, ignorarla
-            if basicAnimationTracks[animId] then
+            -- Verificar si está en nuestra lista de animaciones básicas detectadas dinámicamente
+            if basicAnimationIds[animId] then
                 return true
             end
             
-            -- NUEVA LÓGICA: Solo considerar básicas las animaciones de movimiento con prioridad Core o Idle
-            if track.Priority == Enum.AnimationPriority.Core then
-                basicAnimationTracks[animId] = true
-                return true
-            end
-            
-            -- Si es Idle y parece ser animación de sistema (no tiene números como los emotes)
-            if track.Priority == Enum.AnimationPriority.Idle then
-                -- Los emotes suelen tener IDs numéricos, las animaciones básicas no
-                if not animId:match("%d+") then
-                    basicAnimationTracks[animId] = true
+            -- Verificar si es una animación que tiene nombre típico de movimiento
+            if track.Animation and track.Animation.Name then
+                local animName = track.Animation.Name:lower()
+                if animName:find("idle") or animName:find("walk") or animName:find("run") or 
+                   animName:find("jump") or animName:find("fall") or animName:find("climb") or
+                   animName:find("swim") or animName:find("freefall") then
+                    basicAnimationIds[animId] = true -- Aprenderla para el futuro
                     return true
                 end
             end
-            
-            print("[DEBUG EMOTE SYNC] 🎭 Animación NO básica detectada:")
-            print("[DEBUG EMOTE SYNC] ID: " .. animId)
-            print("[DEBUG EMOTE SYNC] Prioridad: " .. tostring(track.Priority))
             
             return false
         end
         
         RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
             if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
-                if not EmoteSync then
-                    print("[DEBUG EMOTE SYNC] EmoteSync desactivado")
-                elseif not targetForEmoteSync then
-                    print("[DEBUG EMOTE SYNC] Target perdido")
-                elseif not targetForEmoteSync.Character then
-                    print("[DEBUG EMOTE SYNC] Personaje del owner perdido")
-                end
                 return 
             end
             
@@ -368,62 +309,39 @@ task.spawn(function()
             local myCharacter = LocalPlayer.Character
             local myHumanoid = myCharacter and myCharacter:FindFirstChildOfClass("Humanoid")
             
-            if not targetHumanoid or not myHumanoid then 
-                if not targetHumanoid then
-                    print("[DEBUG EMOTE SYNC] Humanoid del owner perdido")
-                end
-                if not myHumanoid then
-                    print("[DEBUG EMOTE SYNC] Mi Humanoid perdido")
-                end
-                return 
-            end
+            if not targetHumanoid or not myHumanoid then return end
             
             -- Obtener animaciones del target (owner)
             local targetAnimator = targetHumanoid:FindFirstChildOfClass("Animator")
-            if not targetAnimator then 
-                print("[DEBUG EMOTE SYNC] Animator del owner perdido")
-                return 
-            end
+            if not targetAnimator then return end
             
             -- Buscar animaciones activas del target
-            local activeAnimations = targetAnimator:GetPlayingAnimationTracks()
-            
-            for _, track in pairs(activeAnimations) do
+            for _, track in pairs(targetAnimator:GetPlayingAnimationTracks()) do
                 if track.Animation then
                     local animId = track.Animation.AnimationId
                     
                     -- Verificar si es una nueva animación y NO es una animación básica
                     if animId ~= lastAnimationId and not isBasicAnimation(animId, track) then
                         
-                        print("[DEBUG EMOTE SYNC] 🎭 NUEVA ANIMACIÓN DETECTADA!")
-                        print("[DEBUG EMOTE SYNC] ID: " .. animId)
-                        print("[DEBUG EMOTE SYNC] Prioridad: " .. tostring(track.Priority))
-                        print("[DEBUG EMOTE SYNC] Looped: " .. tostring(track.Looped))
-                        
                         lastAnimationId = animId
                         
                         -- LIMPIAR COMPLETAMENTE todas las animaciones de emote previas del seguidor
                         local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
                         if myAnimator then
-                            print("[DEBUG EMOTE SYNC] Limpiando animaciones previas...")
-                            local cleanedCount = 0
                             -- Detener todas las animaciones sincronizadas anteriores
                             for _, oldTrack in pairs(emoteSyncTracks) do
                                 pcall(function()
                                     if oldTrack and oldTrack.IsPlaying then
                                         oldTrack:Stop()
-                                        cleanedCount = cleanedCount + 1
                                     end
                                 end)
                             end
                             emoteSyncTracks = {} -- Limpiar tabla
-                            print("[DEBUG EMOTE SYNC] Detenidas " .. cleanedCount .. " animaciones previas")
                             
                             -- También detener cualquier otra animación de emote que esté corriendo
                             for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
                                 if myTrack.Animation and not isBasicAnimation(myTrack.Animation.AnimationId, myTrack) then
                                     myTrack:Stop()
-                                    print("[DEBUG EMOTE SYNC] Detenida animación extra: " .. myTrack.Animation.AnimationId)
                                 end
                             end
                         end
@@ -432,7 +350,6 @@ task.spawn(function()
                         task.wait(0.1)
                         
                         -- Aplicar la nueva animación al seguidor
-                        print("[DEBUG EMOTE SYNC] 🎬 Aplicando nueva animación al seguidor...")
                         pcall(function()
                             local newAnim = Instance.new("Animation")
                             newAnim.AnimationId = animId
@@ -443,7 +360,6 @@ task.spawn(function()
                             newTrack.Priority = track.Priority
                             
                             newTrack:Play()
-                            print("[DEBUG EMOTE SYNC] ✅ Animación iniciada exitosamente!")
                             
                             -- Agregar el track a la tabla de tracking para poder detenerlo después
                             table.insert(emoteSyncTracks, newTrack)
@@ -451,18 +367,15 @@ task.spawn(function()
                             -- Sincronizar posición de tiempo si es posible
                             if track.TimePosition > 0 then
                                 newTrack.TimePosition = track.TimePosition
-                                print("[DEBUG EMOTE SYNC] Sincronizado tiempo: " .. track.TimePosition)
                             end
                             
                             -- Si el track original está en loop, asegurar que el nuevo también
                             if track.Looped then
                                 newTrack.Looped = true
-                                print("[DEBUG EMOTE SYNC] Activado modo loop")
                             end
                             
                             -- Limpiar tracks que ya terminaron automáticamente
                             newTrack.Ended:Connect(function()
-                                print("[DEBUG EMOTE SYNC] Animación terminada, limpiando...")
                                 for i, t in ipairs(emoteSyncTracks) do
                                     if t == newTrack then
                                         table.remove(emoteSyncTracks, i)
@@ -478,13 +391,7 @@ task.spawn(function()
         end)
     end
 
-    local function KickPlayer(player)
-        if player and player == LocalPlayer then
-            player:Kick("Kicked by owner command")
-        end
-    end
-
-    -- NUEVO SISTEMA DE CHAT MEJORADO (basado en el primer script)
+    -- SISTEMA DE CHAT MEJORADO
     local function SendChatMessage(message)
         -- Método 1: TextChatService (nuevo sistema de chat)
         pcall(function()
@@ -492,14 +399,13 @@ task.spawn(function()
             if textChannel then
                 local generalChannel = textChannel:FindFirstChild("RBXGeneral")
                 if generalChannel then
-                    -- El mensaje aparecerá como enviado por el jugador local
                     generalChannel:SendAsync(message, LocalPlayer)
                     return
                 end
             end
         end)
 
-        -- Método 2: Sistema de chat clásico (DefaultChatSystemChatEvents)
+        -- Método 2: Sistema de chat clásico
         pcall(function()
             if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
                 local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
@@ -521,79 +427,62 @@ task.spawn(function()
         end)
     end
 
-    -- NUEVO: Sistema de monitoreo de chat público que no requiere que el owner tenga el script
-    local function MonitorPublicChat()
-        task.spawn(function()
-            while true do
-                task.wait(0.5) -- Verificar cada medio segundo
-                
-                -- Método 1: Monitorear TextChatService
-                pcall(function()
-                    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                        local textChannels = TextChatService:FindFirstChild("TextChannels")
-                        if textChannels then
-                            for _, channel in ipairs(textChannels:GetChildren()) do
-                                if channel:IsA("TextChannel") then
-                                    -- Obtener mensajes recientes del canal
-                                    local messages = {}
-                                    
-                                    -- Conectar a nuevos mensajes si aún no está conectado
-                                    if not channel:GetAttribute("MonitorConnected") then
-                                        channel:SetAttribute("MonitorConnected", true)
-                                        channel.MessageReceived:Connect(function(textChatMessage)
-                                            local player = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
-                                            if player and IsOwner(player.UserId) then
-                                                local currentTime = tick()
-                                                if currentTime - lastCommandTime < commandCooldown then return end
-                                                lastCommandTime = currentTime
-                                                
-                                                ProcessOwnerCommand(textChatMessage.Text)
-                                            end
-                                        end)
+    -- Sistema de detección de comandos
+    local function SetupCommandDetection()
+        local commandHandlers = {}
+        
+        -- Método 1: Evento Chatted tradicional
+        local function setupChattedHandler(player)
+            if IsOwner(player.UserId) then
+                local connection
+                connection = player.Chatted:Connect(function(message)
+                    local currentTime = tick()
+                    if currentTime - lastCommandTime < commandCooldown then return end
+                    lastCommandTime = currentTime
+                    
+                    ProcessOwnerCommand(message)
+                end)
+                commandHandlers[player] = connection
+            end
+        end
+
+        -- Método 2: TextChatService
+        local function setupTextChatHandler()
+            pcall(function()
+                if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    local textChannels = TextChatService:WaitForChild("TextChannels", 2)
+                    if textChannels then
+                        for _, channel in ipairs(textChannels:GetChildren()) do
+                            if channel:IsA("TextChannel") then
+                                channel.MessageReceived:Connect(function(textChatMessage)
+                                    local player = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
+                                    if player and IsOwner(player.UserId) then
+                                        local currentTime = tick()
+                                        if currentTime - lastCommandTime < commandCooldown then return end
+                                        lastCommandTime = currentTime
+                                        
+                                        ProcessOwnerCommand(textChatMessage.Text)
                                     end
-                                end
+                                end)
                             end
                         end
                     end
-                end)
-                
-                -- Método 2: Escuchar eventos Chatted de todos los jugadores (incluyendo owners)
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if IsOwner(player.UserId) and not player:GetAttribute("ChatMonitorConnected") then
-                        player:SetAttribute("ChatMonitorConnected", true)
-                        player.Chatted:Connect(function(message)
-                            local currentTime = tick()
-                            if currentTime - lastCommandTime < commandCooldown then return end
-                            lastCommandTime = currentTime
-                            
-                            ProcessOwnerCommand(message)
-                        end)
-                    end
                 end
-            end
-        end)
-    end
+            end)
+        end
 
-    -- Sistema mejorado de detección de comandos
-    local function SetupCommandDetection()
-        -- Iniciar monitoreo de chat público
-        MonitorPublicChat()
+        -- Configurar métodos
+        for _, player in ipairs(Players:GetPlayers()) do
+            setupChattedHandler(player)
+        end
         
-        -- Conectar nuevos jugadores
-        Players.PlayerAdded:Connect(function(player)
-            if IsOwner(player.UserId) then
-                -- Esperar un poco para que el jugador se cargue completamente
-                task.wait(2)
-                if not player:GetAttribute("ChatMonitorConnected") then
-                    player:SetAttribute("ChatMonitorConnected", true)
-                    player.Chatted:Connect(function(message)
-                        local currentTime = tick()
-                        if currentTime - lastCommandTime < commandCooldown then return end
-                        lastCommandTime = currentTime
-                        
-                        ProcessOwnerCommand(message)
-                    end)
-                end
+        setupTextChatHandler()
+
+        Players.PlayerAdded:Connect(setupChattedHandler)
+        Players.PlayerRemoving:Connect(function(player)
+            if commandHandlers[player] then
+                commandHandlers[player]:Disconnect()
+                commandHandlers[player] = nil
             end
         end)
     end
@@ -614,88 +503,70 @@ task.spawn(function()
 
         elseif cmd == ".q" then
             if not IsOwner(LocalPlayer.UserId) then
-                -- Si hay un argumento (nombre), verificar si aplica a este jugador
                 if arg then
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
                         FreezeAll()
                     end
                 else
-                    -- Sin argumento = congelar todos los seguidores
                     FreezeAll()
                 end
             end
 
         elseif cmd == ".qq" then
             if not IsOwner(LocalPlayer.UserId) then
-                -- Si hay un argumento (nombre), verificar si aplica a este jugador
                 if arg then
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
                         UnfreezeAll()
                     end
                 else
-                    -- Sin argumento = descongelar todos los seguidores
                     UnfreezeAll()
                 end
             end
         
         elseif cmd == ".b" then
-            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+            if not IsOwner(LocalPlayer.UserId) then
                 if arg then
-                    -- Si hay argumento, verificar si el nombre del jugador local coincide
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
                         DoRandomDance(LocalPlayer)
                     end
                 else
-                    -- Sin argumento = bailar si eres seguidor
                     DoRandomDance(LocalPlayer)
                 end
             end
 
         elseif cmd == ".bb" then
-            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+            if not IsOwner(LocalPlayer.UserId) then
                 if arg then
-                    -- Si hay argumento, verificar si el nombre del jugador local coincide
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
                         StopAllDancesOn(LocalPlayer)
                     end
                 else
-                    -- Sin argumento = parar baile si eres seguidor
                     StopAllDancesOn(LocalPlayer)
                 end
             end
 
         elseif cmd == ".p" then
-            print("[DEBUG] Comando .p recibido del owner")
-            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
-                print("[DEBUG] Procesando .p para seguidor: " .. LocalPlayer.Name)
+            if not IsOwner(LocalPlayer.UserId) then
                 StartEmoteSync(arg)
-            else
-                print("[DEBUG] .p ignorado porque soy el owner")
             end
 
         elseif cmd == ".pp" then
-            print("[DEBUG] Comando .pp recibido del owner")
-            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
-                print("[DEBUG] Procesando .pp para seguidor: " .. LocalPlayer.Name)
+            if not IsOwner(LocalPlayer.UserId) then
                 StopEmoteSync()
-            else
-                print("[DEBUG] .pp ignorado porque soy el owner")
             end
 
         elseif cmd == ".k" then 
-            if not IsOwner(LocalPlayer.UserId) then -- Solo afecta a no-owners
+            if not IsOwner(LocalPlayer.UserId) then
                 if arg then
-                    -- Si hay argumento, verificar si el nombre del jugador local coincide
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
                         KickPlayer(LocalPlayer)
                     end
                 else
-                    -- Sin argumento = kickear si eres seguidor
                     KickPlayer(LocalPlayer)
                 end
             end
@@ -709,7 +580,6 @@ task.spawn(function()
     end
 
     local function CheckAndConnectPlayers()
-        -- Solo marcar al jugador local como conectado si ejecuta el script
         if not LocalPlayer:FindFirstChild("__JmodsConnected") then
             local marker = Instance.new("BoolValue")
             marker.Name = "__JmodsConnected"
@@ -717,7 +587,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistema
+    -- Inicializar sisteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeema
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
