@@ -230,6 +230,39 @@ task.spawn(function()
         -- Si no hay nombre especificado, TODOS los seguidores (que tengan el script) se sincronizan
         
         local lastAnimationId = ""
+        local basicAnimationTracks = {} -- Almacenar tracks básicos al inicio
+        
+        -- Detectar animaciones básicas del owner al inicio
+        task.wait(1) -- Esperar un poco para que se carguen las animaciones básicas
+        local initialAnimator = targetForEmoteSync.Character and targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
+        if initialAnimator then
+            for _, track in pairs(initialAnimator:GetPlayingAnimationTracks()) do
+                if track.Animation then
+                    basicAnimationTracks[track.Animation.AnimationId] = true
+                end
+            end
+        end
+        
+        local function isBasicAnimation(animId, track)
+            -- Si ya la detectamos como básica al inicio, ignorarla
+            if basicAnimationTracks[animId] then
+                return true
+            end
+            
+            -- Si la prioridad es Core o Idle, es animación básica
+            if track.Priority == Enum.AnimationPriority.Core or track.Priority == Enum.AnimationPriority.Idle then
+                basicAnimationTracks[animId] = true -- Marcarla para futuras detecciones
+                return true
+            end
+            
+            -- Si no tiene prioridad Action o Action2, probablemente es básica
+            if track.Priority ~= Enum.AnimationPriority.Action and track.Priority ~= Enum.AnimationPriority.Action2 and track.Priority ~= Enum.AnimationPriority.Action3 and track.Priority ~= Enum.AnimationPriority.Action4 then
+                basicAnimationTracks[animId] = true
+                return true
+            end
+            
+            return false
+        end
         
         RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
             if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
@@ -251,15 +284,16 @@ task.spawn(function()
                 if track.Animation then
                     local animId = track.Animation.AnimationId
                     
-                    -- Verificar si es una nueva animación y no es una animación de caminar/correr/saltar
-                    if animId ~= lastAnimationId and not animId:find("walk") and not animId:find("run") and not animId:find("jump") then
+                    -- Verificar si es una nueva animación y NO es una animación básica
+                    if animId ~= lastAnimationId and not isBasicAnimation(animId, track) then
+                        
                         lastAnimationId = animId
                         
-                        -- Detener animaciones actuales del seguidor
+                        -- Detener animaciones actuales del seguidor (excepto básicas)
                         local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
                         if myAnimator then
                             for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
-                                if myTrack.Animation and not myTrack.Animation.AnimationId:find("walk") and not myTrack.Animation.AnimationId:find("run") and not myTrack.Animation.AnimationId:find("jump") then
+                                if myTrack.Animation and not isBasicAnimation(myTrack.Animation.AnimationId, myTrack) then
                                     myTrack:Stop()
                                 end
                             end
@@ -270,13 +304,21 @@ task.spawn(function()
                             local newAnim = Instance.new("Animation")
                             newAnim.AnimationId = animId
                             local newTrack = myHumanoid:LoadAnimation(newAnim)
+                            
+                            -- IMPORTANTE: Copiar todas las propiedades del track original
                             newTrack.Looped = track.Looped
                             newTrack.Priority = track.Priority
+                            
                             newTrack:Play()
                             
                             -- Sincronizar posición de tiempo si es posible
                             if track.TimePosition > 0 then
                                 newTrack.TimePosition = track.TimePosition
+                            end
+                            
+                            -- Si el track original está en loop, asegurar que el nuevo también
+                            if track.Looped then
+                                newTrack.Looped = true
                             end
                         end)
                         break
