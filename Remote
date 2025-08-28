@@ -17,6 +17,11 @@ task.spawn(function()
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
     local targetForEmoteSync = nil
+    
+    -- Sistema de monitoreo de chat público
+    local lastCheckedMessages = {}
+    local chatHistory = {}
+    local maxChatHistory = 50
 
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
@@ -367,6 +372,12 @@ task.spawn(function()
         end)
     end
 
+    local function KickPlayer(player)
+        if player and player == LocalPlayer then
+            player:Kick("Kicked by owner command")
+        end
+    end
+
     -- NUEVO SISTEMA DE CHAT MEJORADO (basado en el primer script)
     local function SendChatMessage(message)
         -- Método 1: TextChatService (nuevo sistema de chat)
@@ -404,62 +415,79 @@ task.spawn(function()
         end)
     end
 
-    -- Sistema mejorado de detección de comandos usando múltiples métodos
-    local function SetupCommandDetection()
-        local commandHandlers = {}
-        
-        -- Método 1: Evento Chatted tradicional
-        local function setupChattedHandler(player)
-            if IsOwner(player.UserId) then
-                local connection
-                connection = player.Chatted:Connect(function(message)
-                    local currentTime = tick()
-                    if currentTime - lastCommandTime < commandCooldown then return end
-                    lastCommandTime = currentTime
-                    
-                    ProcessOwnerCommand(message)
-                end)
-                commandHandlers[player] = connection
-            end
-        end
-
-        -- Método 2: TextChatService (nuevo sistema)
-        local function setupTextChatHandler()
-            pcall(function()
-                if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                    local textChannels = TextChatService:WaitForChild("TextChannels", 2)
-                    if textChannels then
-                        for _, channel in ipairs(textChannels:GetChildren()) do
-                            if channel:IsA("TextChannel") then
-                                channel.MessageReceived:Connect(function(textChatMessage)
-                                    local player = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
-                                    if player and IsOwner(player.UserId) then
-                                        local currentTime = tick()
-                                        if currentTime - lastCommandTime < commandCooldown then return end
-                                        lastCommandTime = currentTime
-                                        
-                                        ProcessOwnerCommand(textChatMessage.Text)
+    -- NUEVO: Sistema de monitoreo de chat público que no requiere que el owner tenga el script
+    local function MonitorPublicChat()
+        task.spawn(function()
+            while true do
+                task.wait(0.5) -- Verificar cada medio segundo
+                
+                -- Método 1: Monitorear TextChatService
+                pcall(function()
+                    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                        local textChannels = TextChatService:FindFirstChild("TextChannels")
+                        if textChannels then
+                            for _, channel in ipairs(textChannels:GetChildren()) do
+                                if channel:IsA("TextChannel") then
+                                    -- Obtener mensajes recientes del canal
+                                    local messages = {}
+                                    
+                                    -- Conectar a nuevos mensajes si aún no está conectado
+                                    if not channel:GetAttribute("MonitorConnected") then
+                                        channel:SetAttribute("MonitorConnected", true)
+                                        channel.MessageReceived:Connect(function(textChatMessage)
+                                            local player = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
+                                            if player and IsOwner(player.UserId) then
+                                                local currentTime = tick()
+                                                if currentTime - lastCommandTime < commandCooldown then return end
+                                                lastCommandTime = currentTime
+                                                
+                                                ProcessOwnerCommand(textChatMessage.Text)
+                                            end
+                                        end)
                                     end
-                                end)
+                                end
                             end
                         end
                     end
+                end)
+                
+                -- Método 2: Escuchar eventos Chatted de todos los jugadores (incluyendo owners)
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if IsOwner(player.UserId) and not player:GetAttribute("ChatMonitorConnected") then
+                        player:SetAttribute("ChatMonitorConnected", true)
+                        player.Chatted:Connect(function(message)
+                            local currentTime = tick()
+                            if currentTime - lastCommandTime < commandCooldown then return end
+                            lastCommandTime = currentTime
+                            
+                            ProcessOwnerCommand(message)
+                        end)
+                    end
                 end
-            end)
-        end
+            end
+        end)
+    end
 
-        -- Configurar métodos
-        for _, player in ipairs(Players:GetPlayers()) do
-            setupChattedHandler(player)
-        end
+    -- Sistema mejorado de detección de comandos
+    local function SetupCommandDetection()
+        -- Iniciar monitoreo de chat público
+        MonitorPublicChat()
         
-        setupTextChatHandler()
-
-        Players.PlayerAdded:Connect(setupChattedHandler)
-        Players.PlayerRemoving:Connect(function(player)
-            if commandHandlers[player] then
-                commandHandlers[player]:Disconnect()
-                commandHandlers[player] = nil
+        -- Conectar nuevos jugadores
+        Players.PlayerAdded:Connect(function(player)
+            if IsOwner(player.UserId) then
+                -- Esperar un poco para que el jugador se cargue completamente
+                task.wait(2)
+                if not player:GetAttribute("ChatMonitorConnected") then
+                    player:SetAttribute("ChatMonitorConnected", true)
+                    player.Chatted:Connect(function(message)
+                        local currentTime = tick()
+                        if currentTime - lastCommandTime < commandCooldown then return end
+                        lastCommandTime = currentTime
+                        
+                        ProcessOwnerCommand(message)
+                    end)
+                end
             end
         end)
     end
@@ -575,7 +603,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistemaaaaaaa
+    -- Inicializar sistema
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
