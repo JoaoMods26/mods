@@ -307,22 +307,47 @@ task.spawn(function()
         end
         
         local function isBasicAnimation(animId, track)
+            -- Lista de animaciones básicas conocidas de Roblox (walking, running, idle, etc.)
+            local basicAnimIds = {
+                "rbxasset://animations/walk.xml",
+                "rbxasset://animations/run.xml", 
+                "rbxasset://animations/idle.xml",
+                "rbxasset://animations/jump.xml",
+                "rbxasset://animations/fall.xml",
+                "rbxasset://animations/climb.xml",
+                "rbxasset://animations/swim.xml"
+            }
+            
+            -- Verificar si es una animación básica específica
+            for _, basicId in ipairs(basicAnimIds) do
+                if animId:find(basicId) then
+                    return true
+                end
+            end
+            
             -- Si ya la detectamos como básica al inicio, ignorarla
             if basicAnimationTracks[animId] then
                 return true
             end
             
-            -- Si la prioridad es Core o Idle, es animación básica
-            if track.Priority == Enum.AnimationPriority.Core or track.Priority == Enum.AnimationPriority.Idle then
-                basicAnimationTracks[animId] = true -- Marcarla para futuras detecciones
-                return true
-            end
-            
-            -- Si no tiene prioridad Action o Action2, probablemente es básica
-            if track.Priority ~= Enum.AnimationPriority.Action and track.Priority ~= Enum.AnimationPriority.Action2 and track.Priority ~= Enum.AnimationPriority.Action3 and track.Priority ~= Enum.AnimationPriority.Action4 then
+            -- NUEVA LÓGICA: Solo considerar básicas las animaciones de movimiento con prioridad Core o Idle
+            if track.Priority == Enum.AnimationPriority.Core then
                 basicAnimationTracks[animId] = true
                 return true
             end
+            
+            -- Si es Idle y parece ser animación de sistema (no tiene números como los emotes)
+            if track.Priority == Enum.AnimationPriority.Idle then
+                -- Los emotes suelen tener IDs numéricos, las animaciones básicas no
+                if not animId:match("%d+") then
+                    basicAnimationTracks[animId] = true
+                    return true
+                end
+            end
+            
+            print("[DEBUG EMOTE SYNC] 🎭 Animación NO básica detectada:")
+            print("[DEBUG EMOTE SYNC] ID: " .. animId)
+            print("[DEBUG EMOTE SYNC] Prioridad: " .. tostring(track.Priority))
             
             return false
         end
@@ -692,7 +717,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistemaaaaaaaaaaaaaaaaaa
+    -- Inicializar sistema
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
