@@ -587,7 +587,7 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sisteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeema
+    -- Inicializar sistema
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
