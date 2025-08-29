@@ -2505,6 +2505,119 @@ JugadoresTab:CreateInput({
     end
 })
 
+-----Boton crear herramienta-------
+local selectorTool = nil
+local isToolActive = false
+
+-- Función para crear la herramienta de selección
+local function CreateSelectorTool()
+    -- Eliminar herramienta existente si existe
+    if selectorTool then
+        selectorTool:Destroy()
+        selectorTool = nil
+    end
+    
+    -- Crear nueva herramienta
+    selectorTool = Instance.new("Tool")
+    selectorTool.Name = "Selector de Jugadores"
+    selectorTool.RequiresHandle = false
+    
+    -- Crear el handle (opcional, para visualización)
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(0.2, 0.2, 1)
+    handle.Material = Enum.Material.Neon
+    handle.BrickColor = BrickColor.new("Bright blue")
+    handle.CanCollide = false
+    handle.Parent = selectorTool
+    
+    -- Función cuando se hace clic con la herramienta
+    selectorTool.Activated:Connect(function()
+        local player = game.Players.LocalPlayer
+        local mouse = player:GetMouse()
+        
+        -- Verificar si el mouse está apuntando a un jugador
+        if mouse.Target and mouse.Target.Parent then
+            local targetCharacter = mouse.Target.Parent
+            local targetPlayer = nil
+            
+            -- Buscar si el objeto clickeado pertenece a un jugador
+            for _, plr in ipairs(game.Players:GetPlayers()) do
+                if plr.Character == targetCharacter then
+                    targetPlayer = plr
+                    break
+                end
+            end
+            
+            -- Si encontramos un jugador, actualizarlo
+            if targetPlayer and targetPlayer ~= player then
+                selectedPlayer = targetPlayer
+                
+                -- Notificación de éxito
+                Rayfield:Notify({
+                    Title = "Jugador Seleccionado",
+                    Content = targetPlayer.DisplayName .. " (" .. targetPlayer.Name .. ") ha sido seleccionado.",
+                    Duration = 3,
+                    Image = 4483362458
+                })
+                
+                -- Opcional: Desequipar la herramienta automáticamente
+                selectorTool.Parent = player.Backpack
+            else
+                -- Notificación si no es un jugador válido
+                Rayfield:Notify({
+                    Title = "Error",
+                    Content = "No has clickeado en un jugador válido.",
+                    Duration = 2,
+                    Image = 4483362458
+                })
+            end
+        end
+    end)
+    
+    -- Cuando se equipa la herramienta
+    selectorTool.Equipped:Connect(function()
+        Rayfield:Notify({
+            Title = "Herramienta Equipada",
+            Content = "Haz click en cualquier jugador para seleccionarlo.",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end)
+    
+    -- Cuando se desequipa la herramienta
+    selectorTool.Unequipped:Connect(function()
+        Rayfield:Notify({
+            Title = "Herramienta Guardada",
+            Content = "Selector de jugadores guardado en el inventario.",
+            Duration = 2,
+            Image = 4483362458
+        })
+    end)
+    
+    return selectorTool
+end
+
+-- Botón para crear/dar la herramienta de selección
+JugadoresTab:CreateButton({
+    Name = "Herramienta Selector",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        
+        -- Crear la herramienta
+        local tool = CreateSelectorTool()
+        
+        -- Darle la herramienta al jugador
+        tool.Parent = player.Backpack
+        
+        Rayfield:Notify({
+            Title = "Herramienta Creada",
+            Content = "Revisa tu inventario y equipa el 'Selector de Jugadores'.",
+            Duration = 4,
+            Image = 4483362458
+        })
+    end
+})
 
 
 local espectando = false
