@@ -707,6 +707,84 @@ Button = MainTab:CreateButton({
    end,
 })
 
+
+
+-- WalkFlin
+do
+    local wf, mv, noclipConn, charConn
+
+    local function stopWalkFling()
+        wf = false
+        if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+        if charConn then charConn:Disconnect(); charConn = nil end
+    end
+
+    local function startWalkFling()
+        stopWalkFling()
+        wf = true
+        mv = 0.1
+
+        local plr = game.Players.LocalPlayer
+
+        noclipConn = game:GetService("RunService").Stepped:Connect(function()
+            if wf and plr.Character then
+                for _,p in ipairs(plr.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        p.CanCollide = false
+                    end
+                end
+            end
+        end)
+
+        charConn = plr.CharacterAdded:Connect(function(ch)
+            if wf then
+                ch:WaitForChild("HumanoidRootPart",5)
+                for _,p in ipairs(ch:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end
+        end)
+
+        task.spawn(function()
+            while wf do
+                game:GetService("RunService").Heartbeat:Wait()
+                local ch = plr.Character
+                local root = ch and (ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Torso") or ch:FindFirstChild("UpperTorso"))
+
+                while wf and (not ch or not root) do
+                    game:GetService("RunService").Heartbeat:Wait()
+                    ch = plr.Character
+                    root = ch and (ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Torso") or ch:FindFirstChild("UpperTorso"))
+                end
+                if not wf then break end
+
+                local vel = root.Velocity
+                root.Velocity = vel * 10000 + Vector3.new(0,10000,0)
+
+                game:GetService("RunService").RenderStepped:Wait()
+                if not wf or not root then break end
+                root.Velocity = vel
+
+                game:GetService("RunService").Stepped:Wait()
+                if not wf or not root then break end
+                root.Velocity = vel + Vector3.new(0,mv,0)
+                mv = -mv
+            end
+        end)
+    end
+
+    MainTab:CreateToggle({
+        Name = "WalkFling",
+        CurrentValue = false,
+        Flag = "WalkFlingToggle",
+        Callback = function(on)
+            if on then startWalkFling() else stopWalkFling() end
+        end
+    })
+end
+
+
+
 ---Spin
 
 local spinActive = false
