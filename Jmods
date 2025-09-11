@@ -843,42 +843,66 @@ end)
 
 ----Reset
 
+-- Variable global para manejar la conexión del segundo botón
+local positionConnection = nil
+
+----Reset
 Button = MainTab:CreateButton({
-   Name = "Respawn",
-   Callback = function()
-		game.Players.LocalPlayer.Character:BreakJoints()
-   end,
-})
-
- -----Refresh---
- Button = MainTab:CreateButton({
-    Name = "Respawn Guardando posición",
+    Name = "Respawn",
     Callback = function()
-        local player = Players.LocalPlayer
+        local player = game.Players.LocalPlayer
         local character = player.Character or player.CharacterAdded:Wait()
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-
-        if hrp then
-            local savedCFrame = hrp.CFrame
-
-            -- Conectamos a CharacterAdded para volver a teletransportarlo cuando reaparezca
-            local connection
-            connection = player.CharacterAdded:Connect(function(char)
-                local newHrp = char:WaitForChild("HumanoidRootPart", 5)
-                if newHrp then
-                    newHrp.CFrame = savedCFrame
-                end
-                connection:Disconnect()
-            end)
-
-            -- Matamos al personaje
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.Health = 0
+        -- Lista de partes críticas (eliminar una es suficiente para respawn)
+        local criticalParts = {"Head", "Torso", "UpperTorso"}
+        for _, partName in pairs(criticalParts) do
+            local part = character:FindFirstChild(partName)
+            if part then
+                part:Destroy()
+                break -- Solo necesitamos eliminar una parte crítica
             end
         end
     end,
 })
+
+-----Refresh---
+Button = MainTab:CreateButton({
+    Name = "Respawn Guardando posición",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local savedCFrame = hrp.CFrame
+            
+            -- Desconectar conexión anterior si existe
+            if positionConnection then
+                positionConnection:Disconnect()
+            end
+            
+            -- Conectamos a CharacterAdded para volver a teletransportarlo cuando reaparezca
+            positionConnection = player.CharacterAdded:Connect(function(char)
+                local newHrp = char:WaitForChild("HumanoidRootPart", 5)
+                if newHrp then
+                    newHrp.CFrame = savedCFrame
+                end
+                positionConnection:Disconnect()
+                positionConnection = nil
+            end)
+            
+            -- Respawn usando método de eliminar partes críticas
+            local criticalParts = {"Head", "Torso", "UpperTorso"}
+            for _, partName in pairs(criticalParts) do
+                local part = character:FindFirstChild(partName)
+                if part then
+                    part:Destroy()
+                    break -- Solo necesitamos eliminar una parte crítica
+                end
+            end
+        end
+    end,
+})
+
+
 
 
 
