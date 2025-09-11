@@ -201,6 +201,113 @@ local Button19 = TPTab:CreateButton({
 
 Juegostab= _G.Window:CreateTab("Juegos", nil) -- Title, Image
 
+
+ boton= Juegostab:CreateButton({
+   Name = "Jmods99 (99 Noches en el Bosque)",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/99-Nights-in-the-Forest-ALIENS-Jmods-99-45686"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Arbixhub(Steal a Brainrot)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Youifpg/Steal-a-Brainrot-op/refs/heads/main/Arbixhub-obfuscated.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Arsenal thunder client",
+   Callback = function()
+       loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e41f4a030044b055add.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "AutoFarm Pelotas(Murder Mystery 2)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/beachball-farm.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Basicamente FNF Remix",
+   Callback = function()
+       loadstring(game:HttpGet("https://orbitsc.net/bfnf"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Be an NPC or DIE",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/main/BeNpcOrDie"))("t.me/arceusxscripts")
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(auto parry)",
+   Callback = function()
+       loadstring(game:HttpGet("https://scriptblox.com/raw/UPD-Blade-Ball-op-autoparry-with-visualizer-8652"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(EminenceXLua)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/EminenceXLua/Blade-your-Balls/main/BladeBallLoader.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blade Ball(necesita key)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/FFJ1/Roblox-Exploits/main/scripts/Loader.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blox Fruit (necesita key)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/3345-c-a-t-s-u-s/Kncrypt/refs/heads/main/sources/BloxFruit.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Blox Fuit Super OP",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Break in 2",
+   Callback = function()
+       loadstring(game:HttpGet(("https://pastebin.com/raw/365H7AMr")))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Breaking Point",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "build a boat for treasure",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/TheRealAsu/BABFT/refs/heads/main/Jan25_Source.lua'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "CH HUB (Natural disaster)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxHackingProject/CHHub/main/CHHub.lua", true))()
+   end,
+})
+
+
 boton= Juegostab:CreateButton({
    Name = "Dress to impres",
    Callback = function()
@@ -210,271 +317,131 @@ end)
    end,
 })
 
- boton= Juegostab:CreateButton({
-   Name = "Jmods99 (99 Noches en el Bosque)",
-   Callback = function()
-loadstring(game:HttpGet("https://rawscripts.net/raw/99-Nights-in-the-Forest-ALIENS-Jmods-99-45686"))()
-   end,
-})
 
- boton= Juegostab:CreateButton({
-   Name = "Blox Fuit Super OP",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Arceney/refs/heads/main/main.luau"))()
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "TRP(no universal pude ocacionar lag)",
-   Callback = function()
-pcall(function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/therapy-gui/main/therapy-gui.lua", true))()
-   end)
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Piggy (ESP y TP a items)",
-   Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Tora (Grow a Garden)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/GrowaGarden"))()
-
-   end,
-})
-
-
- boton= Juegostab:CreateButton({
-   Name = "Arsenal thunder client",
-   Callback = function()
-loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/b95e8fecdf824e41f4a030044b055add.lua"))()
-
-   end,
-})
-
-
- boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(dofug)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/heads/main/dofug.txt"))()
-   end,
-})
-
-
- boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(Lennon hub ESP)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Klevis123-1/Lennon-hub-leaked/refs/heads/main/Lennon.txt"))()
-   end,
-})
-
-
-
- boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(pide key)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a-brainrot/refs/heads/main/Protected_3771863424757750.lua.txt"))()
-   end,
-})
-
-
-
- boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(chilli)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"))()
-   end,
-})
-
-
-
-
- boton= Juegostab:CreateButton({
-   Name = "Steal a Brainrot(Dolfinhub)",
-   Callback = function()
-loadstring(game:HttpGet('https://pastefy.app/8XQTsrZK/raw'))()
-   end,
-})
-
-
-
- boton= Juegostab:CreateButton({
-   Name = "Breaking Point",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ColdStep2/Breaking-Point-Funny-Squid-Hax/main/Breaking%20Point%20Funny%20Squid%20Hax",true))();
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Basicamente FNF Remix",
-   Callback = function()
-loadstring(game:HttpGet("https://orbitsc.net/bfnf"))()
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Xhub(Murder Mystery 2)",
-   Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/zdkjaime/Xhub/refs/heads/main/MainHub'))()
-   end,
-})
-
-
- boton= Juegostab:CreateButton({
-   Name = "AutoFarm Pelotas(Murder Mystery 2)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/beachball-farm.lua"))()
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Natural disaster",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
-
-   end,
-})
-
-
- boton= Juegostab:CreateButton({
+boton= Juegostab:CreateButton({
    Name = "Jailbreak",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/zyn789/Aoi-Script/main/Jailbreak", true))()
-
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/zyn789/Aoi-Script/main/Jailbreak", true))()
    end,
 })
 
- boton= Juegostab:CreateButton({
+boton= Juegostab:CreateButton({
+   Name = "Natural disaster",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/2dgeneralspam1/scripts-and-stuff/master/scripts/LoadstringUjHI6RQpz2o8", true))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
    Name = "Natural disaster (Null Fire)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Thebestofhack123/Null-Fire/main/Loader", true))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Thebestofhack123/Null-Fire/main/Loader", true))()
    end,
 })
-
- boton= Juegostab:CreateButton({
-   Name = "Telekinesis (Natural disaster)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "CH HUB (Natural disaster)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxHackingProject/CHHub/main/CHHub.lua", true))()
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Blox Fruit (necesita key)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/3345-c-a-t-s-u-s/Kncrypt/refs/heads/main/sources/BloxFruit.lua"))()
-
-   end,
-})
-boton= Juegostab:CreateButton({
-   Name = "Be an NPC or DIE",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/main/BeNpcOrDie"))("t.me/arceusxscripts")
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-   Name = "Blade Ball(EminenceXLua)",
-   Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/EminenceXLua/Blade-your-Balls/main/BladeBallLoader.lua"))()
-
-
-   end,
-})
-
-boton= Juegostab:CreateButton({
-   Name = "Blade Ball(auto parry)",
-   Callback = function()
-loadstring(game:HttpGet("https://scriptblox.com/raw/UPD-Blade-Ball-op-autoparry-with-visualizer-8652"))()
-
-
-   end,
-})
-
- boton= Juegostab:CreateButton({
-    Name = "Blade Ball(necesita key)",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/FFJ1/Roblox-Exploits/main/scripts/Loader.lua"))()
- 
- 
-    end,
- })
-
-
 
 boton= Juegostab:CreateButton({
    Name = "Nebula hub (Booga booga)",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/Yousuck780/Nebula-Hub/refs/heads/main/boogaboogareborn'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/Yousuck780/Nebula-Hub/refs/heads/main/boogaboogareborn'))()
    end,
 })
 
 boton= Juegostab:CreateButton({
-   Name = "Break in 2",
+   Name = "Piggy (ESP y TP a items)",
    Callback = function()
-loadstring(game:HttpGet(("https://pastebin.com/raw/365H7AMr")))()
-
+       loadstring(game:HttpGet("https://pastebin.com/raw/48KRKYzZ"))()
    end,
 })
 
- boton= Juegostab:CreateButton({
+boton= Juegostab:CreateButton({
    Name = "Redz Hub (Blox fruit)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"))(Settings)
-
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"))(Settings)
    end,
 })
 
- boton= Juegostab:CreateButton({
-   Name = "build a boat for treasure",
+boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(chilli)",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/TheRealAsu/BABFT/refs/heads/main/Jan25_Source.lua'))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"))()
    end,
 })
 
- boton= Juegostab:CreateButton({
-   Name = "Thunder Cliend(Arsenal)",
+boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(dofug)",
    Callback = function()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/thunderclient/main/main.lua'))();
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/OneClye1/dofug/refs/heads/main/dofug.txt"))()
    end,
 })
 
- boton= Juegostab:CreateButton({
-   Name = "Arbixhub(Steal a Brainrot)",
+boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(Dolfinhub)",
    Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Youifpg/Steal-a-Brainrot-op/refs/heads/main/Arbixhub-obfuscated.lua"))()
+       loadstring(game:HttpGet('https://pastefy.app/8XQTsrZK/raw'))()
    end,
 })
 
+boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(Lennon hub ESP)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Klevis123-1/Lennon-hub-leaked/refs/heads/main/Lennon.txt"))()
+   end,
+})
 
- boton= Juegostab:CreateButton({
+boton= Juegostab:CreateButton({
+   Name = "Steal a Brainrot(pide key)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/onliengamerop/Steal-a-brainrot/refs/heads/main/Protected_3771863424757750.lua.txt"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
    Name = "Super ring mod(Natural disaster)",
    Callback = function()
-loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
+       loadstring(game:HttpGet('https://pastebin.com/raw/HSQqqjUp'))()
    end,
 })
 
- boton= Juegostab:CreateButton({
+boton= Juegostab:CreateButton({
    Name = "Super ring v6 mod(Natural disaster)",
    Callback = function()
-loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
+       loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Telekinesis (Natural disaster)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Thunder Cliend(Arsenal)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/andrewdarkyyofficial/thunderclient/main/main.lua'))();
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Tora (Grow a Garden)",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/GrowaGarden"))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "TRP(no universal pude ocacionar lag)",
+   Callback = function()
+       pcall(function()
+           loadstring(game:HttpGet("https://raw.githubusercontent.com/hellohellohell012321/therapy-gui/main/therapy-gui.lua", true))()
+       end)
+   end,
+})
+
+boton= Juegostab:CreateButton({
+   Name = "Xhub(Murder Mystery 2)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/zdkjaime/Xhub/refs/heads/main/MainHub'))()
    end,
 })
