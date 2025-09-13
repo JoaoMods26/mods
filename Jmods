@@ -309,17 +309,23 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/UWUMAxd/re
     
     
 ---barra de velocidad---
+local wsReady = false
+
 Slider = MainTab:CreateSlider({
-       Name = "Velocidad al correr",
-       Range = {1, 500},
-       Increment = 1,
-       Suffix = "velocidad",
-       CurrentValue = 16,
-       Flag = "sliderws", -- 
-       Callback = function(Value)
-            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
-       end,
-    })
+    Name = "Velocidad al correr",
+    Range = {1, 500},
+    Increment = 1,
+    Suffix = "velocidad",
+    CurrentValue = 16,
+    Flag = "sliderws", 
+    Callback = function(Value)
+        if wsReady then
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        else
+            wsReady = true
+        end
+    end,
+})
     
 
 
