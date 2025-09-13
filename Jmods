@@ -325,17 +325,23 @@ Slider = MainTab:CreateSlider({
 
 
 ----barra Salto----
+local sliderReady = false  -- controlamos si ya está listo
+
 Slider = MainTab:CreateSlider({
-       Name = "Salto",
-       Range = {1, 500},
-       Increment = 1,
-       Suffix = "Poder",
-       CurrentValue = 16,
-       Flag = "sliderjp", 
-       Callback = function(Value)
-            game.Players.LocalPlayer.Character.Humanoid.JumpPower = (Value)
-       end,
-    })
+    Name = "Salto",
+    Range = {1, 500},
+    Increment = 1,
+    Suffix = "Poder",
+    CurrentValue = 16,
+    Flag = "sliderjp", 
+    Callback = function(Value)
+        if sliderReady then
+            game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+        else
+            sliderReady = true -- la primera vez solo marca como listo, no cambia nada
+        end
+    end,
+})
 
 
 
