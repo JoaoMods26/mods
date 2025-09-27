@@ -7,7 +7,13 @@ local Window = Rayfield:CreateWindow({
     Icon = 127271155083726,
     LoadingTitle = "Subscribete: joao_mods",
     LoadingSubtitle = "Cargando Jmods universal....",
-    Theme = "Bloom",
+Intro = true,
+AnimationIntro = 5,
+OpenButtomImage = 127271155083726,
+DragImage = 127271155083726,
+Theme = "Oscuro",
+
+
     DisableRayfieldPrompts = true,
     DisableBuildWarnings = false,
     ConfigurationSaving = {
@@ -53,7 +59,7 @@ loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 
 
 
-
+--[[
 -- FUNCIONES DE TEMA
 local themeSavePath = "JmodsUniversal/SelectedTheme.txt"
 
@@ -108,7 +114,7 @@ end
 -- Cargar tema guardado al inicio
 LoadSavedTheme()
 
-
+]]
 -----
 
 
@@ -279,8 +285,8 @@ MainSection = MainTab:CreateSection("Main")
 
     Rayfield:Notify({
            Title = "Bienvenido",
-       Content = "joao_mods te espera en youtube",
-       Duration = 15,
+       Content = "joao_mods te espera en https://www.youtube.com/@joao_mods0",
+       Duration = 20,
        Image = 13458017478,
              Callback = function()
           end
@@ -3800,7 +3806,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 
 
 
-
+--[[
 ----Temas---
 ----Temas---
 themesTab = Window:CreateTab("Configs ⚙️", nil)
@@ -3943,7 +3949,7 @@ if savedLang and JmodsUI then
     TranslateUI(JmodsUI, savedLang)
 end
 
-
+]]
 
 
 
