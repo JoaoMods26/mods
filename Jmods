@@ -283,15 +283,7 @@ MainSection = MainTab:CreateSection("Main")
 
 
 
-    Rayfield:Notify({
-           Title = "Bienvenido",
-       Content = "joao_mods te espera en https://www.youtube.com/@joao_mods0",
-       Duration = 20,
-       Image = 13458017478,
-             Callback = function()
-          end
 
-    })
 
 
 ---Chat HAKER----
