@@ -1466,14 +1466,12 @@ MainTab:CreateSlider({
 ----Guardar juegos---
 
 Button = MainTab:CreateButton({
-
     Name = "Guardar juego",
     Callback = function()
+        print("Guardando juego...") 
         saveinstance();
     end,
- })
- 
-
+})
 
 
 
