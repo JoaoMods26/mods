@@ -1478,62 +1478,80 @@ Button = MainTab:CreateButton({
 
 ----Autoclicker----
 
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local mouse = game.Players.LocalPlayer:GetMouse()
 
 -- Estados
 local autoClicking = false
 local toggleEnabled = false
-local clickDelay = 0.1 -- valor inicial, ajustable por el slider
+local clickDelay = 0.1
 
--- Bucle del autoclicker
-task.spawn(function()
-	while task.wait() do
-		if autoClicking and toggleEnabled then
-			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-		end
-		task.wait(clickDelay)
-	end
+-- Función de click más natural
+local function performClick()
+    -- Método 1: Usar mouse1click (más natural)
+    pcall(function()
+        mouse1click()
+    end)
+    
+    -- Método 2: Si no funciona el anterior, usar fireclickdetector
+    if mouse.Target then
+        local clickDetector = mouse.Target:FindFirstChildOfClass("ClickDetector") or mouse.Target.Parent:FindFirstChildOfClass("ClickDetector")
+        if clickDetector then
+            pcall(function()
+                fireclickdetector(clickDetector)
+            end)
+        end
+    end
+end
+
+-- Bucle principal del autoclicker
+spawn(function()
+    while true do
+        if autoClicking and toggleEnabled then
+            performClick()
+        end
+        wait(clickDelay)
+    end
 end)
 
--- Toggle (maestro)
-AutoClickerToggle = MainTab:CreateToggle({
-	Name = "Auto Clicker (primero activar)",
-	CurrentValue = false,
-	Flag = "AutoClickerToggle",
-	Callback = function(Value)
-		toggleEnabled = Value
-		if not Value then
-			autoClicking = false
-		end
-	end,
+-- 1. TOGGLE PRINCIPAL
+MainTab:CreateToggle({
+    Name = "Auto Clicker",
+    CurrentValue = false,
+    Flag = "AutoClickerToggle",
+    Callback = function(Value)
+        toggleEnabled = Value
+        if not Value then
+            autoClicking = false
+        end
+    end,
 })
 
--- Keybind (solo funciona si el toggle está activo)
+-- 2. KEYBIND PARA ACTIVAR/DESACTIVAR
 MainTab:CreateKeybind({
-	Name = "Bind Auto Click",
-	CurrentKeybind = "E",
-	HoldToInteract = false,
-	Flag = "AutoClickerKeybind",
-	Callback = function()
-		if toggleEnabled then
-			autoClicking = not autoClicking
-		end
-	end,
+    Name = "Activar Auto Click",
+    CurrentKeybind = "E",
+    HoldToInteract = false,
+    Flag = "AutoClickerKeybind",
+    Callback = function()
+        if toggleEnabled then
+            autoClicking = not autoClicking
+        end
+    end,
 })
 
--- Slider para velocidad (menor = más rápido)
+-- 3. SLIDER DE VELOCIDAD
 MainTab:CreateSlider({
-	Name = "Velocidad AutoClicker",
-	Range = {0, 1}, -- 0.01 = muy rápido, 1 = más lento
-	Increment = 0.01,
-	Suffix = "s",
-	CurrentValue = clickDelay,
-	Flag = "ClickDelaySlider",
-	Callback = function(Value)
-		clickDelay = Value
-	end,
+    Name = "Velocidad AutoClicker",
+    Range = {0.01, 1},
+    Increment = 0.01,
+    Suffix = "s",
+    CurrentValue = clickDelay,
+    Flag = "ClickDelaySlider",
+    Callback = function(Value)
+        clickDelay = Value
+    end,
 })
+
 ----Camara libre---
 
 
