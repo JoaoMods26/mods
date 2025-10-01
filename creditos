@@ -6,7 +6,7 @@ CreditosTab:CreateSection("Creador")
 local DiscordInvite = "https://discord.gg/ZTVC94ZmVZ"
 
 CreditosTab:CreateButton({
-    Name = "Joao_mods                                                             Desarrollador de Jmods Universal y Youtuber",
+    Name = "Joao_mods: Desarrollador de Jmods Universal y Youtuber",
     Callback = function()
         setclipboard(DiscordInvite)
         _G.Rayfield:Notify({
@@ -25,7 +25,7 @@ CreditosTab:CreateSection("Testers")
 
 CreditosTab:CreateParagraph({
     Title = "erjazzy",
-    Content = "chupen pico"
+    Content = "El guebo mio ta que ladra dioss denme qk"
 })
 
 CreditosTab:CreateParagraph({
