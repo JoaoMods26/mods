@@ -12,7 +12,7 @@ AnimationIntro = 5,
 OpenButtomImage = 127271155083726,
 DragImage = 127271155083726,
 Theme = "Oscuro",
-
+HideCloseButton = true,
 
     DisableRayfieldPrompts = true,
     DisableBuildWarnings = false,
