@@ -209,6 +209,17 @@ loadstring(game:HttpGet("https://rawscripts.net/raw/99-Nights-in-the-Forest-ALIE
    end,
 })
 
+
+ boton= Juegostab:CreateButton({
+   Name = "JbrookMods (Brookhaven)",
+   Callback = function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/Brookhaven-RP-JBrookMods-56926"))()
+   end,
+})
+
+
+
+
 boton= Juegostab:CreateButton({
    Name = "Arbixhub(Steal a Brainrot)",
    Callback = function()
