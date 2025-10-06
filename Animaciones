@@ -207,12 +207,12 @@ end
 
 -- Carga los botones al presionar
 AnimacionesTab:CreateButton({
-	Name = "▶️ Cargar Animaciones R15 (Pisa solo 1 vez)",
+	Name = "▶️ Cargar Animaciones R15",
 	Callback = setupUI_R15
 })
 
 AnimacionesTab:CreateButton({
-	Name = "▶️ Cargar Animaciones R6 (Pisa solo 1 vez)",
+	Name = "▶️ Cargar Animaciones R6",
 	Callback = setupUI_R6
 })
 
@@ -220,3 +220,155 @@ AnimacionesTab:CreateButton({
 LocalPlayer.CharacterAdded:Connect(function()
 	currentTrack = nil
 end)
+
+
+
+
+
+
+
+
+ 
+ 
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+ 
+local buttonsCreatedSets = false
+local OriginalAnimations = nil -- Animaciones originales
+local CurrentSet = nil -- Para recordar qué set está activo
+ 
+-- Guardar animaciones originales
+local function SaveOriginalAnimations(character)
+    local Animate = character:FindFirstChild("Animate")
+    if not Animate then return end
+    OriginalAnimations = {
+        idle1 = Animate.idle.Animation1.AnimationId,
+        idle2 = Animate.idle.Animation2.AnimationId,
+        walk  = Animate.walk.WalkAnim.AnimationId,
+        run   = Animate.run.RunAnim.AnimationId,
+        jump  = Animate.jump.JumpAnim.AnimationId,
+        climb = Animate.climb.ClimbAnim.AnimationId,
+        fall  = Animate.fall.FallAnim.AnimationId
+    }
+end
+ 
+local function StopAnim(character)
+    if not character then return end
+    local Animate = character:FindFirstChild("Animate")
+    local Hum = character:FindFirstChild("Humanoid")
+    if Animate then pcall(function() Animate.Disabled = false end) end
+    if Hum then
+        local animtrack = Hum:GetPlayingAnimationTracks()
+        for _, track in pairs(animtrack) do
+            pcall(function() track:Stop() end)
+        end
+    end
+end
+ 
+local function ApplyAnimationSet(set)
+    if not LocalPlayer.Character then return end
+    local Animate = LocalPlayer.Character:FindFirstChild("Animate")
+    local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not Animate or not Hum then return end
+ 
+    -- Guardar animaciones originales la primera vez
+    if not OriginalAnimations then
+        SaveOriginalAnimations(LocalPlayer.Character)
+    end
+ 
+    Animate.Disabled = true
+    StopAnim(LocalPlayer.Character)
+ 
+    Animate.idle.Animation1.AnimationId = set.idle1
+    Animate.idle.Animation2.AnimationId = set.idle2
+    Animate.walk.WalkAnim.AnimationId = set.walk
+    Animate.run.RunAnim.AnimationId = set.run
+    Animate.jump.JumpAnim.AnimationId = set.jump
+    Animate.climb.ClimbAnim.AnimationId = set.climb
+    Animate.fall.FallAnim.AnimationId = set.fall
+ 
+    Hum:ChangeState(3)
+    Animate.Disabled = false
+ 
+    CurrentSet = set -- Guardar set activo
+end
+ 
+local function RestoreOriginalAnimations()
+    if not LocalPlayer.Character or not OriginalAnimations then return end
+    local Animate = LocalPlayer.Character:FindFirstChild("Animate")
+    local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not Animate or not Hum then return end
+ 
+    Animate.Disabled = true
+    StopAnim(LocalPlayer.Character)
+ 
+    Animate.idle.Animation1.AnimationId = OriginalAnimations.idle1
+    Animate.idle.Animation2.AnimationId = OriginalAnimations.idle2
+    Animate.walk.WalkAnim.AnimationId = OriginalAnimations.walk
+    Animate.run.RunAnim.AnimationId = OriginalAnimations.run
+    Animate.jump.JumpAnim.AnimationId = OriginalAnimations.jump
+    Animate.climb.ClimbAnim.AnimationId = OriginalAnimations.climb
+    Animate.fall.FallAnim.AnimationId = OriginalAnimations.fall
+ 
+    Hum:ChangeState(3)
+    Animate.Disabled = false
+ 
+    CurrentSet = nil -- Ningún set activo
+end
+ 
+-- Cada vez que el personaje reaparece
+LocalPlayer.CharacterAdded:Connect(function(character)
+    -- Esperar a que Animate exista
+    character:WaitForChild("Animate")
+    character:WaitForChild("Humanoid")
+ 
+    if OriginalAnimations then
+        -- Restaurar animaciones originales si no hay set activo
+        if CurrentSet then
+            ApplyAnimationSet(CurrentSet)
+        else
+            RestoreOriginalAnimations()
+        end
+    else
+        SaveOriginalAnimations(character)
+    end
+end)
+ 
+-- UI
+local function setupUI_AnimSets()
+    if buttonsCreatedSets then return end
+    buttonsCreatedSets = true
+ 
+    AnimacionesTab:CreateSection("Paquete de Animaciones")
+ 
+    AnimacionesTab:CreateButton({
+        Name = "❌ Quitar Animación",
+        Callback = RestoreOriginalAnimations
+    })
+ 
+    task.spawn(function()
+        local success, sets = pcall(function()
+            local raw = game:HttpGet("https://pastebin.com/raw/14q07TEP")
+            return HttpService:JSONDecode(raw)
+        end)
+ 
+        if success and sets then
+            for setName, setData in pairs(sets) do
+                AnimacionesTab:CreateButton({
+                    Name = setName,
+                    Callback = function()
+                        ApplyAnimationSet(setData)
+                    end
+                })
+            end
+        else
+            warn("❌ Error al cargar JSON de animaciones:", sets)
+        end
+    end)
+end
+ 
+AnimacionesTab:CreateButton({
+    Name = "▶️ Cargar Paquete de Animaciones",
+    Callback = setupUI_AnimSets
+})
