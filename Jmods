@@ -1037,35 +1037,37 @@ MainTab:CreateToggle({
 
 ------Fly-----
 
+ 
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+ 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
 local RootPart = Character:FindFirstChild("HumanoidRootPart")
-
+ 
 local FlyEnabled = false
 local FlySpeed = 50
 local Connection
 local MobileGui = nil
-
+ 
 local MobileMove = {
-    Forward = false,
-    Backward = false,
-    Left = false,
-    Right = false,
     Up = false,
     Down = false,
 }
-
+ 
+-- Variable para el stick de movimiento nativo
+local moveVector = Vector3.zero
+ 
 -- Función para actualizar el personaje y sus componentes
 local function UpdateCharacter(newCharacter)
     Character = newCharacter
     Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
     RootPart = Character:FindFirstChild("HumanoidRootPart")
 end
-
+ 
 -- Actualizar referencias cuando el personaje cambia
 LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     newCharacter:WaitForChild("HumanoidRootPart")
@@ -1076,46 +1078,75 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
         ToggleFly(true)
     end
 end)
-
--- Crear controles móviles
+ 
+-- Capturar el movimiento del stick nativo de Roblox
+local function getMobileMovement()
+    local moveDirection = Vector3.zero
+ 
+    -- Obtiene el MoveVector desde el ControlModule de Roblox
+    pcall(function()
+        local playerModule = LocalPlayer.PlayerScripts:WaitForChild("PlayerModule")
+        local controls = require(playerModule:WaitForChild("ControlModule"))
+        if controls then
+            moveDirection = controls:GetMoveVector()
+        end
+    end)
+ 
+    return moveDirection
+end
+ 
+-- Crear controles móviles (solo Up/Down)
 local function CreateMobileControls()
     if not UIS.TouchEnabled or MobileGui then return end
-
+ 
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
     MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-    local ButtonSize = UDim2.new(0, 60, 0, 60)
-
-    local function CreateButton(name, position, onPress, onRelease)
+ 
+    local ButtonSize = UDim2.new(0, 80, 0, 80)
+ 
+    local function CreateButton(name, position, text, onPress, onRelease)
         local Button = Instance.new("TextButton")
         Button.Name = name
         Button.Size = ButtonSize
         Button.Position = position
-        Button.Text = name
+        Button.Text = text
+        Button.TextScaled = true
+        Button.Font = Enum.Font.GothamBold
         Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         Button.TextColor3 = Color3.new(1, 1, 1)
         Button.AutoButtonColor = false
         Button.Parent = MobileGui
-
+ 
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0.2, 0)
+        corner.Parent = Button
+ 
         Button.MouseButton1Down:Connect(function()
             onPress()
+            Button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
         end)
-
+ 
         Button.MouseButton1Up:Connect(function()
             onRelease()
+            Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         end)
+ 
+        return Button
     end
-
-    CreateButton("W", UDim2.new(0, 80, 1, -180), function() MobileMove.Forward = true end, function() MobileMove.Forward = false end)
-    CreateButton("S", UDim2.new(0, 80, 1, -60), function() MobileMove.Backward = true end, function() MobileMove.Backward = false end)
-    CreateButton("A", UDim2.new(0, 20, 1, -120), function() MobileMove.Left = true end, function() MobileMove.Left = false end)
-    CreateButton("D", UDim2.new(0, 140, 1, -120), function() MobileMove.Right = true end, function() MobileMove.Right = false end)
-    CreateButton("Up", UDim2.new(1, -120, 1, -180), function() MobileMove.Up = true end, function() MobileMove.Up = false end)
-    CreateButton("Down", UDim2.new(1, -120, 1, -100), function() MobileMove.Down = true end, function() MobileMove.Down = false end)
+ 
+    -- Botones de subir y bajar (derecha de la pantalla)
+    CreateButton("Up", UDim2.new(1, -100, 1, -200), "▲", 
+        function() MobileMove.Up = true end, 
+        function() MobileMove.Up = false end
+    )
+    CreateButton("Down", UDim2.new(1, -100, 1, -100), "▼", 
+        function() MobileMove.Down = true end, 
+        function() MobileMove.Down = false end
+    )
 end
-
+ 
 local function DestroyMobileControls()
     if MobileGui then
         MobileGui:Destroy()
@@ -1125,38 +1156,60 @@ local function DestroyMobileControls()
         MobileMove[key] = false
     end
 end
-
---toggle
+ 
+-- Toggle Fly
 function ToggleFly(state)
     if not RootPart or not Humanoid then
         return
     end
-
+ 
     FlyEnabled = state
-
+ 
     if FlyEnabled then
-        -- Activar controles móviles si es touch
+        -- Activar controles móviles si es touch (solo Up/Down)
         if UIS.TouchEnabled then
             CreateMobileControls()
         end
-
+ 
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
         Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-
+ 
         Connection = RunService.RenderStepped:Connect(function()
             local MoveDirection = Vector3.new()
             local cameraCFrame = Workspace.CurrentCamera.CFrame
-            local forward = cameraCFrame.LookVector
-            local right = cameraCFrame.RightVector
             local up = Vector3.new(0, 1, 0)
-
-            if UIS:IsKeyDown(Enum.KeyCode.W) or MobileMove.Forward then MoveDirection = MoveDirection + forward end
-            if UIS:IsKeyDown(Enum.KeyCode.S) or MobileMove.Backward then MoveDirection = MoveDirection - forward end
-            if UIS:IsKeyDown(Enum.KeyCode.A) or MobileMove.Left then MoveDirection = MoveDirection - right end
-            if UIS:IsKeyDown(Enum.KeyCode.D) or MobileMove.Right then MoveDirection = MoveDirection + right end
-            if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then MoveDirection = MoveDirection + up end
-            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then MoveDirection = MoveDirection - up end
-
+ 
+            -- Para PC - Movimiento horizontal con WASD
+            if not UIS.TouchEnabled then
+                local forward = cameraCFrame.LookVector
+                local right = cameraCFrame.RightVector
+ 
+                if UIS:IsKeyDown(Enum.KeyCode.W) then MoveDirection = MoveDirection + forward end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then MoveDirection = MoveDirection - forward end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDirection = MoveDirection - right end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then MoveDirection = MoveDirection + right end
+            else
+                -- Para Móvil - Usar el stick nativo de Roblox
+                local mobileMove = getMobileMovement()
+                if mobileMove.Magnitude > 0 then
+                    local lookVector = cameraCFrame.LookVector
+                    local rightVector = cameraCFrame.RightVector
+ 
+                    -- Convertir el input del stick a dirección mundial
+                    local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
+                    MoveDirection = MoveDirection + worldDirection
+                end
+            end
+ 
+            -- Movimiento vertical (PC y Móvil)
+            if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then 
+                MoveDirection = MoveDirection + up 
+            end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then 
+                MoveDirection = MoveDirection - up 
+            end
+ 
+            -- Aplicar velocidad
             if MoveDirection.Magnitude == 0 then
                 RootPart.Velocity = Vector3.new(0, 0, 0)
             else
@@ -1168,15 +1221,15 @@ function ToggleFly(state)
             Connection:Disconnect()
             Connection = nil
         end
-
+ 
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
         Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-
+ 
         -- Desactivar controles móviles si estaban activos
         DestroyMobileControls()
     end
 end
-
+ 
 -- UI Rayfield
 FlyToggle = MainTab:CreateToggle({
     Name = "Volar Gravedad 0",
@@ -1185,17 +1238,20 @@ FlyToggle = MainTab:CreateToggle({
         ToggleFly(state)
     end
 })
-
+ 
 FlySpeedSlider = MainTab:CreateSlider({
     Name = "Velocidad Gravedad 0",
     Range = {0, 300},
     Increment = 5,
-    Suffix = "Velocidad",
+    Suffix = " Velocidad",
     CurrentValue = FlySpeed,
     Callback = function(value)
         FlySpeed = value
     end
 })
+
+
+
 
 
 
