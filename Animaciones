@@ -233,11 +233,12 @@ end)
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
- 
+
 local buttonsCreatedSets = false
 local OriginalAnimations = nil -- Animaciones originales
 local CurrentSet = nil -- Para recordar qué set está activo
- 
+local AnimationSystemActive = false -- ✅ NUEVO: Control de activación
+
 -- Guardar animaciones originales
 local function SaveOriginalAnimations(character)
     local Animate = character:FindFirstChild("Animate")
@@ -252,7 +253,7 @@ local function SaveOriginalAnimations(character)
         fall  = Animate.fall.FallAnim.AnimationId
     }
 end
- 
+
 local function StopAnim(character)
     if not character then return end
     local Animate = character:FindFirstChild("Animate")
@@ -265,21 +266,21 @@ local function StopAnim(character)
         end
     end
 end
- 
+
 local function ApplyAnimationSet(set)
     if not LocalPlayer.Character then return end
     local Animate = LocalPlayer.Character:FindFirstChild("Animate")
     local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
     if not Animate or not Hum then return end
- 
+
     -- Guardar animaciones originales la primera vez
     if not OriginalAnimations then
         SaveOriginalAnimations(LocalPlayer.Character)
     end
- 
+
     Animate.Disabled = true
     StopAnim(LocalPlayer.Character)
- 
+
     Animate.idle.Animation1.AnimationId = set.idle1
     Animate.idle.Animation2.AnimationId = set.idle2
     Animate.walk.WalkAnim.AnimationId = set.walk
@@ -287,34 +288,33 @@ local function ApplyAnimationSet(set)
     Animate.jump.JumpAnim.AnimationId = set.jump
     Animate.climb.ClimbAnim.AnimationId = set.climb
     Animate.fall.FallAnim.AnimationId = set.fall
- 
-    -- ✅ SOLUCIÓN: Usar GetState() para mantener el estado actual
+
+    -- ✅ Usar GetState() para mantener el estado actual
     local currentState = Hum:GetState()
     
     -- ✅ Solo forzar cambio de estado si NO está en el aire o cayendo
     if currentState ~= Enum.HumanoidStateType.Freefall and 
        currentState ~= Enum.HumanoidStateType.Flying and
        currentState ~= Enum.HumanoidStateType.Jumping then
-        -- Usar estado idle (0) en lugar de jumping (3)
         task.defer(function()
             Hum:ChangeState(Enum.HumanoidStateType.Landed)
         end)
     end
     
     Animate.Disabled = false
- 
+
     CurrentSet = set -- Guardar set activo
 end
- 
+
 local function RestoreOriginalAnimations()
     if not LocalPlayer.Character or not OriginalAnimations then return end
     local Animate = LocalPlayer.Character:FindFirstChild("Animate")
     local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
     if not Animate or not Hum then return end
- 
+
     Animate.Disabled = true
     StopAnim(LocalPlayer.Character)
- 
+
     Animate.idle.Animation1.AnimationId = OriginalAnimations.idle1
     Animate.idle.Animation2.AnimationId = OriginalAnimations.idle2
     Animate.walk.WalkAnim.AnimationId = OriginalAnimations.walk
@@ -322,8 +322,8 @@ local function RestoreOriginalAnimations()
     Animate.jump.JumpAnim.AnimationId = OriginalAnimations.jump
     Animate.climb.ClimbAnim.AnimationId = OriginalAnimations.climb
     Animate.fall.FallAnim.AnimationId = OriginalAnimations.fall
- 
-    -- ✅ SOLUCIÓN: No forzar ningún estado, solo reactivar Animate
+
+    -- ✅ No forzar ningún estado, solo reactivar Animate
     task.defer(function()
         local currentState = Hum:GetState()
         if currentState ~= Enum.HumanoidStateType.Freefall and 
@@ -334,46 +334,50 @@ local function RestoreOriginalAnimations()
     end)
     
     Animate.Disabled = false
- 
+
     CurrentSet = nil -- Ningún set activo
 end
- 
--- Cada vez que el personaje reaparece
+
+-- ✅ CORREGIDO: Solo se ejecuta si el sistema está activo
 LocalPlayer.CharacterAdded:Connect(function(character)
+    -- ✅ NO hacer nada si el sistema no está activo
+    if not AnimationSystemActive then return end
+    
     -- Esperar a que Animate exista
     character:WaitForChild("Animate")
     character:WaitForChild("Humanoid")
- 
-    if OriginalAnimations then
-        -- Restaurar animaciones originales si no hay set activo
-        if CurrentSet then
-            ApplyAnimationSet(CurrentSet)
-        else
-            RestoreOriginalAnimations()
-        end
-    else
+
+    -- Solo guardar animaciones originales si no existen
+    if not OriginalAnimations then
         SaveOriginalAnimations(character)
     end
+
+    -- Solo reaplicar si hay un set activo
+    if CurrentSet then
+        task.wait(0.1) -- Pequeña espera para asegurar que todo esté cargado
+        ApplyAnimationSet(CurrentSet)
+    end
 end)
- 
+
 -- UI
 local function setupUI_AnimSets()
     if buttonsCreatedSets then return end
     buttonsCreatedSets = true
- 
+    AnimationSystemActive = true -- ✅ Activar el sistema
+
     AnimacionesTab:CreateSection("Paquete de Animaciones")
- 
+
     AnimacionesTab:CreateButton({
         Name = "❌ Quitar Animación",
         Callback = RestoreOriginalAnimations
     })
- 
+
     task.spawn(function()
         local success, sets = pcall(function()
             local raw = game:HttpGet("https://pastebin.com/raw/14q07TEP")
             return HttpService:JSONDecode(raw)
         end)
- 
+
         if success and sets then
             for setName, setData in pairs(sets) do
                 AnimacionesTab:CreateButton({
@@ -388,7 +392,8 @@ local function setupUI_AnimSets()
         end
     end)
 end
- 
+
+-- ✅ BOTÓN QUE ACTIVA TODO
 AnimacionesTab:CreateButton({
     Name = "▶️ Cargar Paquete de Animaciones",
     Callback = setupUI_AnimSets
