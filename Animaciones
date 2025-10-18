@@ -288,7 +288,19 @@ local function ApplyAnimationSet(set)
     Animate.climb.ClimbAnim.AnimationId = set.climb
     Animate.fall.FallAnim.AnimationId = set.fall
  
-    Hum:ChangeState(3)
+    -- ✅ SOLUCIÓN: Usar GetState() para mantener el estado actual
+    local currentState = Hum:GetState()
+    
+    -- ✅ Solo forzar cambio de estado si NO está en el aire o cayendo
+    if currentState ~= Enum.HumanoidStateType.Freefall and 
+       currentState ~= Enum.HumanoidStateType.Flying and
+       currentState ~= Enum.HumanoidStateType.Jumping then
+        -- Usar estado idle (0) en lugar de jumping (3)
+        task.defer(function()
+            Hum:ChangeState(Enum.HumanoidStateType.Landed)
+        end)
+    end
+    
     Animate.Disabled = false
  
     CurrentSet = set -- Guardar set activo
@@ -311,7 +323,16 @@ local function RestoreOriginalAnimations()
     Animate.climb.ClimbAnim.AnimationId = OriginalAnimations.climb
     Animate.fall.FallAnim.AnimationId = OriginalAnimations.fall
  
-    Hum:ChangeState(3)
+    -- ✅ SOLUCIÓN: No forzar ningún estado, solo reactivar Animate
+    task.defer(function()
+        local currentState = Hum:GetState()
+        if currentState ~= Enum.HumanoidStateType.Freefall and 
+           currentState ~= Enum.HumanoidStateType.Flying and
+           currentState ~= Enum.HumanoidStateType.Jumping then
+            Hum:ChangeState(Enum.HumanoidStateType.Landed)
+        end
+    end)
+    
     Animate.Disabled = false
  
     CurrentSet = nil -- Ningún set activo
