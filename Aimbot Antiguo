@@ -5,12 +5,11 @@ task.spawn(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
     local AimbotTab = _G.AimbotTab
 
-AimbotTab:CreateSection("Aimbot Movil/Pc")
+    AimbotTab:CreateSection("Aimbot Movil/Pc")
 
     local AimbotSettings = {
         Enabled = false,
@@ -18,7 +17,7 @@ AimbotTab:CreateSection("Aimbot Movil/Pc")
         FOVRadius = 350,
         FOVColor = Color3.fromRGB(0, 0, 255),
         ESPColor = Color3.fromRGB(0, 0, 255),
-        ESPSizeMultiplier = 5,
+        ESPSizeMultiplier = 10,
         Sensitivity = 0,
         AimPart = "Head",
         TeamCheckEnabled = false,
@@ -28,143 +27,569 @@ AimbotTab:CreateSection("Aimbot Movil/Pc")
         OnlyClosePlayers = false,
         CloseDistanceThreshold = 100,
         WallCheck = false,
+        UseAlternativeESP = false,
+        ShowNamesOnly = false,
     }
 
     local Holding = false
+    
+    -- Verificar si Drawing está disponible
+    local drawingSupported = false
+    
+    local success, result = pcall(function()
+        local testCircle = Drawing.new("Circle")
+        testCircle:Remove()
+        return true
+    end)
+    
+    if success and result then
+        drawingSupported = true
+    else
+        drawingSupported = false
+    end
 
-    local FOVCircle = Drawing.new("Circle")
-    FOVCircle.Filled = false
-    FOVCircle.Thickness = 1
-    FOVCircle.NumSides = 64
-    FOVCircle.Transparency = 0.7
-    FOVCircle.Visible = false
+    -- FOV Circle
+    local FOVCircle
+    if drawingSupported then
+        pcall(function()
+            FOVCircle = Drawing.new("Circle")
+            FOVCircle.Filled = false
+            FOVCircle.Thickness = 2
+            FOVCircle.NumSides = 64
+            FOVCircle.Transparency = 0.8
+            FOVCircle.Visible = false
+        end)
+    end
 
+    -- Función para verificar si un jugador es visible
+    local function IsVisible(targetChar)
+        if not AimbotSettings.WallCheck then return true end
+        
+        local targetPos = targetChar.HumanoidRootPart.Position
+        local direction = (targetPos - Camera.CFrame.Position).Unit * (targetPos - Camera.CFrame.Position).Magnitude
+        
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.IgnoreWater = true
+        
+        local result = workspace:Raycast(Camera.CFrame.Position, direction, rayParams)
+        
+        return result == nil or targetChar:IsAncestorOf(result.Instance)
+    end
+
+    -- Función para obtener el jugador más cercano
     local function GetClosestPlayer()
         local closestPlayer, shortestDistance = nil, math.huge
+        
         for _, v in pairs(Players:GetPlayers()) do
-            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-                if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then continue end
-                local targetPos = v.Character.HumanoidRootPart.Position
-                if AimbotSettings.WallCheck then
-                    local result = workspace:Raycast(Camera.CFrame.Position, targetPos - Camera.CFrame.Position, RaycastParams.new())
-                    if result and result.Instance and not v.Character:IsAncestorOf(result.Instance) then continue end
-                end
-                local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPos)
-                if onScreen then
-                    local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - UserInputService:GetMouseLocation()).Magnitude
-                    local distFromPlayer = (targetPos - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if distance < shortestDistance and distance < AimbotSettings.FOVRadius then
-                        if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then continue end
-                        shortestDistance = distance
-                        closestPlayer = v
+            if v ~= LocalPlayer and v.Character then
+                local char = v.Character
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChild("Humanoid")
+                
+                if hrp and hum and hum.Health > 0 then
+                    if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then 
+                        continue 
+                    end
+                    
+                    local targetPos = hrp.Position
+                    
+                    if not IsVisible(char) then continue end
+                    
+                    local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPos)
+                    
+                    if onScreen then
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePos).Magnitude
+                        local distFromPlayer = (targetPos - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        
+                        if distance < AimbotSettings.FOVRadius then
+                            if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then 
+                                continue 
+                            end
+                            
+                            if distance < shortestDistance then
+                                shortestDistance = distance
+                                closestPlayer = v
+                            end
+                        end
                     end
                 end
             end
         end
+        
         return closestPlayer
     end
 
+    -- Input handling
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
             Holding = true
         end
     end)
+    
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
             Holding = false
         end
     end)
 
-    local ESPBoxes, Lines = {}, {}
+    -- ESP y Tracers - Sistema de caché
+    local ESPCache = {}
+    local TracerCache = {}
+    local ESPFolder = Instance.new("Folder", game.CoreGui)
+    ESPFolder.Name = "ESPFolder_" .. math.random(1, 10000)
 
+    -- Función para actualizar o crear ESP
+    local function UpdateESP(player, color, position, size)
+        if not ESPCache[player] then
+            local box, text
+            
+            -- Crear cuadro
+            pcall(function()
+                box = Drawing.new("Square")
+                box.Color = color
+                box.Thickness = 2
+                box.Filled = false
+                box.Transparency = 1
+                box.Visible = true
+                box.ZIndex = 1
+            end)
+            
+            -- Crear texto
+            pcall(function()
+                text = Drawing.new("Text")
+                text.Text = player.Name
+                text.Size = 18
+                text.Center = true
+                text.Outline = true
+                text.Color = color
+                text.Visible = true
+                text.ZIndex = 2
+            end)
+            
+            if box and text then
+                ESPCache[player] = {box = box, text = text, lastUpdate = tick()}
+            else
+                return false
+            end
+        end
+        
+        -- Actualizar ESP existente
+        local cache = ESPCache[player]
+        if cache then
+            pcall(function()
+                -- Actualizar cuadro
+                if cache.box then
+                    if AimbotSettings.ShowNamesOnly then
+                        cache.box.Visible = false
+                    else
+                        cache.box.Color = color
+                        cache.box.Size = size
+                        cache.box.Position = position
+                        cache.box.Visible = true
+                    end
+                end
+                
+                -- Actualizar texto
+                if cache.text then
+                    cache.text.Text = player.Name
+                    cache.text.Color = color
+                    cache.text.Position = Vector2.new(position.X + size.X / 2, position.Y - 20)
+                    cache.text.Visible = true
+                end
+                
+                cache.lastUpdate = tick()
+            end)
+            return true
+        end
+        
+        return false
+    end
+
+    -- Función para actualizar o crear Tracer
+    local function UpdateTracer(player, color, fromPos, toPos)
+        if not TracerCache[player] then
+            local line
+            
+            pcall(function()
+                line = Drawing.new("Line")
+                line.Thickness = 2
+                line.Transparency = 0.9
+                line.Visible = true
+                line.ZIndex = 1
+            end)
+            
+            if line then
+                TracerCache[player] = {line = line, lastUpdate = tick()}
+            else
+                return false
+            end
+        end
+        
+        -- Actualizar Tracer existente
+        local cache = TracerCache[player]
+        if cache and cache.line then
+            pcall(function()
+                cache.line.Color = color
+                cache.line.From = fromPos
+                cache.line.To = toPos
+                cache.line.Visible = true
+                cache.lastUpdate = tick()
+            end)
+            return true
+        end
+        
+        return false
+    end
+
+    -- Función para limpiar ESP
+    local function CleanupESP()
+        local currentTime = tick()
+        for player, cache in pairs(ESPCache) do
+            if not player.Parent or 
+               not player.Character or 
+               not player.Character:FindFirstChild("Humanoid") or 
+               player.Character.Humanoid.Health <= 0 or
+               (currentTime - cache.lastUpdate) > 0.1 then
+                
+                if cache.box then
+                    pcall(function() cache.box:Remove() end)
+                end
+                if cache.text then
+                    pcall(function() cache.text:Remove() end)
+                end
+                ESPCache[player] = nil
+            end
+        end
+    end
+
+    -- Función para limpiar Tracers
+    local function CleanupTracers()
+        local currentTime = tick()
+        for player, cache in pairs(TracerCache) do
+            if not player.Parent or 
+               not player.Character or 
+               not player.Character:FindFirstChild("Humanoid") or 
+               player.Character.Humanoid.Health <= 0 or
+               (currentTime - cache.lastUpdate) > 0.1 then
+                
+                if cache.line then
+                    pcall(function() cache.line:Remove() end)
+                end
+                TracerCache[player] = nil
+            end
+        end
+    end
+
+    -- Función para ocultar ESP
+    local function HideAllESP()
+        for player, cache in pairs(ESPCache) do
+            if cache.box then
+                pcall(function() cache.box.Visible = false end)
+            end
+            if cache.text then
+                pcall(function() cache.text.Visible = false end)
+            end
+        end
+    end
+
+    -- Función para ocultar Tracers
+    local function HideAllTracers()
+        for player, cache in pairs(TracerCache) do
+            if cache.line then
+                pcall(function() cache.line.Visible = false end)
+            end
+        end
+    end
+
+    -- Función para eliminar todos los ESP
+    local function RemoveAllESP()
+        for player, cache in pairs(ESPCache) do
+            if cache.box then
+                pcall(function() cache.box:Remove() end)
+            end
+            if cache.text then
+                pcall(function() cache.text:Remove() end)
+            end
+        end
+        ESPCache = {}
+    end
+
+    -- Función para eliminar todos los Tracers
+    local function RemoveAllTracers()
+        for player, cache in pairs(TracerCache) do
+            if cache.line then
+                pcall(function() cache.line:Remove() end)
+            end
+        end
+        TracerCache = {}
+    end
+
+    -- ESP Alternativo con BillboardGui
+    local BillboardESPs = {}
+    
+    local function ClearAllBillboardESPs()
+        for player, billboard in pairs(BillboardESPs) do
+            if billboard and billboard.Parent then
+                pcall(function() billboard:Destroy() end)
+            end
+        end
+        BillboardESPs = {}
+    end
+    
+    local function CreateBillboardESP(player)
+        local char = player.Character
+        if not char then return end
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        if BillboardESPs[player] then
+            pcall(function() 
+                if BillboardESPs[player].Parent then
+                    BillboardESPs[player]:Destroy() 
+                end
+            end)
+            BillboardESPs[player] = nil
+        end
+        
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ESP_" .. player.Name
+        billboard.Adornee = hrp
+        billboard.Size = UDim2.new(4, 0, 5, 0)
+        billboard.StudsOffset = Vector3.new(0, 1, 0)
+        billboard.AlwaysOnTop = true
+        billboard.ResetOnSpawn = false
+        billboard.Parent = ESPFolder
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundTransparency = 1
+        frame.BorderSizePixel = 0
+        frame.Parent = billboard
+        
+        local borders = {}
+        local function createBorder(position, size)
+            local border = Instance.new("Frame")
+            border.Position = position
+            border.Size = size
+            border.BackgroundColor3 = AimbotSettings.ESPColor
+            border.BorderSizePixel = 0
+            border.Parent = frame
+            table.insert(borders, border)
+            return border
+        end
+        
+        createBorder(UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 2))
+        createBorder(UDim2.new(0, 0, 1, -2), UDim2.new(1, 0, 0, 2))
+        createBorder(UDim2.new(0, 0, 0, 0), UDim2.new(0, 2, 1, 0))
+        createBorder(UDim2.new(1, -2, 0, 0), UDim2.new(0, 2, 1, 0))
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0, 20)
+        nameLabel.Position = UDim2.new(0, 0, -0.15, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = player.Name
+        nameLabel.TextColor3 = AimbotSettings.ESPColor
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.Font = Enum.Font.SourceSansBold
+        nameLabel.TextSize = 14
+        nameLabel.Parent = frame
+        
+        BillboardESPs[player] = billboard
+        
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if not billboard.Parent or not char.Parent or not hrp.Parent then
+                connection:Disconnect()
+                if BillboardESPs[player] then
+                    pcall(function() BillboardESPs[player]:Destroy() end)
+                    BillboardESPs[player] = nil
+                end
+                return
+            end
+            
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                return
+            end
+            
+            local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
+                and Color3.fromRGB(255, 0, 0) 
+                or AimbotSettings.ESPColor
+            
+            nameLabel.TextColor3 = color
+            for _, border in pairs(borders) do
+                if border and border.Parent then
+                    border.BackgroundColor3 = color
+                end
+            end
+        end)
+    end
+
+    -- Loop principal de renderizado
     RunService.RenderStepped:Connect(function()
-        -- FOV
-        FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y - 36)
-        FOVCircle.Radius = AimbotSettings.FOVRadius
-        FOVCircle.Color = AimbotSettings.FOVColor
-        FOVCircle.Visible = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
+        -- FOV Circle
+        if drawingSupported and FOVCircle then
+            pcall(function()
+                local mousePos = UserInputService:GetMouseLocation()
+                FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+                FOVCircle.Radius = AimbotSettings.FOVRadius
+                FOVCircle.Color = AimbotSettings.FOVColor
+                FOVCircle.Visible = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
+            end)
+        end
 
         -- Aimbot
         if AimbotSettings.Enabled and (Holding or AimbotSettings.AutoAimEnabled) then
             local target = GetClosestPlayer()
-            if target and target.Character and target.Character:FindFirstChild(AimbotSettings.AimPart) then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character[AimbotSettings.AimPart].Position)
-            end
-        end
-
-        -- ESP
-        for _, box in pairs(ESPBoxes) do if box and box.Remove then box:Remove() end end
-        ESPBoxes = {}
-        if AimbotSettings.ESPEnabled then
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-                    if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then continue end
-                    local hrp = v.Character.HumanoidRootPart
-                    local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                        local scale = 1 / (hrp.Position - Camera.CFrame.Position).Magnitude * 100
-                        local h = math.clamp(6 * scale * AimbotSettings.ESPSizeMultiplier, 2, 500)
-                        local w = h / 1.5
-                        local box = Drawing.new("Square")
-                        box.Color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) and Color3.fromRGB(255, 0, 0) or AimbotSettings.ESPColor
-                        box.Thickness, box.Filled, box.Transparency = 1, false, 1
-                        box.Size = Vector2.new(w, h)
-                        box.Position = Vector2.new(rootPos.X - w/2, rootPos.Y - h/2)
-                        box.Visible = true
-                        table.insert(ESPBoxes, box)
+            if target and target.Character then
+                local aimPart = target.Character:FindFirstChild(AimbotSettings.AimPart)
+                if aimPart then
+                    local targetPos = aimPart.Position
+                    local currentCFrame = Camera.CFrame
+                    local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+                    
+                    if AimbotSettings.Sensitivity > 0 then
+                        Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.1 + (AimbotSettings.Sensitivity / 100))
+                    else
+                        Camera.CFrame = targetCFrame
                     end
                 end
             end
+        end
+
+        -- ESP con Drawing API
+        if drawingSupported and AimbotSettings.ESPEnabled and not AimbotSettings.UseAlternativeESP then
+            for player, cache in pairs(ESPCache) do
+                cache.lastUpdate = 0
+            end
+            
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character then
+                    local char = v.Character
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChild("Humanoid")
+                    
+                    if hrp and hum and hum.Health > 0 then
+                        if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then continue end
+                        
+                        local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        
+                        if onScreen and rootPos.Z > 0 then
+                            local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            local scale = 1000 / (rootPos.Z * 10)
+                            local h = math.clamp(scale * AimbotSettings.ESPSizeMultiplier, 20, 400)
+                            local w = h / 1.5
+                            
+                            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
+                                and Color3.fromRGB(255, 0, 0) 
+                                or AimbotSettings.ESPColor
+                            
+                            local position = Vector2.new(rootPos.X - w/2, rootPos.Y - h/2)
+                            local size = Vector2.new(w, h)
+                            
+                            UpdateESP(v, color, position, size)
+                        end
+                    end
+                end
+            end
+            
+            CleanupESP()
+        elseif not AimbotSettings.ESPEnabled or AimbotSettings.UseAlternativeESP then
+            HideAllESP()
+        end
+
+        -- ESP Alternativo con BillboardGui
+        if AimbotSettings.UseAlternativeESP then
+            HideAllESP()
+            
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character then
+                    local hum = v.Character:FindFirstChild("Humanoid")
+                    local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if hum and hrp and hum.Health > 0 then
+                        if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then 
+                            if BillboardESPs[v] and BillboardESPs[v].Parent then
+                                pcall(function() BillboardESPs[v]:Destroy() end)
+                                BillboardESPs[v] = nil
+                            end
+                            continue 
+                        end
+                        
+                        if not BillboardESPs[v] or not BillboardESPs[v].Parent then
+                            CreateBillboardESP(v)
+                        end
+                    else
+                        if BillboardESPs[v] and BillboardESPs[v].Parent then
+                            pcall(function() BillboardESPs[v]:Destroy() end)
+                            BillboardESPs[v] = nil
+                        end
+                    end
+                end
+            end
+            
+            for player, billboard in pairs(BillboardESPs) do
+                if not player.Parent or not Players:FindFirstChild(player.Name) then
+                    if billboard and billboard.Parent then
+                        pcall(function() billboard:Destroy() end)
+                    end
+                    BillboardESPs[player] = nil
+                end
+            end
+        else
+            ClearAllBillboardESPs()
         end
 
         -- Tracers
-        for _, l in pairs(Lines) do if l and l.Remove then l:Remove() end end
-        Lines = {}
-        if AimbotSettings.TracersEnabled then
+        if drawingSupported and AimbotSettings.TracersEnabled then
+            for player, cache in pairs(TracerCache) do
+                cache.lastUpdate = 0
+            end
+            
             for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-                    if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then continue end
-                    local hrp = v.Character.HumanoidRootPart
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                        local line = Drawing.new("Line")
-                        line.Thickness = 1.5
-                        line.Transparency = 0.9
-                        line.Color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) and Color3.fromRGB(255, 0, 0) or AimbotSettings.TracerColor
-                        line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                        line.To = Vector2.new(screenPos.X, screenPos.Y)
-                        line.Visible = true
-                        table.insert(Lines, line)
+                if v ~= LocalPlayer and v.Character then
+                    local char = v.Character
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChild("Humanoid")
+                    
+                    if hrp and hum and hum.Health > 0 then
+                        if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then continue end
+                        
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        
+                        if onScreen and screenPos.Z > 0 then
+                            local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            
+                            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
+                                and Color3.fromRGB(255, 0, 0) 
+                                or AimbotSettings.TracerColor
+                            
+                            local fromPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                            local toPos = Vector2.new(screenPos.X, screenPos.Y)
+                            
+                            UpdateTracer(v, color, fromPos, toPos)
+                        end
                     end
                 end
             end
+            
+            CleanupTracers()
+        else
+            HideAllTracers()
         end
     end)
 
-    -- UI Toggles
+    -- Sistema Rainbow
     local rainbowEnabled = false
     local rainbowSpeed = 5
 
     local function GetRainbowColor()
-        return Color3.fromHSV((tick() * rainbowSpeed) % 1, 1, 1)
+        return Color3.fromHSV((tick() * rainbowSpeed / 10) % 1, 1, 1)
     end
-
-    AimbotTab:CreateToggle({ Name = "Aimbot", CurrentValue = false, Callback = function(v) AimbotSettings.Enabled = v end })
-    AimbotTab:CreateToggle({ Name = "Auto Apuntar", CurrentValue = false, Callback = function(v) AimbotSettings.AutoAimEnabled = v end })
-    AimbotTab:CreateSlider({ Name = "Tamaño del FOV", Range = {10, 1000}, Increment = 1, CurrentValue = AimbotSettings.FOVRadius, Callback = function(v) AimbotSettings.FOVRadius = v end })
-    AimbotTab:CreateColorPicker({ Name = "Color del FOV", Color = AimbotSettings.FOVColor, Callback = function(v) AimbotSettings.FOVColor = v end })
-    AimbotTab:CreateToggle({ Name = "ESP", CurrentValue = false, Callback = function(v) AimbotSettings.ESPEnabled = v end })
-    AimbotTab:CreateColorPicker({ Name = "Color del ESP", Color = AimbotSettings.ESPColor, Callback = function(v) AimbotSettings.ESPColor = v end })
-    AimbotTab:CreateSlider({ Name = "Tamaño del ESP", Range = {1, 10}, Increment = 0.1, CurrentValue = AimbotSettings.ESPSizeMultiplier, Callback = function(v) AimbotSettings.ESPSizeMultiplier = v end })
-    AimbotTab:CreateToggle({ Name = "No apuntar al Team", CurrentValue = false, Callback = function(v) AimbotSettings.TeamCheckEnabled = v end })
-    AimbotTab:CreateToggle({ Name = "Mostrar Líneas (Tracers)", CurrentValue = false, Callback = function(v) AimbotSettings.TracersEnabled = v end })
-    AimbotTab:CreateColorPicker({ Name = "Color de las Líneas (Tracers)", Color = AimbotSettings.TracerColor, Callback = function(v) AimbotSettings.TracerColor = v end })
-    AimbotTab:CreateToggle({ Name = "Apuntar a jugadores cercanos", CurrentValue = false, Callback = function(v) AimbotSettings.OnlyClosePlayers = v end })
-    AimbotTab:CreateSlider({ Name = "Distancia", Range = {1, 300}, Increment = 1, CurrentValue = AimbotSettings.CloseDistanceThreshold, Callback = function(v) if AimbotSettings.OnlyClosePlayers then AimbotSettings.CloseDistanceThreshold = v end end })
-    AimbotTab:CreateToggle({ Name = "Rainbow", CurrentValue = false, Callback = function(v) rainbowEnabled = v end })
-    AimbotTab:CreateSlider({ Name = "Rainbow", Range = {0, 20}, Increment = 0.1, CurrentValue = rainbowSpeed, Callback = function(v) rainbowSpeed = v end })
 
     RunService.RenderStepped:Connect(function()
         if rainbowEnabled then
@@ -173,4 +598,221 @@ AimbotTab:CreateSection("Aimbot Movil/Pc")
             AimbotSettings.TracerColor = GetRainbowColor()
         end
     end)
+
+    -- Limpieza al salir del jugador
+    Players.PlayerRemoving:Connect(function(player)
+        if ESPCache[player] then
+            if ESPCache[player].box then
+                pcall(function() ESPCache[player].box:Remove() end)
+            end
+            if ESPCache[player].text then
+                pcall(function() ESPCache[player].text:Remove() end)
+            end
+            ESPCache[player] = nil
+        end
+        
+        if TracerCache[player] then
+            if TracerCache[player].line then
+                pcall(function() TracerCache[player].line:Remove() end)
+            end
+            TracerCache[player] = nil
+        end
+        
+        if BillboardESPs[player] and BillboardESPs[player].Parent then
+            pcall(function() BillboardESPs[player]:Destroy() end)
+            BillboardESPs[player] = nil
+        end
+    end)
+    
+    Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function()
+            if ESPCache[player] then
+                if ESPCache[player].box then
+                    pcall(function() ESPCache[player].box:Remove() end)
+                end
+                if ESPCache[player].text then
+                    pcall(function() ESPCache[player].text:Remove() end)
+                end
+                ESPCache[player] = nil
+            end
+            
+            if TracerCache[player] then
+                if TracerCache[player].line then
+                    pcall(function() TracerCache[player].line:Remove() end)
+                end
+                TracerCache[player] = nil
+            end
+            
+            if BillboardESPs[player] and BillboardESPs[player].Parent then
+                pcall(function() BillboardESPs[player]:Destroy() end)
+                BillboardESPs[player] = nil
+            end
+        end)
+    end)
+
+    -- UI Toggles y Sliders
+    AimbotTab:CreateToggle({ 
+        Name = "Aimbot", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.Enabled = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Auto Apuntar", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.AutoAimEnabled = v 
+        end 
+    })
+
+    AimbotTab:CreateSlider({ 
+        Name = "Tamaño del FOV", 
+        Range = {10, 1000}, 
+        Increment = 1, 
+        CurrentValue = AimbotSettings.FOVRadius, 
+        Callback = function(v) 
+            AimbotSettings.FOVRadius = v 
+        end 
+    })
+
+    AimbotTab:CreateColorPicker({ 
+        Name = "Color del FOV", 
+        Color = AimbotSettings.FOVColor, 
+        Callback = function(v) 
+            AimbotSettings.FOVColor = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "ESP", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.ESPEnabled = v 
+            if not v then
+                HideAllESP()
+            end
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "ESP Alternativo", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.UseAlternativeESP = v 
+            if not v then
+                ClearAllBillboardESPs()
+            end
+        end 
+    })
+
+    AimbotTab:CreateColorPicker({ 
+        Name = "Color del ESP", 
+        Color = AimbotSettings.ESPColor, 
+        Callback = function(v) 
+            AimbotSettings.ESPColor = v 
+        end 
+    })
+
+    AimbotTab:CreateSlider({ 
+        Name = "Tamaño del ESP", 
+        Range = {2, 30}, 
+        Increment = 0.5, 
+        CurrentValue = AimbotSettings.ESPSizeMultiplier, 
+        Callback = function(v) 
+            AimbotSettings.ESPSizeMultiplier = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Mostrar Solo Nombres", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.ShowNamesOnly = v 
+        end 
+    })
+
+    AimbotTab:CreateSlider({ 
+        Name = "Sensibilidad del Aim", 
+        Range = {0, 100}, 
+        Increment = 1, 
+        CurrentValue = AimbotSettings.Sensitivity, 
+        Callback = function(v) 
+            AimbotSettings.Sensitivity = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "No apuntar al Team", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.TeamCheckEnabled = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Verificar Paredes", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.WallCheck = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Mostrar Líneas (Tracers)", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.TracersEnabled = v 
+            if not v then
+                HideAllTracers()
+            end
+        end 
+    })
+
+    AimbotTab:CreateColorPicker({ 
+        Name = "Color de las Líneas", 
+        Color = AimbotSettings.TracerColor, 
+        Callback = function(v) 
+            AimbotSettings.TracerColor = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Solo Jugadores Cercanos", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.OnlyClosePlayers = v 
+        end 
+    })
+
+    AimbotTab:CreateSlider({ 
+        Name = "Distancia Máxima", 
+        Range = {10, 500}, 
+        Increment = 5, 
+        CurrentValue = AimbotSettings.CloseDistanceThreshold, 
+        Callback = function(v) 
+            AimbotSettings.CloseDistanceThreshold = v 
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Rainbow", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            rainbowEnabled = v 
+        end 
+    })
+
+    AimbotTab:CreateSlider({ 
+        Name = "Velocidad Rainbow", 
+        Range = {1, 20}, 
+        Increment = 0.5, 
+        CurrentValue = rainbowSpeed, 
+        Callback = function(v) 
+            rainbowSpeed = v 
+        end 
+    })
+
+  ---  print("✅ Aimbot cargado exitosamente")
 end)
