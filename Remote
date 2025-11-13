@@ -12,7 +12,7 @@ task.spawn(function()
 
     local Orbiting, Walking, Frozen, EmoteSync = false, false, false, false
     local danceTracks, frozenPositions, emotes = {}, {}, {}
-    local emoteSyncTracks = {} -- Nueva tabla para trackear emotes sincronizados
+    local emoteSyncTracks = {}
     local lastCommandTime = 0
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
@@ -145,7 +145,7 @@ task.spawn(function()
     end
 
     local function FreezeAll()
-        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se congela
+        if IsOwner(LocalPlayer.UserId) then return end
         Frozen = true
         RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
             if not Frozen then return end
@@ -157,7 +157,7 @@ task.spawn(function()
     end
 
     local function UnfreezeAll()
-        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se descongela
+        if IsOwner(LocalPlayer.UserId) then return end
         Frozen = false
         RunService:UnbindFromRenderStep("FreezePlayers")
         local char = LocalPlayer.Character
@@ -210,7 +210,7 @@ task.spawn(function()
                 end
             end)
         end
-        emoteSyncTracks = {} -- Limpiar la tabla
+        emoteSyncTracks = {}
         
         if emoteSyncConnection then
             emoteSyncConnection:Disconnect()
@@ -220,7 +220,7 @@ task.spawn(function()
     end
 
     local function StartEmoteSync(name)
-        if IsOwner(LocalPlayer.UserId) then return end -- Owner no se sincroniza
+        if IsOwner(LocalPlayer.UserId) then return end
         
         StopEmoteSync()
         EmoteSync = true
@@ -239,70 +239,54 @@ task.spawn(function()
                 return
             end
         end
-        -- Si no hay nombre especificado, TODOS los seguidores (que tengan el script) se sincronizan
         
         local lastAnimationId = ""
-        local basicAnimationIds = {} -- Solo IDs detectados dinámicamente como básicos
+        local lastAnimationSpeed = 1
+        local basicAnimationIds = {}
+        local isCapturingBasicAnims = true
+        local currentSyncedTrack = nil -- Track actual que estamos sincronizando
         
-        -- Detectar animaciones básicas del owner al inicio (capturar su estado inicial)
-        task.wait(1) -- Esperar a que se carguen las animaciones básicas
-        local initialAnimator = targetForEmoteSync.Character and targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
-        if initialAnimator then
-            for _, track in pairs(initialAnimator:GetPlayingAnimationTracks()) do
-                if track.Animation then
-                    local animId = track.Animation.AnimationId
-                    -- Marcar como básica cualquier animación que YA esté corriendo al inicio
-                    -- Estas son las animaciones de movimiento/idle que el usuario tiene por defecto
-                    basicAnimationIds[animId] = true
-                    print("Animación básica detectada:", animId) -- Debug opcional
-                end
-            end
-        end
-        
-        -- Esperar un poco más y capturar animaciones que se activen al caminar/moverse
+        -- Capturar animaciones básicas del owner durante los primeros 5 segundos
         task.spawn(function()
-            task.wait(3) -- Esperar más tiempo para capturar animaciones de movimiento
-            if targetForEmoteSync and targetForEmoteSync.Character then
-                local animator = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid") and targetForEmoteSync.Character.Humanoid:FindFirstChildOfClass("Animator")
-                if animator then
-                    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-                        if track.Animation then
-                            local animId = track.Animation.AnimationId
-                            -- Si es una animación que no habíamos visto antes y tiene prioridad básica,
-                            -- probablemente sea una animación de movimiento que se activó después
-                            if not basicAnimationIds[animId] and (track.Priority == Enum.AnimationPriority.Core or track.Priority == Enum.AnimationPriority.Idle) then
-                                basicAnimationIds[animId] = true
-                                print("Animación básica tardía detectada:", animId) -- Debug opcional
+            local captureStartTime = tick()
+            while isCapturingBasicAnims and (tick() - captureStartTime) < 5 do
+                task.wait(0.5)
+                if targetForEmoteSync and targetForEmoteSync.Character then
+                    local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
+                    if targetHumanoid then
+                        local animator = targetHumanoid:FindFirstChildOfClass("Animator")
+                        if animator then
+                            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                                if track.Animation and track.Animation.AnimationId then
+                                    local animId = track.Animation.AnimationId
+                                    -- Marcar animaciones con prioridad Core, Idle o Movement como básicas
+                                    if track.Priority == Enum.AnimationPriority.Core or 
+                                       track.Priority == Enum.AnimationPriority.Idle or
+                                       track.Priority == Enum.AnimationPriority.Movement then
+                                        basicAnimationIds[animId] = true
+                                    end
+                                end
                             end
                         end
                     end
                 end
             end
+            isCapturingBasicAnims = false
         end)
         
-        local function isBasicAnimation(animId, track)
-            -- Verificar si está en nuestra lista de animaciones básicas detectadas dinámicamente
-            if basicAnimationIds[animId] then
-                return true
-            end
-            
-            -- Verificar si es una animación que tiene nombre típico de movimiento
-            if track.Animation and track.Animation.Name then
-                local animName = track.Animation.Name:lower()
-                if animName:find("idle") or animName:find("walk") or animName:find("run") or 
-                   animName:find("jump") or animName:find("fall") or animName:find("climb") or
-                   animName:find("swim") or animName:find("freefall") then
-                    basicAnimationIds[animId] = true -- Aprenderla para el futuro
-                    return true
-                end
-            end
-            
-            return false
-        end
+        local lastCheckTime = 0
+        local checkCooldown = 0.3 -- Cooldown para evitar detecciones múltiples
+        local speedCheckInterval = 0.1 -- Intervalo para verificar cambios de velocidad
+        local lastSpeedCheck = 0
         
         RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
             if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
                 return 
+            end
+            
+            local currentTime = tick()
+            if currentTime - lastCheckTime < checkCooldown then
+                return
             end
             
             local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
@@ -311,80 +295,118 @@ task.spawn(function()
             
             if not targetHumanoid or not myHumanoid then return end
             
-            -- Obtener animaciones del target (owner)
             local targetAnimator = targetHumanoid:FindFirstChildOfClass("Animator")
             if not targetAnimator then return end
             
-            -- Buscar animaciones activas del target
+            -- Buscar la animación de mayor prioridad que NO sea básica
+            local highestPriorityTrack = nil
+            local highestPriorityValue = -1
+            
             for _, track in pairs(targetAnimator:GetPlayingAnimationTracks()) do
-                if track.Animation then
+                if track.Animation and track.Animation.AnimationId then
                     local animId = track.Animation.AnimationId
+                    local priorityValue = track.Priority.Value
                     
-                    -- Verificar si es una nueva animación y NO es una animación básica
-                    if animId ~= lastAnimationId and not isBasicAnimation(animId, track) then
-                        
-                        lastAnimationId = animId
-                        
-                        -- LIMPIAR COMPLETAMENTE todas las animaciones de emote previas del seguidor
-                        local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
-                        if myAnimator then
-                            -- Detener todas las animaciones sincronizadas anteriores
-                            for _, oldTrack in pairs(emoteSyncTracks) do
+                    -- Ignorar animaciones básicas
+                    if not basicAnimationIds[animId] then
+                        -- Buscar la de mayor prioridad
+                        if priorityValue > highestPriorityValue then
+                            highestPriorityValue = priorityValue
+                            highestPriorityTrack = track
+                        end
+                    end
+                end
+            end
+            
+            -- Si encontramos una animación válida y es diferente a la última
+            if highestPriorityTrack and highestPriorityTrack.Animation.AnimationId ~= lastAnimationId then
+                lastCheckTime = currentTime
+                lastAnimationId = highestPriorityTrack.Animation.AnimationId
+                lastAnimationSpeed = highestPriorityTrack.Speed
+                
+                -- DETENER TODAS LAS ANIMACIONES NO-BÁSICAS DEL SEGUIDOR
+                local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
+                if myAnimator then
+                    -- Primero, detener tracks guardados
+                    for i = #emoteSyncTracks, 1, -1 do
+                        local oldTrack = emoteSyncTracks[i]
+                        pcall(function()
+                            if oldTrack and oldTrack.IsPlaying then
+                                oldTrack:Stop()
+                            end
+                        end)
+                        table.remove(emoteSyncTracks, i)
+                    end
+                    
+                    -- Luego, detener cualquier animación que no sea básica
+                    for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
+                        if myTrack.Animation and myTrack.Animation.AnimationId then
+                            local myAnimId = myTrack.Animation.AnimationId
+                            -- Si no es una animación básica MÍA, detenerla
+                            if myTrack.Priority.Value > Enum.AnimationPriority.Movement.Value then
                                 pcall(function()
-                                    if oldTrack and oldTrack.IsPlaying then
-                                        oldTrack:Stop()
-                                    end
+                                    myTrack:Stop()
                                 end)
                             end
-                            emoteSyncTracks = {} -- Limpiar tabla
-                            
-                            -- También detener cualquier otra animación de emote que esté corriendo
-                            for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
-                                if myTrack.Animation and not isBasicAnimation(myTrack.Animation.AnimationId, myTrack) then
-                                    myTrack:Stop()
-                                end
-                            end
                         end
-                        
-                        -- Pequeña pausa para asegurar que las animaciones anteriores se detengan
-                        task.wait(0.1)
-                        
-                        -- Aplicar la nueva animación al seguidor
-                        pcall(function()
-                            local newAnim = Instance.new("Animation")
-                            newAnim.AnimationId = animId
-                            local newTrack = myHumanoid:LoadAnimation(newAnim)
-                            
-                            -- IMPORTANTE: Copiar todas las propiedades del track original
-                            newTrack.Looped = track.Looped
-                            newTrack.Priority = track.Priority
-                            
-                            newTrack:Play()
-                            
-                            -- Agregar el track a la tabla de tracking para poder detenerlo después
-                            table.insert(emoteSyncTracks, newTrack)
-                            
-                            -- Sincronizar posición de tiempo si es posible
-                            if track.TimePosition > 0 then
-                                newTrack.TimePosition = track.TimePosition
-                            end
-                            
-                            -- Si el track original está en loop, asegurar que el nuevo también
-                            if track.Looped then
-                                newTrack.Looped = true
-                            end
-                            
-                            -- Limpiar tracks que ya terminaron automáticamente
-                            newTrack.Ended:Connect(function()
-                                for i, t in ipairs(emoteSyncTracks) do
-                                    if t == newTrack then
-                                        table.remove(emoteSyncTracks, i)
-                                        break
+                    end
+                end
+                
+                -- Esperar un frame para asegurar limpieza
+                task.wait()
+                
+                -- Cargar y reproducir la nueva animación
+                pcall(function()
+                    local newAnim = Instance.new("Animation")
+                    newAnim.AnimationId = highestPriorityTrack.Animation.AnimationId
+                    local newTrack = myHumanoid:LoadAnimation(newAnim)
+                    
+                    -- Copiar propiedades
+                    newTrack.Priority = highestPriorityTrack.Priority
+                    newTrack.Looped = highestPriorityTrack.Looped
+                    
+                    -- Reproducir
+                    newTrack:Play()
+                    
+                    -- SINCRONIZAR VELOCIDAD DE ANIMACIÓN
+                    newTrack:AdjustSpeed(highestPriorityTrack.Speed)
+                    
+                    -- Sincronizar tiempo si es relevante
+                    if highestPriorityTrack.TimePosition > 0 and highestPriorityTrack.TimePosition < 0.5 then
+                        newTrack.TimePosition = highestPriorityTrack.TimePosition
+                    end
+                    
+                    -- Guardar referencia del track actual
+                    currentSyncedTrack = newTrack
+                    table.insert(emoteSyncTracks, newTrack)
+                    
+                    -- Limpiar cuando termine (si no es looped)
+                    if not newTrack.Looped then
+                        newTrack.Ended:Connect(function()
+                            for i, t in ipairs(emoteSyncTracks) do
+                                if t == newTrack then
+                                    table.remove(emoteSyncTracks, i)
+                                    if currentSyncedTrack == newTrack then
+                                        currentSyncedTrack = nil
                                     end
+                                    break
                                 end
-                            end)
+                            end
                         end)
-                        break
+                    end
+                end)
+            -- Verificar cambios de velocidad en la animación actual
+            elseif highestPriorityTrack and currentTime - lastSpeedCheck > speedCheckInterval then
+                lastSpeedCheck = currentTime
+                
+                -- Si la velocidad del owner cambió, actualizar la del seguidor
+                if currentSyncedTrack and currentSyncedTrack.IsPlaying then
+                    local currentSpeed = highestPriorityTrack.Speed
+                    if math.abs(currentSpeed - lastAnimationSpeed) > 0.01 then -- Tolerancia de 0.01
+                        lastAnimationSpeed = currentSpeed
+                        pcall(function()
+                            currentSyncedTrack:AdjustSpeed(currentSpeed)
+                        end)
                     end
                 end
             end
@@ -393,7 +415,6 @@ task.spawn(function()
 
     -- SISTEMA DE CHAT MEJORADO
     local function SendChatMessage(message)
-        -- Método 1: TextChatService (nuevo sistema de chat)
         pcall(function()
             local textChannel = TextChatService:FindFirstChild("TextChannels")
             if textChannel then
@@ -405,7 +426,6 @@ task.spawn(function()
             end
         end)
 
-        -- Método 2: Sistema de chat clásico
         pcall(function()
             if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
                 local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
@@ -416,7 +436,6 @@ task.spawn(function()
             end
         end)
 
-        -- Método 3: Mostrar mensaje del sistema como fallback
         pcall(function()
             StarterGui:SetCore("ChatMakeSystemMessage", {
                 Text = message,
@@ -427,11 +446,9 @@ task.spawn(function()
         end)
     end
 
-    -- Sistema de detección de comandos
     local function SetupCommandDetection()
         local commandHandlers = {}
         
-        -- Método 1: Evento Chatted tradicional
         local function setupChattedHandler(player)
             if IsOwner(player.UserId) then
                 local connection
@@ -446,7 +463,6 @@ task.spawn(function()
             end
         end
 
-        -- Método 2: TextChatService
         local function setupTextChatHandler()
             pcall(function()
                 if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -471,7 +487,6 @@ task.spawn(function()
             end)
         end
 
-        -- Configurar métodos
         for _, player in ipairs(Players:GetPlayers()) do
             setupChattedHandler(player)
         end
@@ -559,15 +574,55 @@ task.spawn(function()
                 StopEmoteSync()
             end
 
+        elseif cmd == ".r" then 
+            if not IsOwner(LocalPlayer.UserId) then
+                if arg then
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        if LocalPlayer.Character then
+                            LocalPlayer.Character:BreakJoints()
+                        end
+                    end
+                else
+                    if LocalPlayer.Character then
+                        LocalPlayer.Character:BreakJoints()
+                    end
+                end
+            end
+
+        elseif cmd == ".s" then 
+            if not IsOwner(LocalPlayer.UserId) then
+                if arg then
+                    local playerName = LocalPlayer.Name:lower()
+                    if playerName:sub(1, #arg) == arg then
+                        local char = LocalPlayer.Character
+                        if char then
+                            local hum = char:FindFirstChildOfClass("Humanoid")
+                            if hum then
+                                hum.Sit = true
+                            end
+                        end
+                    end
+                else
+                    local char = LocalPlayer.Character
+                    if char then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum.Sit = true
+                        end
+                    end
+                end
+            end
+
         elseif cmd == ".k" then 
             if not IsOwner(LocalPlayer.UserId) then
                 if arg then
                     local playerName = LocalPlayer.Name:lower()
                     if playerName:sub(1, #arg) == arg then
-                        KickPlayer(LocalPlayer)
+                        LocalPlayer:Kick("Expulsado por el owner")
                     end
                 else
-                    KickPlayer(LocalPlayer)
+                    LocalPlayer:Kick("Expulsado por el owner")
                 end
             end
             
@@ -587,7 +642,6 @@ task.spawn(function()
         end
     end
 
-    -- Inicializar sistema nuclear xd
     CheckAndConnectPlayers()
     SetupCommandDetection()
 end)
