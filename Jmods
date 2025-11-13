@@ -4197,30 +4197,30 @@ TelekinesisTab:CreateButton({
         MobileControlsGui.ResetOnSpawn = false
 
         local ButtonContainer = Instance.new("Frame", MobileControlsGui)
-        ButtonContainer.Size = UDim2.new(0, 340, 0, 200)
-        ButtonContainer.Position = UDim2.new(0, 10, 1, -210)
+        ButtonContainer.Size = UDim2.new(0, 220, 0, 150)
+        ButtonContainer.Position = UDim2.new(1, -230, 0, 10)
         ButtonContainer.BackgroundTransparency = 1
 
         function createMobileButton(text, icon, position, size, color)
             local btn = Instance.new("TextButton", ButtonContainer)
-            btn.Size = size or UDim2.new(0, 60, 0, 55)
+            btn.Size = size or UDim2.new(0, 42, 0, 38)
             btn.Position = position
             btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 70)
             btn.Text = icon .. "\n" .. text
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             btn.Font = Enum.Font.GothamBold
-            btn.TextSize = 10
+            btn.TextSize = 7
             btn.TextWrapped = true
             btn.BorderSizePixel = 0
             btn.AutoButtonColor = false
             
             local corner = Instance.new("UICorner", btn)
-            corner.CornerRadius = UDim.new(0, 10)
+            corner.CornerRadius = UDim.new(0, 8)
             
             local stroke = Instance.new("UIStroke", btn)
             stroke.Color = Color3.fromRGB(255, 255, 255)
-            stroke.Thickness = 1.5
-            stroke.Transparency = 0.7
+            stroke.Thickness = 1
+            stroke.Transparency = 0.8
             
             btn.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -4238,46 +4238,46 @@ TelekinesisTab:CreateButton({
         end
 
         -- Fila 1
-        local BtnAcercar = createMobileButton("CERCAR", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 120, 200))
-        local BtnAlejar = createMobileButton("ALEJAR", "⬇️", UDim2.new(0, 70, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 120, 200))
-        local BtnRotar = createMobileButton("ROTAR", "🔄", UDim2.new(0, 140, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 100, 50))
-        local BtnLanzar = createMobileButton("LANZAR", "🚀", UDim2.new(0, 210, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 50, 50))
-        local BtnSoltar = createMobileButton("SOLTAR", "❌", UDim2.new(0, 280, 0, 0), UDim2.new(0, 60, 0, 55), Color3.fromRGB(150, 50, 150))
+        local BtnAcercar = createMobileButton("⬆️", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 120, 200))
+        local BtnAlejar = createMobileButton("⬇️", "⬇️", UDim2.new(0, 45, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 120, 200))
+        local BtnRotar = createMobileButton("🔄", "🔄", UDim2.new(0, 90, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(200, 100, 50))
+        local BtnLanzar = createMobileButton("🚀", "🚀", UDim2.new(0, 135, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(200, 50, 50))
+        local BtnSoltar = createMobileButton("❌", "❌", UDim2.new(0, 180, 0, 0), UDim2.new(0, 38, 0, 38), Color3.fromRGB(150, 50, 150))
         
         -- Fila 2
-        local BtnMagnetico = createMobileButton("IMÁN", "🧲", UDim2.new(0, 0, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 200, 100))
-        local BtnLiberar = createMobileButton("LIBERAR", "🔓", UDim2.new(0, 70, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(100, 150, 50))
-        local BtnAnclar = createMobileButton("ANCLAR", "📌", UDim2.new(0, 140, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(150, 100, 200))
-        local BtnColisiones = createMobileButton("COLIS.", "💥", UDim2.new(0, 210, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 150, 50))
-        local BtnArrojar = createMobileButton("ARROJAR", "💨", UDim2.new(0, 280, 0, 60), UDim2.new(0, 60, 0, 55), Color3.fromRGB(180, 80, 180))
+        local BtnMagnetico = createMobileButton("🧲", "🧲", UDim2.new(0, 0, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 200, 100))
+        local BtnLiberar = createMobileButton("🔓", "🔓", UDim2.new(0, 45, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(100, 150, 50))
+        local BtnAnclar = createMobileButton("📌", "📌", UDim2.new(0, 90, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(150, 100, 200))
+        local BtnColisiones = createMobileButton("💥", "💥", UDim2.new(0, 135, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(200, 150, 50))
+        local BtnArrojar = createMobileButton("💨", "💨", UDim2.new(0, 180, 0, 42), UDim2.new(0, 38, 0, 38), Color3.fromRGB(180, 80, 180))
 
         local StatusLabel = Instance.new("TextLabel", ButtonContainer)
-        StatusLabel.Size = UDim2.new(0, 330, 0, 35)
-        StatusLabel.Position = UDim2.new(0, 5, 0, 125)
+        StatusLabel.Size = UDim2.new(0, 215, 0, 28)
+        StatusLabel.Position = UDim2.new(0, 3, 0, 85)
         StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
         StatusLabel.BackgroundTransparency = 0.3
-        StatusLabel.Text = "💥 Colisión: OFF | 🧲 Objetos: 0 | 📌 Anclados: 0"
+        StatusLabel.Text = "💥OFF | 🧲0 | 📌0"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         StatusLabel.Font = Enum.Font.GothamBold
-        StatusLabel.TextSize = 11
+        StatusLabel.TextSize = 9
         StatusLabel.TextWrapped = true
         
         local statusCorner = Instance.new("UICorner", StatusLabel)
-        statusCorner.CornerRadius = UDim.new(0, 8)
+        statusCorner.CornerRadius = UDim.new(0, 6)
         
         -- Botón para mantener selección en móvil
         local BtnMantener = Instance.new("TextButton", ButtonContainer)
-        BtnMantener.Size = UDim2.new(0, 330, 0, 30)
-        BtnMantener.Position = UDim2.new(0, 5, 0, 165)
+        BtnMantener.Size = UDim2.new(0, 215, 0, 25)
+        BtnMantener.Position = UDim2.new(0, 3, 0, 118)
         BtnMantener.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        BtnMantener.Text = "📌 MANTENER SELECCIÓN: OFF"
+        BtnMantener.Text = "📌 MANTENER: OFF"
         BtnMantener.TextColor3 = Color3.fromRGB(255, 255, 255)
         BtnMantener.Font = Enum.Font.GothamBold
-        BtnMantener.TextSize = 11
+        BtnMantener.TextSize = 9
         BtnMantener.BorderSizePixel = 0
         
         local mantenerCorner = Instance.new("UICorner", BtnMantener)
-        mantenerCorner.CornerRadius = UDim.new(0, 8)
+        mantenerCorner.CornerRadius = UDim.new(0, 6)
         
         local mantenerActivo = false
 
@@ -4401,7 +4401,7 @@ TelekinesisTab:CreateButton({
             
             local magCount = #magnetizedObjects
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
                 collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
             
             if collisionsEnabled then
@@ -4503,7 +4503,7 @@ TelekinesisTab:CreateButton({
             end
             
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
                 collisionsEnabled and "ON" or "OFF", count, anchorCount)
             
             Rayfield:Notify({
@@ -4536,7 +4536,7 @@ TelekinesisTab:CreateButton({
             magnetMode = false
             
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: 0 | 📌 Anclados: %d", 
+            StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
                 collisionsEnabled and "ON" or "OFF", anchorCount)
             
             Rayfield:Notify({
@@ -4563,7 +4563,7 @@ TelekinesisTab:CreateButton({
                 
                 local anchorCount = updateAnchorCounter()
                 local magCount = #magnetizedObjects
-                StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
                     collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
                 
                 Rayfield:Notify({
@@ -4764,7 +4764,7 @@ TelekinesisTab:CreateButton({
             mantenerActivo = not mantenerActivo
             if mantenerActivo then
                 BtnMantener.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
-                BtnMantener.Text = "📌 MANTENER SELECCIÓN: ON"
+                BtnMantener.Text = "📌 MANTENER: ON"
                 Rayfield:Notify({
                     Title = "✅ Mantener ON",
                     Content = "Los objetos se mantendrán seleccionados",
@@ -4772,7 +4772,7 @@ TelekinesisTab:CreateButton({
                 })
             else
                 BtnMantener.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                BtnMantener.Text = "📌 MANTENER SELECCIÓN: OFF"
+                BtnMantener.Text = "📌 MANTENER: OFF"
                 Rayfield:Notify({
                     Title = "❌ Mantener OFF",
                     Content = "Modo normal de selección",
@@ -4818,7 +4818,7 @@ TelekinesisTab:CreateButton({
             end
             
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: 0 | 📌 Anclados: %d", 
+            StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
                 collisionsEnabled and "ON" or "OFF", anchorCount)
             
             local mouseButton1DownConnection
@@ -5002,7 +5002,7 @@ TelekinesisTab:CreateButton({
                         
                         local magCount = #magnetizedObjects
                         local anchorCount = updateAnchorCounter()
-                        StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                        StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
                             collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
                     end
                     
