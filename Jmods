@@ -4031,7 +4031,6 @@ end
 
 -- Telekinesis
 
-
 local Player = game.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local CoreGui = game:GetService("CoreGui")
@@ -4166,7 +4165,7 @@ TelekinesisTab:CreateButton({
     Callback = function()
         local character = Player.Character
         if not character then 
-            JmodsLib:Notify({
+            Rayfield:Notify({
                 Title = "❌ Error",
                 Content = "Personaje no encontrado",
                 Duration = 3
@@ -4176,7 +4175,7 @@ TelekinesisTab:CreateButton({
         
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if not humanoid then 
-            JmodsLib:Notify({
+            Rayfield:Notify({
                 Title = "❌ Error",
                 Content = "Humanoid no encontrado",
                 Duration = 3
@@ -4184,7 +4183,7 @@ TelekinesisTab:CreateButton({
             return 
         end
 
-        JmodsLib:Notify({
+        Rayfield:Notify({
             Title = "✅ Telekinesis Activada",
             Content = "Herramienta equipada. Usa Q/E/R/F/T/C/Z/G/X",
             Duration = 5
@@ -4387,14 +4386,14 @@ TelekinesisTab:CreateButton({
             
             if collisionsEnabled then
                 BtnColisiones.BackgroundColor3 = Color3.fromRGB(100, 200, 50)
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "💥 Colisiones ON",
                     Content = "Rotación congelada. Puedes subirte al objeto.",
                     Duration = 3
                 })
             else
                 BtnColisiones.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "💥 Colisiones OFF",
                     Content = "Objeto atraviesa todo. Rotación libre.",
                     Duration = 3
@@ -4405,7 +4404,7 @@ TelekinesisTab:CreateButton({
 
          function magnetizeAllObjects()
             if not currentObject then 
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "⚠️ Error",
                     Content = "Primero agarra un objeto",
                     Duration = 3
@@ -4487,7 +4486,7 @@ TelekinesisTab:CreateButton({
             StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
                 collisionsEnabled and "ON" or "OFF", count, anchorCount)
             
-            JmodsLib:Notify({
+            Rayfield:Notify({
                 Title = "🧲 Modo Magnético",
                 Content = count .. " objetos magnetizados",
                 Duration = 4
@@ -4520,7 +4519,7 @@ TelekinesisTab:CreateButton({
             StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: 0 | 📌 Anclados: %d", 
                 collisionsEnabled and "ON" or "OFF", anchorCount)
             
-            JmodsLib:Notify({
+            Rayfield:Notify({
                 Title = "🔓 Liberados",
                 Content = "Todos los objetos fueron liberados",
                 Duration = 3
@@ -4530,7 +4529,7 @@ TelekinesisTab:CreateButton({
 
          function toggleAnchor()
             if not currentObject then
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "⚠️ Error",
                     Content = "Primero agarra un objeto",
                     Duration = 3
@@ -4547,7 +4546,7 @@ TelekinesisTab:CreateButton({
                 StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
                     collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
                 
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "🔓 Desanclado",
                     Content = currentObject.Name .. " desanclado",
                     Duration = 3
@@ -4567,7 +4566,7 @@ TelekinesisTab:CreateButton({
                 StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
                     collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
                 
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "📌 Anclado",
                     Content = currentObject.Name .. " anclado permanentemente",
                     Duration = 3
@@ -4659,7 +4658,7 @@ TelekinesisTab:CreateButton({
          function toggleRotation()
             if currentObject and torque then
                 if collisionsEnabled then
-                    JmodsLib:Notify({
+                    Rayfield:Notify({
                         Title = "⚠️ Error",
                         Content = "Desactiva colisiones primero (tecla C)",
                         Duration = 3
@@ -4673,7 +4672,7 @@ TelekinesisTab:CreateButton({
                     if currentObject and currentObject.Parent then
                         currentObject.Velocity = Vector3.new(0, 0.1, 0)
                     end
-                    JmodsLib:Notify({
+                    Rayfield:Notify({
                         Title = "🔄 Rotación ON",
                         Content = "Objeto girando",
                         Duration = 2
@@ -4684,7 +4683,7 @@ TelekinesisTab:CreateButton({
                         currentObject.Velocity = Vector3.new(0, 0, 0)
                         currentObject.RotVelocity = Vector3.new(0, 0, 0)
                     end
-                    JmodsLib:Notify({
+                    Rayfield:Notify({
                         Title = "⏸️ Rotación OFF",
                         Content = "Rotación detenida",
                         Duration = 2
@@ -4704,7 +4703,7 @@ TelekinesisTab:CreateButton({
                     currentObject.Velocity = direction * 200
                 end
                 deselectObject()
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "🚀 Lanzado",
                     Content = "Objeto lanzado con fuerza",
                     Duration = 2
@@ -4736,7 +4735,7 @@ TelekinesisTab:CreateButton({
                     releaseMagnetizedObjects()
                 end
             else
-                JmodsLib:Notify({
+                Rayfield:Notify({
                     Title = "⚠️ Error",
                     Content = "Primero agarra un objeto",
                     Duration = 3
@@ -4801,7 +4800,7 @@ TelekinesisTab:CreateButton({
                 
                 if target and isValidObject(target) then
                     if selectObject(target) then
-                        JmodsLib:Notify({
+                        Rayfield:Notify({
                             Title = "🎯 Seleccionado",
                             Content = target.Name .. " - " .. math.floor(target:GetMass()) .. "kg",
                             Duration = 2
@@ -4840,7 +4839,7 @@ TelekinesisTab:CreateButton({
                             releaseMagnetizedObjects()
                         end
                     else
-                        JmodsLib:Notify({
+                        Rayfield:Notify({
                             Title = "⚠️ Error",
                             Content = "Primero agarra un objeto",
                             Duration = 3
@@ -5035,7 +5034,7 @@ TelekinesisTab:CreateColorPicker({
             end
         end
         
-        JmodsLib:Notify({
+        Rayfield:Notify({
             Title = "Color",
             Content = string.format("RGB(%d, %d, %d)", 
                 math.floor(color.R*255), 
@@ -5056,7 +5055,7 @@ TelekinesisTab:CreateColorPicker({
             end
         end
         
-        JmodsLib:Notify({
+        Rayfield:Notify({
             Title = "Partículas",
             Content = string.format("Color: RGB(%d, %d, %d)", 
                 math.floor(color.R*255), 
@@ -5114,14 +5113,13 @@ TelekinesisTab:CreateButton({
     Name = "🗑️ Limpiar Todo",
     Callback = function()
         Network.ClearAll()
-        JmodsLib:Notify({
+        Rayfield:Notify({
             Title = "🗑️ Limpieza Completa",
             Content = "Todos los objetos fueron liberados",
             Duration = 3
         })
     end
 })
-
 
 
 
