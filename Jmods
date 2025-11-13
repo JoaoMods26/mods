@@ -4050,21 +4050,21 @@ end
 
 local AnchoredByScript = getgenv().AnchoredByScript
 
- function addToAnchoredList(part)
+function addToAnchoredList(part)
     if part and part:IsA("BasePart") then
         AnchoredByScript[part] = true
     end
 end
 
- function isAnchoredByScript(part)
+function isAnchoredByScript(part)
     return AnchoredByScript[part] == true
 end
 
- function removeFromAnchoredList(part)
+function removeFromAnchoredList(part)
     AnchoredByScript[part] = nil
 end
 
- function updateAnchorCounter()
+function updateAnchorCounter()
     local count = 0
     for part, _ in pairs(AnchoredByScript) do
         if part and part.Parent then
@@ -4197,29 +4197,29 @@ TelekinesisTab:CreateButton({
         MobileControlsGui.ResetOnSpawn = false
 
         local ButtonContainer = Instance.new("Frame", MobileControlsGui)
-        ButtonContainer.Size = UDim2.new(0, 400, 0, 410)
-        ButtonContainer.Position = UDim2.new(1, -420, 1, -430)
+        ButtonContainer.Size = UDim2.new(0, 340, 0, 200)
+        ButtonContainer.Position = UDim2.new(0, 10, 1, -210)
         ButtonContainer.BackgroundTransparency = 1
 
-         function createMobileButton(text, icon, position, size, color)
+        function createMobileButton(text, icon, position, size, color)
             local btn = Instance.new("TextButton", ButtonContainer)
-            btn.Size = size or UDim2.new(0, 80, 0, 80)
+            btn.Size = size or UDim2.new(0, 60, 0, 55)
             btn.Position = position
             btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 70)
             btn.Text = icon .. "\n" .. text
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             btn.Font = Enum.Font.GothamBold
-            btn.TextSize = 14
+            btn.TextSize = 10
             btn.TextWrapped = true
             btn.BorderSizePixel = 0
             btn.AutoButtonColor = false
             
             local corner = Instance.new("UICorner", btn)
-            corner.CornerRadius = UDim.new(0, 12)
+            corner.CornerRadius = UDim.new(0, 10)
             
             local stroke = Instance.new("UIStroke", btn)
             stroke.Color = Color3.fromRGB(255, 255, 255)
-            stroke.Thickness = 2
+            stroke.Thickness = 1.5
             stroke.Transparency = 0.7
             
             btn.InputBegan:Connect(function(input)
@@ -4237,29 +4237,49 @@ TelekinesisTab:CreateButton({
             return btn
         end
 
-        local BtnAcercar = createMobileButton("ACERCAR", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 120, 200))
-        local BtnAlejar = createMobileButton("ALEJAR", "⬇️", UDim2.new(0, 100, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 120, 200))
-        local BtnRotar = createMobileButton("ROTAR", "🔄", UDim2.new(0, 200, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 100, 50))
-        local BtnLanzar = createMobileButton("LANZAR", "🚀", UDim2.new(0, 300, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 50, 50))
-        local BtnSoltar = createMobileButton("SOLTAR", "❌", UDim2.new(0, 0, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(150, 50, 150))
-        local BtnMagnetico = createMobileButton("IMÁN", "🧲", UDim2.new(0, 100, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 200, 100))
-        local BtnLiberar = createMobileButton("LIBERAR", "🔓", UDim2.new(0, 200, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(100, 150, 50))
-        local BtnAnclar = createMobileButton("ANCLAR", "📌", UDim2.new(0, 300, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(150, 100, 200))
-        local BtnColisiones = createMobileButton("COLISIÓN", "💥", UDim2.new(0, 150, 0, 160), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 150, 50))
+        -- Fila 1
+        local BtnAcercar = createMobileButton("CERCAR", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 120, 200))
+        local BtnAlejar = createMobileButton("ALEJAR", "⬇️", UDim2.new(0, 70, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 120, 200))
+        local BtnRotar = createMobileButton("ROTAR", "🔄", UDim2.new(0, 140, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 100, 50))
+        local BtnLanzar = createMobileButton("LANZAR", "🚀", UDim2.new(0, 210, 0, 0), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 50, 50))
+        local BtnSoltar = createMobileButton("SOLTAR", "❌", UDim2.new(0, 280, 0, 0), UDim2.new(0, 60, 0, 55), Color3.fromRGB(150, 50, 150))
+        
+        -- Fila 2
+        local BtnMagnetico = createMobileButton("IMÁN", "🧲", UDim2.new(0, 0, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(50, 200, 100))
+        local BtnLiberar = createMobileButton("LIBERAR", "🔓", UDim2.new(0, 70, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(100, 150, 50))
+        local BtnAnclar = createMobileButton("ANCLAR", "📌", UDim2.new(0, 140, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(150, 100, 200))
+        local BtnColisiones = createMobileButton("COLIS.", "💥", UDim2.new(0, 210, 0, 60), UDim2.new(0, 65, 0, 55), Color3.fromRGB(200, 150, 50))
+        local BtnArrojar = createMobileButton("ARROJAR", "💨", UDim2.new(0, 280, 0, 60), UDim2.new(0, 60, 0, 55), Color3.fromRGB(180, 80, 180))
 
         local StatusLabel = Instance.new("TextLabel", ButtonContainer)
-        StatusLabel.Size = UDim2.new(0, 380, 0, 40)
-        StatusLabel.Position = UDim2.new(0, 10, 0, 240)
+        StatusLabel.Size = UDim2.new(0, 330, 0, 35)
+        StatusLabel.Position = UDim2.new(0, 5, 0, 125)
         StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
         StatusLabel.BackgroundTransparency = 0.3
         StatusLabel.Text = "💥 Colisión: OFF | 🧲 Objetos: 0 | 📌 Anclados: 0"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         StatusLabel.Font = Enum.Font.GothamBold
-        StatusLabel.TextSize = 14
+        StatusLabel.TextSize = 11
         StatusLabel.TextWrapped = true
         
         local statusCorner = Instance.new("UICorner", StatusLabel)
         statusCorner.CornerRadius = UDim.new(0, 8)
+        
+        -- Botón para mantener selección en móvil
+        local BtnMantener = Instance.new("TextButton", ButtonContainer)
+        BtnMantener.Size = UDim2.new(0, 330, 0, 30)
+        BtnMantener.Position = UDim2.new(0, 5, 0, 165)
+        BtnMantener.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        BtnMantener.Text = "📌 MANTENER SELECCIÓN: OFF"
+        BtnMantener.TextColor3 = Color3.fromRGB(255, 255, 255)
+        BtnMantener.Font = Enum.Font.GothamBold
+        BtnMantener.TextSize = 11
+        BtnMantener.BorderSizePixel = 0
+        
+        local mantenerCorner = Instance.new("UICorner", BtnMantener)
+        mantenerCorner.CornerRadius = UDim.new(0, 8)
+        
+        local mantenerActivo = false
 
   
         local tool = Instance.new("Tool")
@@ -4279,10 +4299,10 @@ TelekinesisTab:CreateButton({
         local CentralAttachment = Instance.new("Attachment", CentralPart)
 
         local selectionBox = Instance.new("SelectionBox")
-        selectionBox.LineThickness = 0.05
+        selectionBox.LineThickness = 0.08
         selectionBox.Color3 = Color3.fromRGB(255, 100, 50)
         selectionBox.SurfaceColor3 = Color3.fromRGB(255, 150, 100)
-        selectionBox.SurfaceTransparency = 0.9
+        selectionBox.SurfaceTransparency = 0.85
         selectionBox.Adornee = nil
         selectionBox.Visible = false
         selectionBox.Parent = workspace
@@ -4290,8 +4310,8 @@ TelekinesisTab:CreateButton({
         local highlight = Instance.new("Highlight")
         highlight.FillColor = Color3.fromRGB(255, 100, 50)
         highlight.OutlineColor = Color3.fromRGB(255, 150, 100)
-        highlight.FillTransparency = 0.7
-        highlight.OutlineTransparency = 0.3
+        highlight.FillTransparency = 0.6
+        highlight.OutlineTransparency = 0.2
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Adornee = nil
         highlight.Enabled = false
@@ -4311,7 +4331,7 @@ TelekinesisTab:CreateButton({
         local savedRotation = nil
 
 
-         function applyUltraForce(obj)
+        function applyUltraForce(obj)
             for _, x in ipairs(obj:GetChildren()) do
                 if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then
                     x:Destroy()
@@ -4348,7 +4368,7 @@ TelekinesisTab:CreateButton({
             end)
         end
 
-         function toggleCollisions()
+        function toggleCollisions()
             collisionsEnabled = not collisionsEnabled
             
             if currentObject and currentObject.Parent then
@@ -4402,7 +4422,7 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function magnetizeAllObjects()
+        function magnetizeAllObjects()
             if not currentObject then 
                 Rayfield:Notify({
                     Title = "⚠️ Error",
@@ -4494,7 +4514,7 @@ TelekinesisTab:CreateButton({
         end
         
 
-         function releaseMagnetizedObjects()
+        function releaseMagnetizedObjects()
             for _, data in pairs(magnetizedObjects) do
                 if data.object and data.object.Parent then
                     if data.alignPosition then data.alignPosition:Destroy() end
@@ -4527,7 +4547,7 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function toggleAnchor()
+        function toggleAnchor()
             if not currentObject then
                 Rayfield:Notify({
                     Title = "⚠️ Error",
@@ -4575,7 +4595,7 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function isValidObject(obj)
+        function isValidObject(obj)
             if not obj then return false end
             if not obj:IsA("BasePart") then return false end
             if obj.Anchored and not isAnchoredByScript(obj) then return false end
@@ -4584,7 +4604,7 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function selectObject(obj)
+        function selectObject(obj)
             if not isValidObject(obj) then return false end
             
             currentObject = obj
@@ -4603,7 +4623,7 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function deselectObject()
+        function deselectObject()
             if alignPosition then alignPosition:Destroy() alignPosition = nil end
             if torque then torque:Destroy() torque = nil end
             if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
@@ -4647,15 +4667,15 @@ TelekinesisTab:CreateButton({
         end
 
 
-         function acercarObjeto()
+        function acercarObjeto()
             distance = math.max(5, distance - 10)
         end
         
-         function alejarObjeto()
+        function alejarObjeto()
             distance = distance + 10
         end
         
-         function toggleRotation()
+        function toggleRotation()
             if currentObject and torque then
                 if collisionsEnabled then
                     Rayfield:Notify({
@@ -4692,7 +4712,7 @@ TelekinesisTab:CreateButton({
             end
         end
         
-         function lanzarObjeto()
+        function lanzarObjeto()
             if currentObject then
                 local success, mouseHit = pcall(function()
                     return Mouse.Hit.Position
@@ -4711,7 +4731,27 @@ TelekinesisTab:CreateButton({
             end
         end
         
-         function soltarObjeto()
+        function arrojarObjeto()
+            if currentObject then
+                if alignPosition then alignPosition:Destroy() alignPosition = nil end
+                if torque then torque:Destroy() torque = nil end
+                if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
+                
+                currentObject.Velocity = Vector3.new(0, -100, 0)
+                Network.ClearPart(currentObject)
+                
+                local obj = currentObject
+                deselectObject()
+                
+                Rayfield:Notify({
+                    Title = "💨 Arrojado",
+                    Content = "Objeto soltado hacia abajo",
+                    Duration = 2
+                })
+            end
+        end
+        
+        function soltarObjeto()
             if currentObject then
                 currentObject.Velocity = Vector3.new(0, 0, 0)
                 currentObject.RotVelocity = Vector3.new(0, 0, 0)
@@ -4720,6 +4760,27 @@ TelekinesisTab:CreateButton({
         end
 
 
+        BtnMantener.MouseButton1Click:Connect(function()
+            mantenerActivo = not mantenerActivo
+            if mantenerActivo then
+                BtnMantener.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+                BtnMantener.Text = "📌 MANTENER SELECCIÓN: ON"
+                Rayfield:Notify({
+                    Title = "✅ Mantener ON",
+                    Content = "Los objetos se mantendrán seleccionados",
+                    Duration = 3
+                })
+            else
+                BtnMantener.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                BtnMantener.Text = "📌 MANTENER SELECCIÓN: OFF"
+                Rayfield:Notify({
+                    Title = "❌ Mantener OFF",
+                    Content = "Modo normal de selección",
+                    Duration = 3
+                })
+            end
+        end)
+
         BtnAcercar.MouseButton1Click:Connect(acercarObjeto)
         BtnAlejar.MouseButton1Click:Connect(alejarObjeto)
         BtnRotar.MouseButton1Click:Connect(toggleRotation)
@@ -4727,6 +4788,7 @@ TelekinesisTab:CreateButton({
         BtnSoltar.MouseButton1Click:Connect(soltarObjeto)
         BtnAnclar.MouseButton1Click:Connect(toggleAnchor)
         BtnColisiones.MouseButton1Click:Connect(toggleCollisions)
+        BtnArrojar.MouseButton1Click:Connect(arrojarObjeto)
         BtnMagnetico.MouseButton1Click:Connect(function()
             if currentObject then
                 if not magnetMode then
@@ -4810,8 +4872,10 @@ TelekinesisTab:CreateButton({
             end)
 
             mouseButton1UpConnection = mouse.Button1Up:Connect(function()
-                mouseDown = false
-                deselectObject()
+                if not mantenerActivo then
+                    mouseDown = false
+                    deselectObject()
+                end
             end)
 
             keyDownConnection = mouse.KeyDown:Connect(function(key)
@@ -5095,7 +5159,9 @@ TelekinesisTab:CreateParagraph({
   - IMÁN
   - LIBERAR
   - ANCLAR
-  - COLISIÓN]]
+  - COLISIÓN
+  - ARROJAR
+  - MANTENER SELECCIÓN]]
 })
 
 
@@ -5120,6 +5186,7 @@ TelekinesisTab:CreateButton({
         })
     end
 })
+
 
 
 
