@@ -4024,6 +4024,1106 @@ end
 ]]
 
 
+---
+
+
+
+
+-- Telekinesis
+
+
+local Player = game.Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+if CoreGui:FindFirstChild("JMMobileControls") then
+    CoreGui:FindFirstChild("JMMobileControls"):Destroy()
+end
+
+
+if not getgenv().AnchoredByScript then
+    getgenv().AnchoredByScript = {}
+end
+
+local AnchoredByScript = getgenv().AnchoredByScript
+
+ function addToAnchoredList(part)
+    if part and part:IsA("BasePart") then
+        AnchoredByScript[part] = true
+    end
+end
+
+ function isAnchoredByScript(part)
+    return AnchoredByScript[part] == true
+end
+
+ function removeFromAnchoredList(part)
+    AnchoredByScript[part] = nil
+end
+
+ function updateAnchorCounter()
+    local count = 0
+    for part, _ in pairs(AnchoredByScript) do
+        if part and part.Parent then
+            count = count + 1
+        else
+            AnchoredByScript[part] = nil
+        end
+    end
+    return count
+end
+
+
+if not getgenv().Network then
+    getgenv().Network = {
+        BaseParts = {},
+        Velocity = Vector3.new(14.46262424, 14.46262424, 14.46262424),
+        Active = false
+    }
+
+    Network.RetainPart = function(Part)
+        if Part:IsA("BasePart") and Part:IsDescendantOf(workspace) then
+            local alreadyAdded = false
+            for _, p in pairs(Network.BaseParts) do
+                if p == Part then
+                    alreadyAdded = true
+                    break
+                end
+            end
+            
+            if not alreadyAdded then
+                table.insert(Network.BaseParts, Part)
+                Part.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+                pcall(function()
+                    Part:SetNetworkOwner(Player)
+                end)
+            end
+        end
+    end
+    
+    Network.ClearPart = function(Part)
+        for i = #Network.BaseParts, 1, -1 do
+            if Network.BaseParts[i] == Part then
+                table.remove(Network.BaseParts, i)
+                if Part and Part.Parent then
+                    Part.CustomPhysicalProperties = nil
+                    Part.Velocity = Vector3.new(0, 0, 0)
+                    Part.RotVelocity = Vector3.new(0, 0, 0)
+                    pcall(function()
+                        Part:SetNetworkOwnershipAuto()
+                    end)
+                end
+                break
+            end
+        end
+    end
+    
+    Network.ClearAll = function()
+        for _, Part in pairs(Network.BaseParts) do
+            if Part and Part.Parent then
+                Part.CustomPhysicalProperties = nil
+                Part.Velocity = Vector3.new(0, 0, 0)
+                Part.RotVelocity = Vector3.new(0, 0, 0)
+                pcall(function()
+                    Part:SetNetworkOwnershipAuto()
+                end)
+            end
+        end
+        Network.BaseParts = {}
+        Network.Active = false
+    end
+
+    local NetworkConnection = RunService.Heartbeat:Connect(function()
+        if not Network.Active then return end
+        sethiddenproperty(Player, "SimulationRadius", 9e9)
+        for i = #Network.BaseParts, 1, -1 do
+            local Part = Network.BaseParts[i]
+            if Part and Part:IsDescendantOf(workspace) then
+                Part.Velocity = Network.Velocity
+            else
+                table.remove(Network.BaseParts, i)
+            end
+        end
+    end)
+    
+    Player.ReplicationFocus = workspace
+end
+
+
+
+local TelekinesisTab = Window:CreateTab("Telekinesis")
+
+
+TelekinesisTab:CreateSection("Sistema de Telekinesis")
+
+
+TelekinesisTab:CreateButton({
+    Name = "TELEKINESIS",
+    Callback = function()
+        local character = Player.Character
+        if not character then 
+            JmodsLib:Notify({
+                Title = "❌ Error",
+                Content = "Personaje no encontrado",
+                Duration = 3
+            })
+            return 
+        end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then 
+            JmodsLib:Notify({
+                Title = "❌ Error",
+                Content = "Humanoid no encontrado",
+                Duration = 3
+            })
+            return 
+        end
+
+        JmodsLib:Notify({
+            Title = "✅ Telekinesis Activada",
+            Content = "Herramienta equipada. Usa Q/E/R/F/T/C/Z/G/X",
+            Duration = 5
+        })
+
+   
+        local MobileControlsGui = Instance.new("ScreenGui", CoreGui)
+        MobileControlsGui.Name = "JMMobileControls"
+        MobileControlsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        MobileControlsGui.Enabled = false
+        MobileControlsGui.ResetOnSpawn = false
+
+        local ButtonContainer = Instance.new("Frame", MobileControlsGui)
+        ButtonContainer.Size = UDim2.new(0, 400, 0, 410)
+        ButtonContainer.Position = UDim2.new(1, -420, 1, -430)
+        ButtonContainer.BackgroundTransparency = 1
+
+         function createMobileButton(text, icon, position, size, color)
+            local btn = Instance.new("TextButton", ButtonContainer)
+            btn.Size = size or UDim2.new(0, 80, 0, 80)
+            btn.Position = position
+            btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 70)
+            btn.Text = icon .. "\n" .. text
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 14
+            btn.TextWrapped = true
+            btn.BorderSizePixel = 0
+            btn.AutoButtonColor = false
+            
+            local corner = Instance.new("UICorner", btn)
+            corner.CornerRadius = UDim.new(0, 12)
+            
+            local stroke = Instance.new("UIStroke", btn)
+            stroke.Color = Color3.fromRGB(255, 255, 255)
+            stroke.Thickness = 2
+            stroke.Transparency = 0.7
+            
+            btn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    btn.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+                end
+            end)
+            
+            btn.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 70)
+                end
+            end)
+            
+            return btn
+        end
+
+        local BtnAcercar = createMobileButton("ACERCAR", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 120, 200))
+        local BtnAlejar = createMobileButton("ALEJAR", "⬇️", UDim2.new(0, 100, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 120, 200))
+        local BtnRotar = createMobileButton("ROTAR", "🔄", UDim2.new(0, 200, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 100, 50))
+        local BtnLanzar = createMobileButton("LANZAR", "🚀", UDim2.new(0, 300, 0, 0), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 50, 50))
+        local BtnSoltar = createMobileButton("SOLTAR", "❌", UDim2.new(0, 0, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(150, 50, 150))
+        local BtnMagnetico = createMobileButton("IMÁN", "🧲", UDim2.new(0, 100, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(50, 200, 100))
+        local BtnLiberar = createMobileButton("LIBERAR", "🔓", UDim2.new(0, 200, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(100, 150, 50))
+        local BtnAnclar = createMobileButton("ANCLAR", "📌", UDim2.new(0, 300, 0, 80), UDim2.new(0, 90, 0, 70), Color3.fromRGB(150, 100, 200))
+        local BtnColisiones = createMobileButton("COLISIÓN", "💥", UDim2.new(0, 150, 0, 160), UDim2.new(0, 90, 0, 70), Color3.fromRGB(200, 150, 50))
+
+        local StatusLabel = Instance.new("TextLabel", ButtonContainer)
+        StatusLabel.Size = UDim2.new(0, 380, 0, 40)
+        StatusLabel.Position = UDim2.new(0, 10, 0, 240)
+        StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        StatusLabel.BackgroundTransparency = 0.3
+        StatusLabel.Text = "💥 Colisión: OFF | 🧲 Objetos: 0 | 📌 Anclados: 0"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        StatusLabel.Font = Enum.Font.GothamBold
+        StatusLabel.TextSize = 14
+        StatusLabel.TextWrapped = true
+        
+        local statusCorner = Instance.new("UICorner", StatusLabel)
+        statusCorner.CornerRadius = UDim.new(0, 8)
+
+  
+        local tool = Instance.new("Tool")
+        tool.Name = "Telekinesis"
+        tool.RequiresHandle = false
+        tool.Parent = Player.Backpack
+
+        -- CORRECCIÓN: CentralPart INDEPENDIENTE del jugador
+        local CentralPart = Instance.new("Part", workspace)
+        CentralPart.Name = "TelekinesisAnchor"
+        CentralPart.Anchored = true
+        CentralPart.CanCollide = false
+        CentralPart.Transparency = 1
+        CentralPart.Size = Vector3.new(1, 1, 1)
+        CentralPart.CFrame = CFrame.new(0, 0, 0) -- Posición inicial neutral
+        
+        local CentralAttachment = Instance.new("Attachment", CentralPart)
+
+        local selectionBox = Instance.new("SelectionBox")
+        selectionBox.LineThickness = 0.05
+        selectionBox.Color3 = Color3.fromRGB(255, 100, 50)
+        selectionBox.SurfaceColor3 = Color3.fromRGB(255, 150, 100)
+        selectionBox.SurfaceTransparency = 0.9
+        selectionBox.Adornee = nil
+        selectionBox.Visible = false
+        selectionBox.Parent = workspace
+
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = Color3.fromRGB(255, 100, 50)
+        highlight.OutlineColor = Color3.fromRGB(255, 150, 100)
+        highlight.FillTransparency = 0.7
+        highlight.OutlineTransparency = 0.3
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Adornee = nil
+        highlight.Enabled = false
+        highlight.Parent = workspace
+
+        -- VARIABLES GLOBALES
+        local currentObject = nil
+        local alignPosition = nil
+        local torque = nil
+        local objectAttachment = nil
+        local mouseDown = false
+        local distance = 15
+        local magnetMode = false
+        local magnetizedObjects = {}
+        local rotationEnabled = false
+        local collisionsEnabled = false
+        local savedRotation = nil
+
+
+         function applyUltraForce(obj)
+            for _, x in ipairs(obj:GetChildren()) do
+                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then
+                    x:Destroy()
+                end
+            end
+            if obj:FindFirstChild("Attachment") then
+                obj:FindFirstChild("Attachment"):Destroy()
+            end
+            
+            obj.CanCollide = collisionsEnabled
+            obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+            
+            torque = Instance.new("Torque", obj)
+            torque.Torque = Vector3.new(0, 0, 0)
+            
+            alignPosition = Instance.new("AlignPosition", obj)
+            objectAttachment = Instance.new("Attachment", obj)
+            
+            torque.Attachment0 = objectAttachment
+            alignPosition.MaxForce = math.huge
+            alignPosition.MaxVelocity = math.huge
+            alignPosition.Responsiveness = 200
+            alignPosition.Attachment0 = objectAttachment
+            alignPosition.Attachment1 = CentralAttachment
+            
+            Network.RetainPart(obj)
+            Network.Active = true
+            
+            obj.Velocity = Vector3.new(0, 0, 0)
+            obj.RotVelocity = Vector3.new(0, 0, 0)
+            
+            pcall(function()
+                obj:SetNetworkOwner(Player)
+            end)
+        end
+
+         function toggleCollisions()
+            collisionsEnabled = not collisionsEnabled
+            
+            if currentObject and currentObject.Parent then
+                currentObject.CanCollide = collisionsEnabled
+                
+                if collisionsEnabled then
+                    savedRotation = currentObject.CFrame - currentObject.Position
+                    currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                    
+                    if rotationEnabled and torque then
+                        rotationEnabled = false
+                        torque.Torque = Vector3.new(0, 0, 0)
+                    end
+                else
+                    savedRotation = nil
+                end
+            end
+            
+            for _, data in pairs(magnetizedObjects) do
+                if data.object and data.object.Parent then
+                    data.object.CanCollide = collisionsEnabled
+                    if collisionsEnabled then
+                        data.object.RotVelocity = Vector3.new(0, 0, 0)
+                        if data.torque then
+                            data.torque.Torque = Vector3.new(0, 0, 0)
+                        end
+                    end
+                end
+            end
+            
+            local magCount = #magnetizedObjects
+            local anchorCount = updateAnchorCounter()
+            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+            
+            if collisionsEnabled then
+                BtnColisiones.BackgroundColor3 = Color3.fromRGB(100, 200, 50)
+                JmodsLib:Notify({
+                    Title = "💥 Colisiones ON",
+                    Content = "Rotación congelada. Puedes subirte al objeto.",
+                    Duration = 3
+                })
+            else
+                BtnColisiones.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+                JmodsLib:Notify({
+                    Title = "💥 Colisiones OFF",
+                    Content = "Objeto atraviesa todo. Rotación libre.",
+                    Duration = 3
+                })
+            end
+        end
+
+
+         function magnetizeAllObjects()
+            if not currentObject then 
+                JmodsLib:Notify({
+                    Title = "⚠️ Error",
+                    Content = "Primero agarra un objeto",
+                    Duration = 3
+                })
+                return 
+            end
+            
+            magnetMode = true
+            local count = 0
+            
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and not obj.Anchored and obj ~= currentObject then
+                    local isPlayerPart = false
+                    if obj:IsDescendantOf(character) then
+                        isPlayerPart = true
+                    else
+                        for _, player in pairs(game.Players:GetPlayers()) do
+                            if player.Character and obj:IsDescendantOf(player.Character) then
+                                isPlayerPart = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not isPlayerPart then
+                        local alreadyMagnetized = false
+                        for _, data in pairs(magnetizedObjects) do
+                            if data.object == obj then
+                                alreadyMagnetized = true
+                                break
+                            end
+                        end
+                        
+                        if not alreadyMagnetized then
+                            for _, x in ipairs(obj:GetChildren()) do
+                                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then
+                                    x:Destroy()
+                                end
+                            end
+                            
+                            obj.CanCollide = collisionsEnabled
+                            obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+                            Network.RetainPart(obj)
+                            
+                            obj.Velocity = Vector3.new(0, 0, 0)
+                            obj.RotVelocity = Vector3.new(0, 0, 0)
+                            
+                            pcall(function()
+                                obj:SetNetworkOwner(Player)
+                            end)
+                            
+                            local mTorque = Instance.new("Torque", obj)
+                            mTorque.Torque = Vector3.new(0, 0, 0)
+                            
+                            local mAlign = Instance.new("AlignPosition", obj)
+                            local mAttach = Instance.new("Attachment", obj)
+                            
+                            mTorque.Attachment0 = mAttach
+                            mAlign.MaxForce = math.huge
+                            mAlign.MaxVelocity = math.huge
+                            mAlign.Responsiveness = 150
+                            mAlign.Attachment0 = mAttach
+                            mAlign.Attachment1 = CentralAttachment
+                            
+                            table.insert(magnetizedObjects, {
+                                object = obj,
+                                alignPosition = mAlign,
+                                torque = mTorque,
+                                attachment = mAttach
+                            })
+                            
+                            count = count + 1
+                        end
+                    end
+                end
+            end
+            
+            local anchorCount = updateAnchorCounter()
+            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                collisionsEnabled and "ON" or "OFF", count, anchorCount)
+            
+            JmodsLib:Notify({
+                Title = "🧲 Modo Magnético",
+                Content = count .. " objetos magnetizados",
+                Duration = 4
+            })
+        end
+        
+
+         function releaseMagnetizedObjects()
+            for _, data in pairs(magnetizedObjects) do
+                if data.object and data.object.Parent then
+                    if data.alignPosition then data.alignPosition:Destroy() end
+                    if data.torque then data.torque:Destroy() end
+                    if data.attachment then data.attachment:Destroy() end
+                    data.object.CanCollide = true
+                    data.object.CustomPhysicalProperties = nil
+                    data.object.Velocity = Vector3.new(0, 0, 0)
+                    data.object.RotVelocity = Vector3.new(0, 0, 0)
+                    
+                    Network.ClearPart(data.object)
+                    
+                    pcall(function()
+                        data.object:SetNetworkOwnershipAuto()
+                    end)
+                end
+            end
+            magnetizedObjects = {}
+            magnetMode = false
+            
+            local anchorCount = updateAnchorCounter()
+            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: 0 | 📌 Anclados: %d", 
+                collisionsEnabled and "ON" or "OFF", anchorCount)
+            
+            JmodsLib:Notify({
+                Title = "🔓 Liberados",
+                Content = "Todos los objetos fueron liberados",
+                Duration = 3
+            })
+        end
+
+
+         function toggleAnchor()
+            if not currentObject then
+                JmodsLib:Notify({
+                    Title = "⚠️ Error",
+                    Content = "Primero agarra un objeto",
+                    Duration = 3
+                })
+                return
+            end
+            
+            if currentObject.Anchored and isAnchoredByScript(currentObject) then
+                currentObject.Anchored = false
+                removeFromAnchoredList(currentObject)
+                
+                local anchorCount = updateAnchorCounter()
+                local magCount = #magnetizedObjects
+                StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                    collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+                
+                JmodsLib:Notify({
+                    Title = "🔓 Desanclado",
+                    Content = currentObject.Name .. " desanclado",
+                    Duration = 3
+                })
+            else
+                currentObject.Anchored = true
+                addToAnchoredList(currentObject)
+                
+                if alignPosition then alignPosition:Destroy() alignPosition = nil end
+                if torque then torque:Destroy() torque = nil end
+                if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
+                
+                Network.ClearPart(currentObject)
+                
+                local anchorCount = updateAnchorCounter()
+                local magCount = #magnetizedObjects
+                StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                    collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+                
+                JmodsLib:Notify({
+                    Title = "📌 Anclado",
+                    Content = currentObject.Name .. " anclado permanentemente",
+                    Duration = 3
+                })
+            end
+        end
+
+
+         function isValidObject(obj)
+            if not obj then return false end
+            if not obj:IsA("BasePart") then return false end
+            if obj.Anchored and not isAnchoredByScript(obj) then return false end
+            if obj:IsDescendantOf(character) then return false end
+            return true
+        end
+
+
+         function selectObject(obj)
+            if not isValidObject(obj) then return false end
+            
+            currentObject = obj
+            
+            selectionBox.Adornee = obj
+            selectionBox.Visible = true
+            highlight.Adornee = obj
+            highlight.Enabled = true
+            
+            local cameraPosition = workspace.CurrentCamera.CFrame.Position
+            distance = (obj.Position - cameraPosition).Magnitude
+            
+            rotationEnabled = false
+            
+            return true
+        end
+
+
+         function deselectObject()
+            if alignPosition then alignPosition:Destroy() alignPosition = nil end
+            if torque then torque:Destroy() torque = nil end
+            if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
+            
+            if currentObject and currentObject.Parent then
+                currentObject.CanCollide = true
+                currentObject.CustomPhysicalProperties = nil
+                currentObject.Velocity = Vector3.new(0, 0, 0)
+                currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                
+                if currentObject:FindFirstChild("TelekinesisParticle") then
+                    currentObject.TelekinesisParticle:Destroy()
+                end
+                
+                Network.ClearPart(currentObject)
+                
+                pcall(function()
+                    currentObject:SetNetworkOwnershipAuto()
+                end)
+            end
+            
+            if magnetMode or #magnetizedObjects > 0 then
+                releaseMagnetizedObjects()
+            end
+            
+            -- Desactivar Network cuando no hay objetos
+            if not magnetMode and #magnetizedObjects == 0 then
+                Network.Active = false
+            end
+            
+            if CentralPart and CentralPart.Parent then
+                CentralPart.CFrame = CFrame.new(0, 0, 0) -- Reset posición
+            end
+            
+            currentObject = nil
+            rotationEnabled = false
+            selectionBox.Adornee = nil
+            selectionBox.Visible = false
+            highlight.Adornee = nil
+            highlight.Enabled = false
+        end
+
+
+         function acercarObjeto()
+            distance = math.max(5, distance - 10)
+        end
+        
+         function alejarObjeto()
+            distance = distance + 10
+        end
+        
+         function toggleRotation()
+            if currentObject and torque then
+                if collisionsEnabled then
+                    JmodsLib:Notify({
+                        Title = "⚠️ Error",
+                        Content = "Desactiva colisiones primero (tecla C)",
+                        Duration = 3
+                    })
+                    return
+                end
+                
+                rotationEnabled = not rotationEnabled
+                if rotationEnabled then
+                    torque.Torque = Vector3.new(100000, 100000, 100000)
+                    if currentObject and currentObject.Parent then
+                        currentObject.Velocity = Vector3.new(0, 0.1, 0)
+                    end
+                    JmodsLib:Notify({
+                        Title = "🔄 Rotación ON",
+                        Content = "Objeto girando",
+                        Duration = 2
+                    })
+                else
+                    torque.Torque = Vector3.new(0, 0, 0)
+                    if currentObject and currentObject.Parent then
+                        currentObject.Velocity = Vector3.new(0, 0, 0)
+                        currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                    end
+                    JmodsLib:Notify({
+                        Title = "⏸️ Rotación OFF",
+                        Content = "Rotación detenida",
+                        Duration = 2
+                    })
+                end
+            end
+        end
+        
+         function lanzarObjeto()
+            if currentObject then
+                local success, mouseHit = pcall(function()
+                    return Mouse.Hit.Position
+                end)
+                
+                if success and mouseHit then
+                    local direction = (mouseHit - currentObject.Position).Unit
+                    currentObject.Velocity = direction * 200
+                end
+                deselectObject()
+                JmodsLib:Notify({
+                    Title = "🚀 Lanzado",
+                    Content = "Objeto lanzado con fuerza",
+                    Duration = 2
+                })
+            end
+        end
+        
+         function soltarObjeto()
+            if currentObject then
+                currentObject.Velocity = Vector3.new(0, 0, 0)
+                currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                deselectObject()
+            end
+        end
+
+
+        BtnAcercar.MouseButton1Click:Connect(acercarObjeto)
+        BtnAlejar.MouseButton1Click:Connect(alejarObjeto)
+        BtnRotar.MouseButton1Click:Connect(toggleRotation)
+        BtnLanzar.MouseButton1Click:Connect(lanzarObjeto)
+        BtnSoltar.MouseButton1Click:Connect(soltarObjeto)
+        BtnAnclar.MouseButton1Click:Connect(toggleAnchor)
+        BtnColisiones.MouseButton1Click:Connect(toggleCollisions)
+        BtnMagnetico.MouseButton1Click:Connect(function()
+            if currentObject then
+                if not magnetMode then
+                    magnetizeAllObjects()
+                else
+                    releaseMagnetizedObjects()
+                end
+            else
+                JmodsLib:Notify({
+                    Title = "⚠️ Error",
+                    Content = "Primero agarra un objeto",
+                    Duration = 3
+                })
+            end
+        end)
+        BtnLiberar.MouseButton1Click:Connect(releaseMagnetizedObjects)
+
+        tool.Equipped:Connect(function(mouse)
+            if isMobile then
+                MobileControlsGui.Enabled = true
+            end
+            
+            if not mouse then return end
+            
+            if CentralPart then
+                CentralPart.Parent = workspace
+            end
+            
+            local anchorCount = updateAnchorCounter()
+            StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: 0 | 📌 Anclados: %d", 
+                collisionsEnabled and "ON" or "OFF", anchorCount)
+            
+            local mouseButton1DownConnection
+            local mouseButton1UpConnection
+            local keyDownConnection
+            
+            mouseButton1DownConnection = mouse.Button1Down:Connect(function()
+                if not mouse then return end
+                
+                mouseDown = true
+                
+                local target = mouse.Target
+                
+                if not target or not isValidObject(target) then
+                    local camera = workspace.CurrentCamera
+                    local rayOrigin = camera.CFrame.Position
+                    local rayDirection = (mouse.Hit.Position - rayOrigin).Unit * 50000
+                    
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                    raycastParams.FilterDescendantsInstances = {character}
+                    raycastParams.IgnoreWater = true
+                    
+                    local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                    
+                    if rayResult and rayResult.Instance then
+                        target = rayResult.Instance
+                        
+                        local currentPart = target
+                        local attempts = 0
+                        while currentPart and not isValidObject(currentPart) and attempts < 10 do
+                            currentPart = currentPart.Parent
+                            if currentPart and currentPart:IsA("BasePart") then
+                                target = currentPart
+                                break
+                            end
+                            attempts = attempts + 1
+                        end
+                    end
+                end
+                
+                if target and isValidObject(target) then
+                    if selectObject(target) then
+                        JmodsLib:Notify({
+                            Title = "🎯 Seleccionado",
+                            Content = target.Name .. " - " .. math.floor(target:GetMass()) .. "kg",
+                            Duration = 2
+                        })
+                    end
+                end
+            end)
+
+            mouseButton1UpConnection = mouse.Button1Up:Connect(function()
+                mouseDown = false
+                deselectObject()
+            end)
+
+            keyDownConnection = mouse.KeyDown:Connect(function(key)
+                if not mouse then return end
+                
+                key = key:lower()
+                
+                if key == "q" then
+                    acercarObjeto()
+                elseif key == "e" then
+                    alejarObjeto()
+                elseif key == "r" then
+                    toggleRotation()
+                elseif key == "f" then
+                    lanzarObjeto()
+                elseif key == "t" then
+                    toggleAnchor()
+                elseif key == "c" then
+                    toggleCollisions()
+                elseif key == "z" then
+                    if currentObject then
+                        if not magnetMode then
+                            magnetizeAllObjects()
+                        else
+                            releaseMagnetizedObjects()
+                        end
+                    else
+                        JmodsLib:Notify({
+                            Title = "⚠️ Error",
+                            Content = "Primero agarra un objeto",
+                            Duration = 3
+                        })
+                    end
+                elseif key == "g" then
+                    if magnetMode or #magnetizedObjects > 0 then
+                        releaseMagnetizedObjects()
+                    end
+                elseif key == "x" then
+                    soltarObjeto()
+                end
+            end)
+
+            local connection
+            connection = RunService.Heartbeat:Connect(function()
+                if not tool.Parent then
+                    connection:Disconnect()
+                    deselectObject()
+                    if mouseButton1DownConnection then mouseButton1DownConnection:Disconnect() end
+                    if mouseButton1UpConnection then mouseButton1UpConnection:Disconnect() end
+                    if keyDownConnection then keyDownConnection:Disconnect() end
+                    return
+                end
+                
+                local mouseIsValid = pcall(function()
+                    return mouse.Hit
+                end)
+                
+                if not mouseIsValid then 
+                    connection:Disconnect()
+                    return 
+                end
+
+                if mouseDown and currentObject then
+                    if not alignPosition or not alignPosition.Parent then
+                        applyUltraForce(currentObject)
+                    end
+                    
+                    if not currentObject.Parent then
+                        deselectObject()
+                        mouseDown = false
+                        return
+                    end
+
+                    local rootPart = character:FindFirstChild("HumanoidRootPart")
+                    if not rootPart then
+                        deselectObject()
+                        return
+                    end
+
+                    local success, mouseHit = pcall(function()
+                        return mouse.Hit.Position
+                    end)
+                    
+                    if not success then
+                        return
+                    end
+
+                    if currentObject and currentObject.Parent and not rotationEnabled then
+                        currentObject.Velocity = Vector3.new(0, 0, 0)
+                        currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    if collisionsEnabled and savedRotation and currentObject and currentObject.Parent then
+                        currentObject.RotVelocity = Vector3.new(0, 0, 0)
+                        local currentPos = currentObject.Position
+                        currentObject.CFrame = CFrame.new(currentPos) * savedRotation
+                    end
+
+                    -- CORRECCIÓN CRÍTICA: CentralPart se mueve DIRECTO al mouse (NO desde jugador)
+                    local cameraPosition = workspace.CurrentCamera.CFrame.Position
+                    local mouseDirection = (mouseHit - cameraPosition).Unit
+                    local targetPosition = cameraPosition + (mouseDirection * distance)
+                    
+                    if CentralPart and CentralPart.Parent then
+                        CentralPart.CFrame = CFrame.new(targetPosition)
+                    end
+                    
+                    if magnetMode and #magnetizedObjects > 0 then
+                        for i = #magnetizedObjects, 1, -1 do
+                            local data = magnetizedObjects[i]
+                            if not data.object or not data.object.Parent then
+                                if data.alignPosition then data.alignPosition:Destroy() end
+                                if data.torque then data.torque:Destroy() end
+                                if data.attachment then data.attachment:Destroy() end
+                                Network.ClearPart(data.object)
+                                table.remove(magnetizedObjects, i)
+                            else
+                                if not rotationEnabled then
+                                    data.object.Velocity = Vector3.new(0, 0, 0)
+                                    data.object.RotVelocity = Vector3.new(0, 0, 0)
+                                end
+                            end
+                        end
+                        
+                        local magCount = #magnetizedObjects
+                        local anchorCount = updateAnchorCounter()
+                        StatusLabel.Text = string.format("💥 Colisión: %s | 🧲 Objetos: %d | 📌 Anclados: %d", 
+                            collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+                    end
+                    
+                    if not currentObject:FindFirstChild("TelekinesisParticle") then
+                        local particle = Instance.new("ParticleEmitter")
+                        particle.Name = "TelekinesisParticle"
+                        particle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+                        particle.Color = ColorSequence.new(selectionBox.Color3)
+                        particle.Size = NumberSequence.new(0.5)
+                        particle.Transparency = NumberSequence.new({
+                            NumberSequenceKeypoint.new(0, 0.5),
+                            NumberSequenceKeypoint.new(1, 1)
+                        })
+                        particle.Lifetime = NumberRange.new(0.3, 0.6)
+                        particle.Rate = 50
+                        particle.Speed = NumberRange.new(2, 5)
+                        particle.Parent = currentObject
+                    end
+                else
+                    if currentObject and currentObject:FindFirstChild("TelekinesisParticle") then
+                        currentObject.TelekinesisParticle:Destroy()
+                    end
+                end
+            end)
+        end)
+
+        tool.Unequipped:Connect(function()
+            mouseDown = false
+            deselectObject()
+            MobileControlsGui.Enabled = false
+            
+            if CentralPart and CentralPart.Parent then
+                CentralPart.Parent = nil
+            end
+        end)
+
+        tool.AncestryChanged:Connect(function()
+            if not tool.Parent then
+                deselectObject()
+                if selectionBox then selectionBox:Destroy() end
+                if highlight then highlight:Destroy() end
+                if CentralPart then CentralPart:Destroy() end
+                MobileControlsGui.Enabled = false
+                Network.ClearAll()
+            end
+        end)
+
+        if humanoid then
+            humanoid.Died:Connect(function()
+                deselectObject()
+                if tool then tool:Destroy() end
+                if selectionBox then selectionBox:Destroy() end
+                if highlight then highlight:Destroy() end
+                if CentralPart then CentralPart:Destroy() end
+                MobileControlsGui.Enabled = false
+                Network.ClearAll()
+            end)
+        end
+
+        wait(0.5)
+        if humanoid and humanoid.Health > 0 then
+            humanoid:EquipTool(tool)
+        end
+    end
+})
+
+
+TelekinesisTab:CreateSection("Personalización")
+
+TelekinesisTab:CreateColorPicker({
+    Name = "Color de Selección",
+    Color = Color3.fromRGB(255, 100, 50),
+    Callback = function(color)
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("SelectionBox") and obj.Name ~= "SelectionBox" then
+                obj.Color3 = color
+                obj.SurfaceColor3 = Color3.new(
+                    math.min(color.R + 0.2, 1),
+                    math.min(color.G + 0.2, 1),
+                    math.min(color.B + 0.2, 1)
+                )
+            end
+        end
+        
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Highlight") then
+                obj.FillColor = color
+                obj.OutlineColor = Color3.new(
+                    math.min(color.R + 0.2, 1),
+                    math.min(color.G + 0.2, 1),
+                    math.min(color.B + 0.2, 1)
+                )
+            end
+        end
+        
+        JmodsLib:Notify({
+            Title = "Color",
+            Content = string.format("RGB(%d, %d, %d)", 
+                math.floor(color.R*255), 
+                math.floor(color.G*255), 
+                math.floor(color.B*255)),
+            Duration = 3
+        })
+    end
+})
+
+TelekinesisTab:CreateColorPicker({
+    Name = "Color de Partículas",
+    Color = Color3.fromRGB(255, 100, 50),
+    Callback = function(color)
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") and obj.Name == "TelekinesisParticle" then
+                obj.Color = ColorSequence.new(color)
+            end
+        end
+        
+        JmodsLib:Notify({
+            Title = "Partículas",
+            Content = string.format("Color: RGB(%d, %d, %d)", 
+                math.floor(color.R*255), 
+                math.floor(color.G*255), 
+                math.floor(color.B*255)),
+            Duration = 3
+        })
+    end
+})
+
+
+TelekinesisTab:CreateSection("Informacion")
+
+
+
+TelekinesisTab:CreateParagraph({
+    Title = "Controles PC",
+    Content = [[• Click: Agarrar objeto
+• Q/E: Acercar/Alejar
+• R: Toggle Rotación
+• F: Lanzar objeto
+• T: Anclar/Desanclar
+• C: Toggle Colisiones
+• Z: Modo Magnético
+• G: Liberar magnetizados
+• X: Soltar objeto]]
+})
+
+TelekinesisTab:CreateParagraph({
+    Title = "Controles Móvil",
+    Content = [[• Tap: Agarrar objeto
+• Botones en pantalla:
+  - ACERCAR/ALEJAR
+  - ROTAR
+  - LANZAR
+  - SOLTAR
+  - IMÁN
+  - LIBERAR
+  - ANCLAR
+  - COLISIÓN]]
+})
+
+
+
+TelekinesisTab:CreateParagraph({
+    Title = "Informacion",
+    Content = [[Este apartado esta actualmente en fase beta, tiene muchos errores, asi que usenlo sabiendo eso.
+    las personas se pueden seleccionar pero no las puedes arrastrar.]]
+})
+
+
+
+
+TelekinesisTab:CreateButton({
+    Name = "🗑️ Limpiar Todo",
+    Callback = function()
+        Network.ClearAll()
+        JmodsLib:Notify({
+            Title = "🗑️ Limpieza Completa",
+            Content = "Todos los objetos fueron liberados",
+            Duration = 3
+        })
+    end
+})
+
+
+
 
 
 
