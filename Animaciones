@@ -1,6 +1,4 @@
-   
-
- local HttpService = game:GetService("HttpService")
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
@@ -15,6 +13,14 @@ local buttonsCreatedR6 = false
 -- Variables para los binds
 local bindsEnabled = false
 local lastAnimationId = nil
+
+-- Variables para los botones móviles
+local mobileButtonsGui = nil
+local playButton = nil
+local stopButton = nil
+
+-- Detectar si es móvil
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 -- Devuelve el Humanoid actual
 local function getHumanoid()
@@ -59,7 +65,7 @@ local function safePlayAnim(animId)
 			track:Play()
 			track:AdjustSpeed(selectedSpeed)
 			currentTrack = track
-			lastAnimationId = animId -- Guardar la última animación reproducida
+			lastAnimationId = animId
 			return
 		end
 		task.wait(0.1)
@@ -85,6 +91,172 @@ local function stopCurrentAnimation()
 	currentTrack = nil
 end
 
+-- Crear función para hacer un botón draggable
+local function makeDraggable(frame)
+	local dragging = false
+	local dragInput
+	local dragStart
+	local startPos
+
+	local function update(input)
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	frame.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			update(input)
+		end
+	end)
+end
+
+-- Crear botones móviles
+local function createMobileButtons()
+	if mobileButtonsGui then
+		mobileButtonsGui:Destroy()
+	end
+
+	-- Crear ScreenGui
+	mobileButtonsGui = Instance.new("ScreenGui")
+	mobileButtonsGui.Name = "MobileAnimationButtons"
+	mobileButtonsGui.ResetOnSpawn = false
+	mobileButtonsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	mobileButtonsGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+	-- Botón de Reproducir Animación (Verde)
+	playButton = Instance.new("TextButton")
+	playButton.Name = "PlayButton"
+	playButton.Size = UDim2.new(0, 80, 0, 80)
+	playButton.Position = UDim2.new(0.1, 0, 0.7, 0)
+	playButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+	playButton.Text = "▶️"
+	playButton.TextColor3 = Color3.new(1, 1, 1)
+	playButton.TextSize = 35
+	playButton.Font = Enum.Font.GothamBold
+	playButton.AutoButtonColor = false
+	playButton.Parent = mobileButtonsGui
+
+	-- Esquinas redondeadas para botón play
+	local playCorner = Instance.new("UICorner")
+	playCorner.CornerRadius = UDim.new(0.25, 0)
+	playCorner.Parent = playButton
+
+	-- Sombra para botón play
+	local playShadow = Instance.new("UIStroke")
+	playShadow.Color = Color3.fromRGB(30, 130, 76)
+	playShadow.Thickness = 4
+	playShadow.Transparency = 0.5
+	playShadow.Parent = playButton
+
+	-- Hacer draggable el botón play
+	makeDraggable(playButton)
+
+	-- Función del botón play
+	playButton.MouseButton1Click:Connect(function()
+		playLastAnimation()
+		-- Efecto visual al presionar
+		playButton.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
+		task.wait(0.1)
+		playButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+	end)
+
+	-- Botón de Detener Animación (Rojo)
+	stopButton = Instance.new("TextButton")
+	stopButton.Name = "StopButton"
+	stopButton.Size = UDim2.new(0, 80, 0, 80)
+	stopButton.Position = UDim2.new(0.9, -80, 0.7, 0)
+	stopButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+	stopButton.Text = "⏹️"
+	stopButton.TextColor3 = Color3.new(1, 1, 1)
+	stopButton.TextSize = 35
+	stopButton.Font = Enum.Font.GothamBold
+	stopButton.AutoButtonColor = false
+	stopButton.Parent = mobileButtonsGui
+
+	-- Esquinas redondeadas para botón stop
+	local stopCorner = Instance.new("UICorner")
+	stopCorner.CornerRadius = UDim.new(0.25, 0)
+	stopCorner.Parent = stopButton
+
+	-- Sombra para botón stop
+	local stopShadow = Instance.new("UIStroke")
+	stopShadow.Color = Color3.fromRGB(192, 57, 43)
+	stopShadow.Thickness = 4
+	stopShadow.Transparency = 0.5
+	stopShadow.Parent = stopButton
+
+	-- Hacer draggable el botón stop
+	makeDraggable(stopButton)
+
+	-- Función del botón stop
+	stopButton.MouseButton1Click:Connect(function()
+		stopCurrentAnimation()
+		-- Efecto visual al presionar
+		stopButton.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+		task.wait(0.1)
+		stopButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+	end)
+
+	-- Etiqueta para el botón Play
+	local playLabel = Instance.new("TextLabel")
+	playLabel.Size = UDim2.new(1, 0, 0, 20)
+	playLabel.Position = UDim2.new(0, 0, 1, 5)
+	playLabel.BackgroundTransparency = 1
+	playLabel.Text = "Reproducir"
+	playLabel.TextColor3 = Color3.new(1, 1, 1)
+	playLabel.TextSize = 12
+	playLabel.Font = Enum.Font.Gotham
+	playLabel.TextStrokeTransparency = 0.5
+	playLabel.Parent = playButton
+
+	-- Etiqueta para el botón Stop
+	local stopLabel = Instance.new("TextLabel")
+	stopLabel.Size = UDim2.new(1, 0, 0, 20)
+	stopLabel.Position = UDim2.new(0, 0, 1, 5)
+	stopLabel.BackgroundTransparency = 1
+	stopLabel.Text = "Detener"
+	stopLabel.TextColor3 = Color3.new(1, 1, 1)
+	stopLabel.TextSize = 12
+	stopLabel.Font = Enum.Font.Gotham
+	stopLabel.TextStrokeTransparency = 0.5
+	stopLabel.Parent = stopButton
+end
+
+-- Eliminar botones móviles
+local function removeMobileButtons()
+	if mobileButtonsGui then
+		mobileButtonsGui:Destroy()
+		mobileButtonsGui = nil
+		playButton = nil
+		stopButton = nil
+	end
+end
+
 -- Botones para animaciones R15
 local function setupUI_R15()
 	if buttonsCreated then return end
@@ -101,34 +273,46 @@ local function setupUI_R15()
 
 	-- Toggle para activar/desactivar los binds
 	AnimacionesTab:CreateToggle({
-		Name = "Activar Binds de Animación",
+		Name = isMobile and "Activar Botones de Animación" or "Activar Binds de Animación",
 		CurrentValue = false,
 		Callback = function(value)
 			bindsEnabled = value
-		end
-	})
-
-	-- Bind 1: Reproducir última animación (Tecla Q)
-	AnimacionesTab:CreateKeybind({
-		Name = "Reproducir Animación",
-		CurrentKeybind = "Q",
-		Callback = function(key)
-			if bindsEnabled then
-				playLastAnimation()
+			
+			-- Si es móvil, mostrar/ocultar botones
+			if isMobile then
+				if value then
+					createMobileButtons()
+				else
+					removeMobileButtons()
+				end
 			end
 		end
 	})
 
-	-- Bind 2: Quitar animación actual (Tecla E)
-	AnimacionesTab:CreateKeybind({
-		Name = "Quitar Animación",
-		CurrentKeybind = "E",
-		Callback = function(key)
-			if bindsEnabled then
-				stopCurrentAnimation()
+	-- Solo crear keybinds si NO es móvil
+	if not isMobile then
+		-- Bind 1: Reproducir última animación (Tecla Q)
+		AnimacionesTab:CreateKeybind({
+			Name = "Reproducir Animación",
+			CurrentKeybind = "Q",
+			Callback = function(key)
+				if bindsEnabled then
+					playLastAnimation()
+				end
 			end
-		end
-	})
+		})
+
+		-- Bind 2: Quitar animación actual (Tecla E)
+		AnimacionesTab:CreateKeybind({
+			Name = "Quitar Animación",
+			CurrentKeybind = "E",
+			Callback = function(key)
+				if bindsEnabled then
+					stopCurrentAnimation()
+				end
+			end
+		})
+	end
 
 	AnimacionesTab:CreateSlider({
 		Name = "Velocidad de animación",
@@ -193,10 +377,10 @@ local function setupUI_R15()
 					end
 				end
 			else
-				warn("❌ Error al cargar emotes R15 desde pastebin:", emotes1)
+				warn("❌ Error al cargar emotes R15 desde GitHub:", emotes2)
 			end
 		else
-			warn("❌ Error al cargar emotes R15 desde GitHub:", emotes2)
+			warn("❌ Error al cargar emotes R15 desde pastebin:", emotes1)
 		end
 	end)
 end
@@ -264,9 +448,25 @@ AnimacionesTab:CreateButton({
 -- Reset de animaciones al respawn
 LocalPlayer.CharacterAdded:Connect(function()
 	currentTrack = nil
-	lastAnimationId = nil -- Resetear también la última animación guardada
+	lastAnimationId = nil
+	-- Limpiar botones móviles si estaban activos
+	if isMobile and bindsEnabled then
+		removeMobileButtons()
+		if bindsEnabled then
+			task.wait(0.5)
+			createMobileButtons()
+		end
+	end
 end)
 
+-- Limpiar botones al destruir el script
+game:GetService("RunService").Heartbeat:Connect(function()
+	if mobileButtonsGui and not mobileButtonsGui.Parent then
+		mobileButtonsGui = nil
+		playButton = nil
+		stopButton = nil
+	end
+end)
 
 
 
