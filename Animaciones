@@ -1,5 +1,8 @@
-local HttpService = game:GetService("HttpService")
+   
+
+ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local AnimacionesTab = _G.Window:CreateTab("Animaciones", nil)
@@ -8,6 +11,10 @@ local selectedSpeed = 1
 local currentTrack = nil
 local buttonsCreated = false
 local buttonsCreatedR6 = false
+
+-- Variables para los binds
+local bindsEnabled = false
+local lastAnimationId = nil
 
 -- Devuelve el Humanoid actual
 local function getHumanoid()
@@ -52,11 +59,30 @@ local function safePlayAnim(animId)
 			track:Play()
 			track:AdjustSpeed(selectedSpeed)
 			currentTrack = track
+			lastAnimationId = animId -- Guardar la última animación reproducida
 			return
 		end
 		task.wait(0.1)
 	end
 	warn("⚠️ No se pudo cargar la animación tras varios intentos.")
+end
+
+-- Función para reproducir la última animación
+local function playLastAnimation()
+	if lastAnimationId then
+		safePlayAnim(lastAnimationId)
+	end
+end
+
+-- Función para detener animación
+local function stopCurrentAnimation()
+	local humanoid = getHumanoid()
+	if humanoid then
+		for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+			track:Stop()
+		end
+	end
+	currentTrack = nil
 end
 
 -- Botones para animaciones R15
@@ -69,13 +95,38 @@ local function setupUI_R15()
 	AnimacionesTab:CreateButton({
 		Name = "❌ Quitar Animación",
 		Callback = function()
-			local humanoid = getHumanoid()
-			if humanoid then
-				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-					track:Stop()
-				end
+			stopCurrentAnimation()
+		end
+	})
+
+	-- Toggle para activar/desactivar los binds
+	AnimacionesTab:CreateToggle({
+		Name = "Activar Binds de Animación",
+		CurrentValue = false,
+		Callback = function(value)
+			bindsEnabled = value
+		end
+	})
+
+	-- Bind 1: Reproducir última animación (Tecla Q)
+	AnimacionesTab:CreateKeybind({
+		Name = "Reproducir Animación",
+		CurrentKeybind = "Q",
+		Callback = function(key)
+			if bindsEnabled then
+				playLastAnimation()
 			end
-			currentTrack = nil
+		end
+	})
+
+	-- Bind 2: Quitar animación actual (Tecla E)
+	AnimacionesTab:CreateKeybind({
+		Name = "Quitar Animación",
+		CurrentKeybind = "E",
+		Callback = function(key)
+			if bindsEnabled then
+				stopCurrentAnimation()
+			end
 		end
 	})
 
@@ -150,12 +201,6 @@ local function setupUI_R15()
 	end)
 end
 
-
-
-
-
-
-
 -- Botones para animaciones R6
 local function setupUI_R6()
 	if buttonsCreatedR6 then return end
@@ -219,6 +264,7 @@ AnimacionesTab:CreateButton({
 -- Reset de animaciones al respawn
 LocalPlayer.CharacterAdded:Connect(function()
 	currentTrack = nil
+	lastAnimationId = nil -- Resetear también la última animación guardada
 end)
 
 
