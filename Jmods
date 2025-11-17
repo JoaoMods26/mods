@@ -4031,6 +4031,11 @@ end
 
 -- Telekinesis
 
+
+
+
+
+
 local Player = game.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local CoreGui = game:GetService("CoreGui")
@@ -4514,37 +4519,46 @@ TelekinesisTab:CreateButton({
         end
         
 
-        function releaseMagnetizedObjects()
-            for _, data in pairs(magnetizedObjects) do
-                if data.object and data.object.Parent then
-                    if data.alignPosition then data.alignPosition:Destroy() end
-                    if data.torque then data.torque:Destroy() end
-                    if data.attachment then data.attachment:Destroy() end
+function releaseMagnetizedObjects()
+    for _, data in pairs(magnetizedObjects) do
+        pcall(function()
+            if data.object then
+                if data.alignPosition then data.alignPosition:Destroy() end
+                if data.torque then data.torque:Destroy() end
+                if data.attachment then data.attachment:Destroy() end
+                
+                if data.object.Parent then
                     data.object.CanCollide = true
                     data.object.CustomPhysicalProperties = nil
                     data.object.Velocity = Vector3.new(0, 0, 0)
                     data.object.RotVelocity = Vector3.new(0, 0, 0)
-                    
-                    Network.ClearPart(data.object)
-                    
-                    pcall(function()
-                        data.object:SetNetworkOwnershipAuto()
-                    end)
+                    data.object:SetNetworkOwnershipAuto()
                 end
+                
+                Network.ClearPart(data.object)
             end
-            magnetizedObjects = {}
-            magnetMode = false
-            
-            local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
-                collisionsEnabled and "ON" or "OFF", anchorCount)
-            
-            Rayfield:Notify({
-                Title = "🔓 Liberados",
-                Content = "Todos los objetos fueron liberados",
-                Duration = 3
-            })
-        end
+        end)
+    end
+    magnetizedObjects = {}
+    magnetMode = false
+    
+    -- Forzar limpieza completa del Network
+    Network.Active = false
+    
+    if StatusLabel and StatusLabel.Parent then
+        local anchorCount = updateAnchorCounter()
+        StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
+            collisionsEnabled and "ON" or "OFF", anchorCount)
+    end
+    
+    if Rayfield then
+        Rayfield:Notify({
+            Title = "🔓 Liberados",
+            Content = "Todos los objetos fueron liberados",
+            Duration = 3
+        })
+    end
+end
 
 
         function toggleAnchor()
@@ -4623,12 +4637,16 @@ TelekinesisTab:CreateButton({
         end
 
 
-        function deselectObject()
-            if alignPosition then alignPosition:Destroy() alignPosition = nil end
-            if torque then torque:Destroy() torque = nil end
-            if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
-            
-            if currentObject and currentObject.Parent then
+  function deselectObject()
+    pcall(function()
+        if alignPosition then alignPosition:Destroy() alignPosition = nil end
+        if torque then torque:Destroy() torque = nil end
+        if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
+    end)
+    
+    if currentObject then
+        pcall(function()
+            if currentObject.Parent then
                 currentObject.CanCollide = true
                 currentObject.CustomPhysicalProperties = nil
                 currentObject.Velocity = Vector3.new(0, 0, 0)
@@ -4638,33 +4656,38 @@ TelekinesisTab:CreateButton({
                     currentObject.TelekinesisParticle:Destroy()
                 end
                 
-                Network.ClearPart(currentObject)
-                
-                pcall(function()
-                    currentObject:SetNetworkOwnershipAuto()
-                end)
+                currentObject:SetNetworkOwnershipAuto()
             end
             
-            if magnetMode or #magnetizedObjects > 0 then
-                releaseMagnetizedObjects()
-            end
-            
-            -- Desactivar Network cuando no hay objetos
-            if not magnetMode and #magnetizedObjects == 0 then
-                Network.Active = false
-            end
-            
-            if CentralPart and CentralPart.Parent then
-                CentralPart.CFrame = CFrame.new(0, 0, 0) -- Reset posición
-            end
-            
-            currentObject = nil
-            rotationEnabled = false
-            selectionBox.Adornee = nil
-            selectionBox.Visible = false
-            highlight.Adornee = nil
-            highlight.Enabled = false
-        end
+            Network.ClearPart(currentObject)
+        end)
+    end
+    
+    if magnetMode or #magnetizedObjects > 0 then
+        releaseMagnetizedObjects()
+    end
+    
+    -- Limpieza completa del Network
+    Network.ClearAll()
+    
+    if CentralPart and CentralPart.Parent then
+        CentralPart.CFrame = CFrame.new(0, 0, 0)
+    end
+    
+    currentObject = nil
+    rotationEnabled = false
+    savedRotation = nil
+    
+    if selectionBox then
+        selectionBox.Adornee = nil
+        selectionBox.Visible = false
+    end
+    
+    if highlight then
+        highlight.Adornee = nil
+        highlight.Enabled = false
+    end
+end
 
 
         function acercarObjeto()
@@ -5029,15 +5052,28 @@ TelekinesisTab:CreateButton({
             end)
         end)
 
-        tool.Unequipped:Connect(function()
-            mouseDown = false
-            deselectObject()
+ tool.Unequipped:Connect(function()
+    mouseDown = false
+    mantenerActivo = false
+    
+    -- Limpieza completa al desequipar
+    pcall(function()
+        deselectObject()
+        
+        if MobileControlsGui then
             MobileControlsGui.Enabled = false
-            
-            if CentralPart and CentralPart.Parent then
-                CentralPart.Parent = nil
-            end
-        end)
+        end
+        
+        if CentralPart then
+            CentralPart.Parent = nil
+            CentralPart.CFrame = CFrame.new(0, 0, 0)
+        end
+        
+        -- Asegurar que Network esté limpio
+        wait(0.1)
+        Network.ClearAll()
+    end)
+end)
 
         tool.AncestryChanged:Connect(function()
             if not tool.Parent then
@@ -5050,17 +5086,43 @@ TelekinesisTab:CreateButton({
             end
         end)
 
-        if humanoid then
-            humanoid.Died:Connect(function()
-                deselectObject()
-                if tool then tool:Destroy() end
-                if selectionBox then selectionBox:Destroy() end
-                if highlight then highlight:Destroy() end
-                if CentralPart then CentralPart:Destroy() end
-                MobileControlsGui.Enabled = false
-                Network.ClearAll()
-            end)
-        end
+if humanoid then
+    humanoid.Died:Connect(function()
+        -- Limpieza FORZADA de todo
+        pcall(function()
+            -- Liberar objetos magnetizados primero
+            if magnetMode or #magnetizedObjects > 0 then
+                for _, data in pairs(magnetizedObjects) do
+                    pcall(function()
+                        if data.alignPosition then data.alignPosition:Destroy() end
+                        if data.torque then data.torque:Destroy() end
+                        if data.attachment then data.attachment:Destroy() end
+                        if data.object and data.object.Parent then
+                            data.object.Velocity = Vector3.new(0, 0, 0)
+                            data.object.RotVelocity = Vector3.new(0, 0, 0)
+                            data.object:SetNetworkOwnershipAuto()
+                        end
+                    end)
+                end
+                magnetizedObjects = {}
+                magnetMode = false
+            end
+            
+            -- Limpiar objeto actual
+            deselectObject()
+            
+            -- Destruir elementos UI y físicos
+            if tool then tool:Destroy() end
+            if selectionBox then selectionBox:Destroy() end
+            if highlight then highlight:Destroy() end
+            if CentralPart then CentralPart:Destroy() end
+            if MobileControlsGui then MobileControlsGui.Enabled = false end
+            
+            -- Limpieza TOTAL del Network
+            Network.ClearAll()
+        end)
+    end)
+end
 
         wait(0.5)
         if humanoid and humanoid.Health > 0 then
@@ -5186,6 +5248,28 @@ TelekinesisTab:CreateButton({
         })
     end
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
