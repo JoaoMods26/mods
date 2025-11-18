@@ -9,12 +9,6 @@ local Button1 = TPTab:CreateButton({
    end,
 })
 
-local Button24 = TPTab:CreateButton({
-   Name = "JAnimacionesMods",
-   Callback = function()
-loadstring(game:HttpGet("loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-JAnimacionesMods-67700"))()()"))()       
-   end,
-})
 
 local Button24 = TPTab:CreateButton({
    Name = "AnimacionSpoofer Jmods",
