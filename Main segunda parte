@@ -430,7 +430,7 @@ local function createShiftlockGui()
 	-- EVENTOS DEL BOTÓN - TODOS LOS POSIBLES
 	-- MouseButton1Click para PC
 	Button.MouseButton1Click:Connect(function()
-		print("MouseButton1Click detectado")
+	--	print("MouseButton1Click detectado")
 		if shiftlockEnabled then
 			ShiftLockToggle()
 		end
@@ -438,7 +438,7 @@ local function createShiftlockGui()
 	
 	-- Activated para móvil y consolas
 	Button.Activated:Connect(function(inputObject)
-		print("Activated detectado:", inputObject.UserInputType)
+	--	print("Activated detectado:", inputObject.UserInputType)
 		if shiftlockEnabled then
 			ShiftLockToggle()
 		end
@@ -448,7 +448,7 @@ local function createShiftlockGui()
 	Button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or 
 		   input.UserInputType == Enum.UserInputType.MouseButton1 then
-			print("InputBegan Touch detectado")
+		--	print("InputBegan Touch detectado")
 			if shiftlockEnabled then
 				ShiftLockToggle()
 			end
@@ -457,7 +457,7 @@ local function createShiftlockGui()
 	
 	-- TouchTap específico para móvil
 	Button.TouchTap:Connect(function(touchPositions, gameProcessedEvent)
-		print("TouchTap detectado")
+		--print("TouchTap detectado")
 		if shiftlockEnabled and not gameProcessedEvent then
 			ShiftLockToggle()
 		end
@@ -512,10 +512,10 @@ local function AnimateButtonPress()
 end
 
 function ShiftLockToggle()
-	print("ShiftLockToggle ejecutado - Estado actual:", isActive)
+--	print("ShiftLockToggle ejecutado - Estado actual:", isActive)
 	
 	if not ((camera2.CameraSubject == humanoid2 or camera2.CameraSubject == root2) and camera2.CameraType == Enum.CameraType.Custom) then
-		print("Condiciones de cámara no cumplidas")
+		--print("Condiciones de cámara no cumplidas")
 		return
 	end
 
@@ -543,7 +543,7 @@ function ShiftLockToggle()
 			end
 		end)
 		
-		print("Shiftlock ACTIVADO")
+		--print("Shiftlock ACTIVADO")
 	else
 		isActive = false
 		UpdateAutoRotate(true)
@@ -561,7 +561,7 @@ function ShiftLockToggle()
 			cameraConnection = nil
 		end
 		
-		print("Shiftlock DESACTIVADO")
+		--print("Shiftlock DESACTIVADO")
 	end
 end
 
@@ -577,7 +577,7 @@ local function connectInput()
 		
 		-- SOLO tecla Q para PC, el botón maneja sus propios eventos
 		if input.KeyCode == shiftlockKeybind and shiftlockEnabled then
-			print("Tecla Q presionada")
+			--print("Tecla Q presionada")
 			ShiftLockToggle()
 		end
 	end)
@@ -609,14 +609,14 @@ end)
 -- ========================================
 
 function ToggleShiftlock(Value)
-	print("ToggleShiftlock llamado con valor:", Value)
+	--print("ToggleShiftlock llamado con valor:", Value)
 	shiftlockEnabled = Value
 	
 	if Value then
 		createShiftlockGui()
 		connectInput()
-		print("Shiftlock GUI creado - Botón visible:", Button and Button.Visible or "nil")
-		print("Es dispositivo táctil:", UserInputService.TouchEnabled)
+		--print("Shiftlock GUI creado - Botón visible:", Button and Button.Visible or "nil")
+		--print("Es dispositivo táctil:", UserInputService.TouchEnabled)
 	else
 		if isActive then
 			isActive = false
