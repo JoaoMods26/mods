@@ -328,10 +328,7 @@ MainTab:CreateToggle({
 
 -- ========================================
 -- ========================================
----shiftlock
-
--- ========================================
--- SHIFTLOCK LIMPIO Y FUNCIONAL
+-- SHIFTLOCK LIMPIO Y FUNCIONAL - MÓVIL CORREGIDO
 -- ========================================
 
 -- Servicios
@@ -374,9 +371,10 @@ local function createShiftlockGui()
 	ShiftlockGui.Name = "ShiftlockGUI"
 	ShiftlockGui.ResetOnSpawn = false
 	ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	ShiftlockGui.IgnoreGuiInset = false
 	ShiftlockGui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Botón principal
+	-- Botón principal - CORRECCIONES CRÍTICAS PARA MÓVIL
 	Button = Instance.new("ImageButton")
 	Button.Name = "ShiftlockButton"
 	Button.Parent = ShiftlockGui
@@ -385,6 +383,10 @@ local function createShiftlockGui()
 	Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 	Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
 	Button.Visible = UserInputService.TouchEnabled
+	Button.Active = true -- CRÍTICO: Permite interacción
+	Button.Modal = false -- No bloquea otros inputs
+	Button.ZIndex = 10 -- Asegura que esté por encima
+	Button.ImageTransparency = 1 -- Imagen transparente
 
 	-- Fondo del botón
 	StateLabelFrame = Instance.new("Frame")
@@ -392,6 +394,8 @@ local function createShiftlockGui()
 	StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
 	StateLabelFrame.BackgroundTransparency = 0.5
 	StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+	StateLabelFrame.ZIndex = 9
+	StateLabelFrame.Active = false -- NO debe interceptar toques
 
 	local UICorner = Instance.new("UICorner")
 	UICorner.CornerRadius = UDim.new(0.2, 0)
@@ -406,6 +410,8 @@ local function createShiftlockGui()
 	StateLabel.TextColor3 = Color3.new(1, 1, 1)
 	StateLabel.TextScaled = true
 	StateLabel.Font = Enum.Font.SourceSansBold
+	StateLabel.ZIndex = 9
+	StateLabel.Active = false -- NO debe interceptar toques
 
 	-- Crosshair
 	Crosshair = Instance.new("TextLabel")
@@ -418,16 +424,41 @@ local function createShiftlockGui()
 	Crosshair.TextColor3 = Color3.new(1, 1, 1)
 	Crosshair.TextStrokeTransparency = 0.5
 	Crosshair.Visible = false
+	Crosshair.ZIndex = 5
+	Crosshair.Active = false
 
-	-- EVENTO DEL BOTÓN (MÚLTIPLES EVENTOS PARA MÁXIMA COMPATIBILIDAD)
+	-- EVENTOS DEL BOTÓN - TODOS LOS POSIBLES
+	-- MouseButton1Click para PC
 	Button.MouseButton1Click:Connect(function()
+		print("MouseButton1Click detectado")
 		if shiftlockEnabled then
 			ShiftLockToggle()
 		end
 	end)
 	
-	Button.Activated:Connect(function()
+	-- Activated para móvil y consolas
+	Button.Activated:Connect(function(inputObject)
+		print("Activated detectado:", inputObject.UserInputType)
 		if shiftlockEnabled then
+			ShiftLockToggle()
+		end
+	end)
+	
+	-- InputBegan como respaldo adicional
+	Button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or 
+		   input.UserInputType == Enum.UserInputType.MouseButton1 then
+			print("InputBegan Touch detectado")
+			if shiftlockEnabled then
+				ShiftLockToggle()
+			end
+		end
+	end)
+	
+	-- TouchTap específico para móvil
+	Button.TouchTap:Connect(function(touchPositions, gameProcessedEvent)
+		print("TouchTap detectado")
+		if shiftlockEnabled and not gameProcessedEvent then
 			ShiftLockToggle()
 		end
 	end)
@@ -480,8 +511,11 @@ local function AnimateButtonPress()
 	end)
 end
 
-local function ShiftLockToggle()
+function ShiftLockToggle()
+	print("ShiftLockToggle ejecutado - Estado actual:", isActive)
+	
 	if not ((camera2.CameraSubject == humanoid2 or camera2.CameraSubject == root2) and camera2.CameraType == Enum.CameraType.Custom) then
+		print("Condiciones de cámara no cumplidas")
 		return
 	end
 
@@ -508,6 +542,8 @@ local function ShiftLockToggle()
 				end
 			end
 		end)
+		
+		print("Shiftlock ACTIVADO")
 	else
 		isActive = false
 		UpdateAutoRotate(true)
@@ -524,11 +560,13 @@ local function ShiftLockToggle()
 			cameraConnection:Disconnect()
 			cameraConnection = nil
 		end
+		
+		print("Shiftlock DESACTIVADO")
 	end
 end
 
 -- ========================================
--- CONEXIÓN DE INPUTS
+-- CONEXIÓN DE INPUTS (SOLO TECLADO)
 -- ========================================
 
 local function connectInput()
@@ -537,8 +575,9 @@ local function connectInput()
 	inputBeganConnection = UserInputService.InputBegan:Connect(function(input, gp)
 		if gp then return end
 		
-		-- Solo activar con tecla Q, sin bloquear táctil
+		-- SOLO tecla Q para PC, el botón maneja sus propios eventos
 		if input.KeyCode == shiftlockKeybind and shiftlockEnabled then
+			print("Tecla Q presionada")
 			ShiftLockToggle()
 		end
 	end)
@@ -570,11 +609,14 @@ end)
 -- ========================================
 
 function ToggleShiftlock(Value)
+	print("ToggleShiftlock llamado con valor:", Value)
 	shiftlockEnabled = Value
 	
 	if Value then
 		createShiftlockGui()
 		connectInput()
+		print("Shiftlock GUI creado - Botón visible:", Button and Button.Visible or "nil")
+		print("Es dispositivo táctil:", UserInputService.TouchEnabled)
 	else
 		if isActive then
 			isActive = false
@@ -605,7 +647,7 @@ end
 
 if MainTab and MainTab.CreateToggle then
 	MainTab:CreateToggle({
-		Name = "Shiftlock (Q en PC / Botón en Móvil)",
+		Name = "Shiftlock Activar Q",
 		CurrentValue = false,
 		Flag = "ShiftlockToggle",
 		Callback = function(Value)
@@ -613,7 +655,6 @@ if MainTab and MainTab.CreateToggle then
 		end
 	})
 end
-
 
 
 
