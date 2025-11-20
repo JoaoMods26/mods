@@ -380,12 +380,18 @@ Slider = MainTab:CreateSlider({
 
     
 
+
+
+
+
+
+
+
 -- Servicios
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local ContextActionService = game:GetService("ContextActionService")
- 
+
 -- Variables compartidas
 local player = Players.LocalPlayer
 local character, hrp, humanoid
@@ -396,22 +402,32 @@ local sliding = false
 local jumping = false
 local toggleActive = false
 local jumpKey = Enum.KeyCode.Space
- 
+
 -- Variable para el stick de movimiento nativo
 local moveVector = Vector3.zero
- 
+
 -- UI móvil (solo para salto)
-local touchGui = Instance.new("ScreenGui")
-touchGui.Name = "TouchControls"
-touchGui.ResetOnSpawn = false
-touchGui.Parent = player:WaitForChild("PlayerGui")
- 
+local touchGui
 local jumpButton
- 
+
+-- Conexiones que se activarán/desactivarán
+local inputBeganConnection
+local inputEndedConnection
+local inputChangedConnection
+local renderSteppedConnection
+
 -- Función para crear solo el botón de salto
-local function createJumpButton()
+ function createJumpButton()
 	if jumpButton then jumpButton:Destroy() end
- 
+
+	-- Crear el GUI solo si no existe
+	if not touchGui then
+		touchGui = Instance.new("ScreenGui")
+		touchGui.Name = "TouchControls"
+		touchGui.ResetOnSpawn = false
+		touchGui.Parent = player:WaitForChild("PlayerGui")
+	end
+
 	jumpButton = Instance.new("TextButton")
 	jumpButton.Size = UDim2.new(0, 100, 0, 100)
 	jumpButton.Position = UDim2.new(1, -120, 1, -120)
@@ -420,58 +436,89 @@ local function createJumpButton()
 	jumpButton.BackgroundColor3 = Color3.new(1, 1, 1)
 	jumpButton.BackgroundTransparency = 0.2
 	jumpButton.Parent = touchGui
- 
+
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.2, 0)
 	corner.Parent = jumpButton
- 
+
 	jumpButton.MouseButton1Down:Connect(function()
 		if toggleActive then
 			jumping = true
 		end
 	end)
- 
+
 	jumpButton.MouseButton1Up:Connect(function()
 		jumping = false
 	end)
 end
- 
--- Input para PC (teclado)
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.KeyCode then
-		keysPressed[input.KeyCode] = true
+
+-- Función para limpiar el botón de salto
+ function cleanupJumpButton()
+	if jumpButton then
+		jumpButton:Destroy()
+		jumpButton = nil
 	end
-	if input.KeyCode == jumpKey and toggleActive then
-		jumping = true
+	if touchGui then
+		touchGui:Destroy()
+		touchGui = nil
 	end
-end)
- 
-UserInputService.InputEnded:Connect(function(input, gpe)
-	if gpe then return end
-	if input.KeyCode then
-		keysPressed[input.KeyCode] = false
-	end
-	if input.KeyCode == jumpKey then
-		jumping = false
-	end
-end)
- 
--- Capturar el movimiento del stick nativo de Roblox (móvil)
-UserInputService.InputChanged:Connect(function(input, gpe)
-	if input.UserInputType == Enum.UserInputType.Gamepad1 then
-		-- Para gamepads
-		if input.KeyCode == Enum.KeyCode.Thumbstick1 then
-			moveVector = Vector3.new(input.Position.X, 0, -input.Position.Y)
+end
+
+-- Función para conectar inputs (solo cuando se activa)
+ function connectInputs()
+	if inputBeganConnection then return end -- Ya está conectado
+
+	inputBeganConnection = UserInputService.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		if input.KeyCode then
+			keysPressed[input.KeyCode] = true
 		end
+		if input.KeyCode == jumpKey and toggleActive then
+			jumping = true
+		end
+	end)
+
+	inputEndedConnection = UserInputService.InputEnded:Connect(function(input, gpe)
+		if gpe then return end
+		if input.KeyCode then
+			keysPressed[input.KeyCode] = false
+		end
+		if input.KeyCode == jumpKey then
+			jumping = false
+		end
+	end)
+
+	inputChangedConnection = UserInputService.InputChanged:Connect(function(input, gpe)
+		if input.UserInputType == Enum.UserInputType.Gamepad1 then
+			if input.KeyCode == Enum.KeyCode.Thumbstick1 then
+				moveVector = Vector3.new(input.Position.X, 0, -input.Position.Y)
+			end
+		end
+	end)
+end
+
+-- Función para desconectar inputs (cuando se desactiva)
+ function disconnectInputs()
+	if inputBeganConnection then
+		inputBeganConnection:Disconnect()
+		inputBeganConnection = nil
 	end
-end)
- 
--- También capturamos el movimiento táctil del stick virtual de Roblox
-local function getMobileMovement()
+	if inputEndedConnection then
+		inputEndedConnection:Disconnect()
+		inputEndedConnection = nil
+	end
+	if inputChangedConnection then
+		inputChangedConnection:Disconnect()
+		inputChangedConnection = nil
+	end
+	keysPressed = {} -- Limpiar teclas presionadas
+	jumping = false -- Asegurar que no quede saltando
+end
+
+-- Función para obtener el movimiento móvil
+ function getMobileMovement()
 	local moveDirection = Vector3.zero
- 
-	-- Intenta obtener el MoveVector desde el ContextActionService (usado por el control táctil de Roblox)
+
 	pcall(function()
 		local playerModule = player.PlayerScripts:WaitForChild("PlayerModule")
 		local controls = require(playerModule:WaitForChild("ControlModule"))
@@ -479,12 +526,12 @@ local function getMobileMovement()
 			moveDirection = controls:GetMoveVector()
 		end
 	end)
- 
+
 	return moveDirection
 end
- 
+
 -- Dirección de movimiento (PC + Móvil)
-local function getDirection()
+ function getDirection()
 	-- Si estamos en móvil y hay movimiento del stick nativo
 	if UserInputService.TouchEnabled then
 		local mobileMove = getMobileMovement()
@@ -492,58 +539,76 @@ local function getDirection()
 			local camCF = workspace.CurrentCamera.CFrame
 			local lookVector = camCF.LookVector
 			local rightVector = camCF.RightVector
- 
-			-- Convertir el input del stick a dirección mundial
+
 			local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
 			worldDirection = Vector3.new(worldDirection.X, 0, worldDirection.Z)
- 
+
 			return worldDirection.Magnitude > 0 and worldDirection.Unit or Vector3.zero
 		end
 	end
- 
+
 	-- Movimiento para PC (teclado)
 	local camCF = workspace.CurrentCamera.CFrame
 	local moveDir = Vector3.zero
- 
+
 	if keysPressed[Enum.KeyCode.W] then moveDir += camCF.LookVector end
 	if keysPressed[Enum.KeyCode.S] then moveDir -= camCF.LookVector end
 	if keysPressed[Enum.KeyCode.A] then moveDir -= camCF.RightVector end
 	if keysPressed[Enum.KeyCode.D] then moveDir += camCF.RightVector end
- 
+
 	moveDir = Vector3.new(moveDir.X, 0, moveDir.Z)
 	return moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
 end
- 
--- Movimiento principal
-RunService.RenderStepped:Connect(function(dt)
-	if sliding and hrp and character then
-		local dir = getDirection()
-		if dir.Magnitude > 0 then
-			hrp.CFrame += dir * currentSpeed * dt
+
+-- Función para conectar el loop de movimiento
+ function connectRenderStepped()
+	if renderSteppedConnection then return end -- Ya está conectado
+
+	renderSteppedConnection = RunService.RenderStepped:Connect(function(dt)
+		if sliding and hrp and character then
+			local dir = getDirection()
+			if dir.Magnitude > 0 then
+				hrp.CFrame += dir * currentSpeed * dt
+			end
 		end
+		
+		-- Salto suave continuo (como antes)
+		if jumping and toggleActive and hrp then
+			hrp.CFrame = hrp.CFrame + Vector3.new(0, currentJumpHeight, 0)
+		end
+	end)
+end
+
+-- Función para desconectar el loop de movimiento
+ function disconnectRenderStepped()
+	if renderSteppedConnection then
+		renderSteppedConnection:Disconnect()
+		renderSteppedConnection = nil
 	end
-	if jumping and toggleActive and hrp then
-		hrp.CFrame = hrp.CFrame + Vector3.new(0, currentJumpHeight, 0)
-	end
-end)
- 
+end
+
 -- Setup personaje
-local function setupCharacter(char)
+ function setupCharacter(char)
 	character = char
 	hrp = character:WaitForChild("HumanoidRootPart")
 	humanoid = character:WaitForChild("Humanoid")
 	hrp.Anchored = false
- 
+
 	if sliding then
 		humanoid.WalkSpeed = 0
 	else
 		humanoid.WalkSpeed = 16
 	end
 end
- 
+
 if player.Character then setupCharacter(player.Character) end
 player.CharacterAdded:Connect(setupCharacter)
- 
+
+-- Función para verificar si algún toggle está activo
+local function shouldBeActive()
+	return sliding or toggleActive
+end
+
 -- UI con Rayfield
 MainTab:CreateToggle({
 	Name = "Modo deslizamiento",
@@ -551,13 +616,23 @@ MainTab:CreateToggle({
 	Flag = "slidetoggle",
 	Callback = function(Value)
 		sliding = Value
+		
+		if shouldBeActive() then
+			-- ACTIVAR: Conectar todo si hay algún toggle activo
+			connectInputs()
+			connectRenderStepped()
+		else
+			-- DESACTIVAR: Desconectar solo si NINGÚN toggle está activo
+			disconnectInputs()
+			disconnectRenderStepped()
+		end
+		
 		if humanoid then
 			humanoid.WalkSpeed = Value and 0 or 16
 		end
-		-- Ya no creamos botones WASD, el stick nativo funciona automáticamente
 	end,
 })
- 
+
 MainTab:CreateSlider({
 	Name = "Velocidad deslizarse",
 	Range = {1, 500},
@@ -569,27 +644,37 @@ MainTab:CreateSlider({
 		currentSpeed = Value
 	end,
 })
- 
+
 MainTab:CreateToggle({
 	Name = "Salto Deslizado",
 	CurrentValue = false,
 	Flag = "jumptoggle",
 	Callback = function(Value)
 		toggleActive = Value
+		
 		if not Value then
 			jumping = false
-		end
-		-- Solo creamos el botón de salto en móvil
-		if UserInputService.TouchEnabled then
-			if Value then
+			-- Limpiar botón cuando se desactiva
+			cleanupJumpButton()
+			
+			-- Desconectar solo si el modo deslizamiento también está desactivado
+			if not sliding then
+				disconnectInputs()
+				disconnectRenderStepped()
+			end
+		else
+			-- ACTIVAR: Conectar inputs y loop
+			connectInputs()
+			connectRenderStepped()
+			
+			-- Solo crear el botón de salto en móvil cuando se activa
+			if UserInputService.TouchEnabled then
 				createJumpButton()
-			elseif jumpButton then
-				jumpButton:Destroy()
 			end
 		end
 	end,
 })
- 
+
 MainTab:CreateSlider({
 	Name = "Altura del Salto",
 	Range = {0.01, 7},
@@ -601,6 +686,9 @@ MainTab:CreateSlider({
 		currentJumpHeight = Value
 	end,
 })
+
+
+
 
 
 
