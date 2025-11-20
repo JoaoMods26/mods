@@ -1,4 +1,8 @@
 -- // Fantasma
+-- ========================================
+-- FANTASMA
+-- ========================================
+
 -- // Servicios
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
@@ -16,6 +20,9 @@ local ghostPart = nil
 local platform = nil
 local lastPosition = nil
 
+-- Tabla para guardar las transparencias originales
+local originalTransparencies = {}
+
 -- // Movimiento móvil flags
 local moveFlags = {
 	W = false,
@@ -30,7 +37,10 @@ local moveFlags = {
 local screenGui = nil
 local buttons = {}
 
--- // Función para crear la GUI móvil
+-- // Conexión del loop de movimiento (SE ACTIVA SOLO CUANDO SE USA)
+local heartbeatConnection = nil
+
+-- // Función para crear la GUI móvil (SOLO cuando se activa ghost)
 local function createMobileGui()
 	if screenGui then
 		screenGui:Destroy()
@@ -65,8 +75,14 @@ local function createMobileGui()
 	end
 end
 
--- Crear la GUI una vez al inicio
-createMobileGui()
+-- // Función para limpiar la GUI móvil
+local function cleanupMobileGui()
+	if screenGui then
+		screenGui:Destroy()
+		screenGui = nil
+		buttons = {}
+	end
+end
 
 -- // Funciones originales
 local function createPlatform(position)
@@ -150,34 +166,72 @@ local function updateGhostPartMovement()
 	end
 end
 
+-- Función para activar el loop de movimiento
+local function connectHeartbeat()
+	if heartbeatConnection then return end
+	heartbeatConnection = RunService.Heartbeat:Connect(function()
+		updateGhostPartMovement()
+	end)
+end
+
+-- Función para desactivar el loop de movimiento
+local function disconnectHeartbeat()
+	if heartbeatConnection then
+		heartbeatConnection:Disconnect()
+		heartbeatConnection = nil
+	end
+end
+
+-- Función para guardar transparencias originales
+local function saveOriginalTransparencies()
+	originalTransparencies = {}
+	
+	for _, obj in pairs(character:GetDescendants()) do
+		if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+			-- Solo guardar partes que son del cuerpo original del personaje
+			-- Ignorar partes que el juego pueda haber añadido
+			if obj.Parent == character or (obj.Parent and obj.Parent:IsA("Accessory")) then
+				originalTransparencies[obj] = obj.Transparency
+			end
+		elseif obj:IsA("Decal") then
+			if obj.Parent and (obj.Parent.Parent == character or obj.Parent.Name == "Head") then
+				originalTransparencies[obj] = obj.Transparency
+			end
+		end
+	end
+end
+
+-- Función para restaurar transparencias originales
+local function restoreOriginalTransparencies()
+	for obj, transparency in pairs(originalTransparencies) do
+		if obj and obj.Parent then
+			obj.Transparency = transparency
+		end
+	end
+	
+	-- Mantener HumanoidRootPart invisible siempre
+	if humanoidRootPart then
+		humanoidRootPart.Transparency = 1
+	end
+	
+	-- Mantener CollisionPart invisible si existe
+	local collidePart = character:FindFirstChild("CollisionPart", true)
+	if collidePart and collidePart:IsA("BasePart") then
+		collidePart.Transparency = 1
+	end
+	
+	originalTransparencies = {}
+end
+
 local function teleportAndGhost()
 	if isGhostMode then
+		-- DESACTIVAR GHOST MODE
 		humanoidRootPart.CFrame = ghostPart and CFrame.new(ghostPart.Position + Vector3.new(0, 3, 0)) or CFrame.new(0, 100, 0)
 		character.Humanoid.WalkSpeed = 16
 		character.Humanoid.JumpPower = 50
 
-		for _, obj in pairs(character:GetDescendants()) do
-			if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
-				if obj.Name ~= "CollisionPart" then
-					obj.Transparency = 0
-				end
-			elseif obj:IsA("Accessory") and obj:FindFirstChild("Handle") then
-				obj.Handle.Transparency = 0
-			elseif obj:IsA("SpecialMesh") and obj.Parent:IsA("Part") then
-				obj.Parent.Transparency = 0
-			end
-		end
-
-		-- Mantener HumanoidRootPart invisible
-		if humanoidRootPart then
-			humanoidRootPart.Transparency = 1
-		end
-
-		-- Mantener CollisionPart invisible
-		local collidePart = character:FindFirstChild("CollisionPart", true)
-		if collidePart then
-			collidePart.Transparency = 1
-		end
+		-- Restaurar transparencias originales
+		restoreOriginalTransparencies()
 
 		camera.CameraSubject = character:FindFirstChildOfClass("Humanoid") or character
 		camera.CameraType = Enum.CameraType.Custom
@@ -185,31 +239,50 @@ local function teleportAndGhost()
 		if ghostPart then ghostPart:Destroy() ghostPart = nil end
 		if platform then platform:Destroy() platform = nil end
 
-		if screenGui then
-			screenGui.Enabled = false
-		end
+		-- Limpiar GUI y desconectar loop
+		cleanupMobileGui()
+		disconnectHeartbeat()
 
 		isGhostMode = false
 	else
+		-- ACTIVAR GHOST MODE
 		lastPosition = humanoidRootPart.CFrame
 		local teleportPosition = Vector3.new(math.random(-1000, 1000), 100, math.random(-1000, 1000))
+		
+		-- Guardar transparencias antes de modificar
+		saveOriginalTransparencies()
+		
 		createPlatform(teleportPosition)
 		humanoidRootPart.CFrame = CFrame.new(teleportPosition)
 		createGhostPart(lastPosition)
 		character.Humanoid.WalkSpeed = 0
 		character.Humanoid.JumpPower = 0
 
+		-- Hacer invisibles SOLO las partes del personaje original
 		for _, part in pairs(character:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.Transparency = 1
+			if part:IsA("BasePart") or part:IsA("MeshPart") then
+				-- Solo afectar partes del cuerpo y accesorios
+				if part.Parent == character or (part.Parent and part.Parent:IsA("Accessory")) then
+					part.Transparency = 1
+				end
 			elseif part:IsA("Decal") then
-				part.Transparency = 0
+				-- Mantener decals visibles (cara)
+				if part.Parent and (part.Parent.Parent == character or part.Parent.Name == "Head") then
+					part.Transparency = 0
+				end
 			end
 		end
 
-		if UserInputService.TouchEnabled and screenGui then
-			screenGui.Enabled = true
+		-- Crear GUI solo si es móvil
+		if UserInputService.TouchEnabled then
+			createMobileGui()
+			if screenGui then
+				screenGui.Enabled = true
+			end
 		end
+
+		-- Conectar el loop de movimiento
+		connectHeartbeat()
 
 		isGhostMode = true
 	end
@@ -226,16 +299,11 @@ player.CharacterAdded:Connect(function(char)
 		camera.CameraSubject = character:WaitForChild("Humanoid")
 		camera.CameraType = Enum.CameraType.Custom
 		isGhostMode = false
+		cleanupMobileGui()
+		disconnectHeartbeat()
 	end
 
 	if platform then platform:Destroy() platform = nil end
-
-	-- Reconstruir GUI para el nuevo PlayerGui
-	createMobileGui()
-
-	if screenGui then
-		screenGui.Enabled = false
-	end
 
 	local collidePart = character:FindFirstChild("CollisionPart", true)
 	if collidePart then
@@ -257,34 +325,18 @@ MainTab:CreateToggle({
 	end,
 })
 
--- // Loop de movimiento
-RunService.Heartbeat:Connect(function()
-	updateGhostPartMovement()
-end)
 
-
-
-
-
-
-
------Shift lock abajo
-
-
+-- ========================================
+-- ========================================
+---shiftlock
 
 -- Servicios
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
-local VoiceChatService = game:GetService("VoiceChatService")
 
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local root = character:WaitForChild("HumanoidRootPart")
+local camera2 = workspace.CurrentCamera
+local character2 = player.Character or player.CharacterAdded:Wait()
+local humanoid2 = character2:WaitForChild("Humanoid")
+local root2 = character2:WaitForChild("HumanoidRootPart")
 
 -- Shiftlock variables
 local shiftlockEnabled = false
@@ -292,59 +344,97 @@ local shiftlockKeybind = Enum.KeyCode.Q
 local isActive = false
 local cameraConnection = nil
 
--- GUI Shiftlock
-local ShiftlockGui = Instance.new("ScreenGui")
-ShiftlockGui.Name = "ShiftlockGUI"
-ShiftlockGui.ResetOnSpawn = false
-ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ShiftlockGui.Parent = player:WaitForChild("PlayerGui")
+-- GUI Shiftlock (SE CREA PERO NO SE MUESTRA HASTA ACTIVAR)
+local ShiftlockGui = nil
+local Button = nil
+local StateLabelFrame = nil
+local StateLabel = nil
+local Crosshair = nil
 
-local Button = Instance.new("ImageButton")
-Button.Name = "ShiftlockButton"
-Button.Parent = ShiftlockGui
-Button.BackgroundTransparency = 1
-Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
-Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
-Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-Button.Visible = false
+-- Conexión de input (SE ACTIVA SOLO CUANDO SE USA)
+local inputBeganConnection = nil
 
-local StateLabelFrame = Instance.new("Frame")
-StateLabelFrame.Parent = Button
-StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
-StateLabelFrame.BackgroundTransparency = 0.5
-StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+-- Función para crear la GUI (solo cuando se activa el toggle)
+local function createShiftlockGui()
+	if ShiftlockGui then
+		ShiftlockGui:Destroy()
+	end
 
-local StateLabel = Instance.new("TextLabel")
-StateLabel.Parent = StateLabelFrame
-StateLabel.Size = UDim2.new(1, 0, 1, 0)
-StateLabel.BackgroundTransparency = 1
-StateLabel.Text = "OFF"
-StateLabel.TextColor3 = Color3.new(1, 1, 1)
-StateLabel.TextScaled = true
-StateLabel.Font = Enum.Font.SourceSansBold
+	ShiftlockGui = Instance.new("ScreenGui")
+	ShiftlockGui.Name = "ShiftlockGUI"
+	ShiftlockGui.ResetOnSpawn = false
+	ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	ShiftlockGui.Parent = player:WaitForChild("PlayerGui")
 
-local Crosshair = Instance.new("TextLabel")
-Crosshair.Parent = ShiftlockGui
-Crosshair.Size = UDim2.new(0, 30, 0, 30)
-Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
-Crosshair.BackgroundTransparency = 1
-Crosshair.Text = "O"
-Crosshair.TextScaled = true
-Crosshair.TextColor3 = Color3.new(1, 1, 1)
-Crosshair.Visible = false
+	Button = Instance.new("ImageButton")
+	Button.Name = "ShiftlockButton"
+	Button.Parent = ShiftlockGui
+	Button.BackgroundTransparency = 1
+	Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
+	Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
+	Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
+	Button.Visible = false
+
+	StateLabelFrame = Instance.new("Frame")
+	StateLabelFrame.Parent = Button
+	StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
+	StateLabelFrame.BackgroundTransparency = 0.5
+	StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+
+	StateLabel = Instance.new("TextLabel")
+	StateLabel.Parent = StateLabelFrame
+	StateLabel.Size = UDim2.new(1, 0, 1, 0)
+	StateLabel.BackgroundTransparency = 1
+	StateLabel.Text = "OFF"
+	StateLabel.TextColor3 = Color3.new(1, 1, 1)
+	StateLabel.TextScaled = true
+	StateLabel.Font = Enum.Font.SourceSansBold
+
+	Crosshair = Instance.new("TextLabel")
+	Crosshair.Parent = ShiftlockGui
+	Crosshair.Size = UDim2.new(0, 30, 0, 30)
+	Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
+	Crosshair.BackgroundTransparency = 1
+	Crosshair.Text = "O"
+	Crosshair.TextScaled = true
+	Crosshair.TextColor3 = Color3.new(1, 1, 1)
+	Crosshair.Visible = false
+
+	-- Conectar el botón
+	Button.MouseButton1Click:Connect(function()
+		if shiftlockEnabled then
+			ShiftLockToggle()
+		end
+	end)
+end
+
+-- Función para limpiar la GUI
+local function cleanupShiftlockGui()
+	if ShiftlockGui then
+		ShiftlockGui:Destroy()
+		ShiftlockGui = nil
+		Button = nil
+		StateLabelFrame = nil
+		StateLabel = nil
+		Crosshair = nil
+	end
+end
 
 -- Funciones Shiftlock
 local function UpdateImage(state)
-	StateLabel.Text = state
+	if StateLabel then
+		StateLabel.Text = state
+	end
 end
 
 local function UpdateAutoRotate(state)
-	if humanoid then
-		humanoid.AutoRotate = state
+	if humanoid2 then
+		humanoid2.AutoRotate = state
 	end
 end
 
 local function AnimateButtonPress()
+	if not Button then return end
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local shrinkSize = Button.Size - UDim2.new(0.01, 0, 0.01, 0)
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = shrinkSize })
@@ -356,7 +446,7 @@ local function AnimateButtonPress()
 end
 
 local function ShiftLockToggle()
-	if not ((camera.CameraSubject == humanoid or camera.CameraSubject == root) and camera.CameraType == Enum.CameraType.Custom) then
+	if not ((camera2.CameraSubject == humanoid2 or camera2.CameraSubject == root2) and camera2.CameraType == Enum.CameraType.Custom) then
 		return
 	end
 
@@ -366,16 +456,16 @@ local function ShiftLockToggle()
 		isActive = true
 		UpdateAutoRotate(false)
 		UpdateImage("ON")
-		Crosshair.Visible = true
+		if Crosshair then Crosshair.Visible = true end
 		UserInputService.MouseIconEnabled = false
 		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 
 		cameraConnection = RunService.RenderStepped:Connect(function()
-			if character and root and camera then
-				local direction = camera.CFrame.LookVector
+			if character2 and root2 and camera2 then
+				local direction = camera2.CFrame.LookVector
 				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
 				if flatDirection.Magnitude > 0 then
-					root.CFrame = CFrame.new(root.Position, root.Position + flatDirection)
+					root2.CFrame = CFrame.new(root2.Position, root2.Position + flatDirection)
 				end
 			end
 		end)
@@ -383,7 +473,7 @@ local function ShiftLockToggle()
 		isActive = false
 		UpdateAutoRotate(true)
 		UpdateImage("OFF")
-		Crosshair.Visible = false
+		if Crosshair then Crosshair.Visible = false end
 		UserInputService.MouseIconEnabled = true
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 
@@ -394,29 +484,34 @@ local function ShiftLockToggle()
 	end
 end
 
+-- Función para conectar el input (solo cuando se activa)
+local function connectInput()
+	if inputBeganConnection then return end
+	
+	inputBeganConnection = UserInputService.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		if not UserInputService.TouchEnabled and shiftlockEnabled and input.KeyCode == shiftlockKeybind then
+			ShiftLockToggle()
+		end
+	end)
+end
+
+-- Función para desconectar el input
+local function disconnectInput()
+	if inputBeganConnection then
+		inputBeganConnection:Disconnect()
+		inputBeganConnection = nil
+	end
+end
+
 player.CharacterAdded:Connect(function(char)
-	character = char
-	humanoid = character:WaitForChild("Humanoid")
-	root = character:WaitForChild("HumanoidRootPart")
+	character2 = char
+	humanoid2 = character2:WaitForChild("Humanoid")
+	root2 = character2:WaitForChild("HumanoidRootPart")
 	if isActive then
 		UpdateAutoRotate(false)
 	end
 end)
-
-Button.MouseButton1Click:Connect(function()
-	if shiftlockEnabled then
-		ShiftLockToggle()
-	end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if not UserInputService.TouchEnabled and shiftlockEnabled and input.KeyCode == shiftlockKeybind then
-		ShiftLockToggle()
-	end
-end)
-
-UpdateImage("OFF")
 
 -- Toggle Shiftlock
 MainTab:CreateToggle({
@@ -425,21 +520,41 @@ MainTab:CreateToggle({
 	Flag = "ShiftlockToggle",
 	Callback = function(Value)
 		shiftlockEnabled = Value
-		Button.Visible = shiftlockEnabled and UserInputService.TouchEnabled
-		if not shiftlockEnabled and isActive then
-			isActive = false
-			UpdateAutoRotate(true)
-			UpdateImage("OFF")
-			Crosshair.Visible = false
-			UserInputService.MouseIconEnabled = true
-			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-			if cameraConnection then
-				cameraConnection:Disconnect()
-				cameraConnection = nil
+		
+		if Value then
+			-- ACTIVAR: Crear GUI y conectar input
+			createShiftlockGui()
+			connectInput()
+			if Button then
+				Button.Visible = UserInputService.TouchEnabled
 			end
+		else
+			-- DESACTIVAR: Limpiar todo
+			if isActive then
+				isActive = false
+				UpdateAutoRotate(true)
+				UpdateImage("OFF")
+				if Crosshair then Crosshair.Visible = false end
+				UserInputService.MouseIconEnabled = true
+				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+				if cameraConnection then
+					cameraConnection:Disconnect()
+					cameraConnection = nil
+				end
+			end
+			cleanupShiftlockGui()
+			disconnectInput()
 		end
 	end
 })
+
+
+
+
+
+
+
+
 
 -- Caminar en el aire
 local isWalkingInAir = false
