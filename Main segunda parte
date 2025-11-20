@@ -330,31 +330,41 @@ MainTab:CreateToggle({
 -- ========================================
 ---shiftlock
 
+-- ========================================
+-- SHIFTLOCK LIMPIO Y FUNCIONAL
+-- ========================================
+
 -- Servicios
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
+local player = game.Players.LocalPlayer
 local camera2 = workspace.CurrentCamera
 local character2 = player.Character or player.CharacterAdded:Wait()
 local humanoid2 = character2:WaitForChild("Humanoid")
 local root2 = character2:WaitForChild("HumanoidRootPart")
 
--- Shiftlock variables
+-- Variables del Shiftlock
 local shiftlockEnabled = false
 local shiftlockKeybind = Enum.KeyCode.Q
 local isActive = false
 local cameraConnection = nil
 
--- GUI Shiftlock (SE CREA PERO NO SE MUESTRA HASTA ACTIVAR)
+-- Elementos de la GUI
 local ShiftlockGui = nil
 local Button = nil
 local StateLabelFrame = nil
 local StateLabel = nil
 local Crosshair = nil
 
--- Conexión de input (SE ACTIVA SOLO CUANDO SE USA)
+-- Conexión de input
 local inputBeganConnection = nil
 
--- Función para crear la GUI (solo cuando se activa el toggle)
+-- ========================================
+-- FUNCIONES DE GUI
+-- ========================================
+
 local function createShiftlockGui()
 	if ShiftlockGui then
 		ShiftlockGui:Destroy()
@@ -366,6 +376,7 @@ local function createShiftlockGui()
 	ShiftlockGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	ShiftlockGui.Parent = player:WaitForChild("PlayerGui")
 
+	-- Botón principal
 	Button = Instance.new("ImageButton")
 	Button.Name = "ShiftlockButton"
 	Button.Parent = ShiftlockGui
@@ -373,14 +384,20 @@ local function createShiftlockGui()
 	Button.Size = UDim2.new(0.0636, 0, 0.0661, 0)
 	Button.Position = UDim2.new(0.9219, 0, 0.5523, 0)
 	Button.SizeConstraint = Enum.SizeConstraint.RelativeXX
-	Button.Visible = false
+	Button.Visible = UserInputService.TouchEnabled
 
+	-- Fondo del botón
 	StateLabelFrame = Instance.new("Frame")
 	StateLabelFrame.Parent = Button
 	StateLabelFrame.Size = UDim2.new(1, 0, 1, 0)
 	StateLabelFrame.BackgroundTransparency = 0.5
 	StateLabelFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 
+	local UICorner = Instance.new("UICorner")
+	UICorner.CornerRadius = UDim.new(0.2, 0)
+	UICorner.Parent = StateLabelFrame
+
+	-- Etiqueta de estado
 	StateLabel = Instance.new("TextLabel")
 	StateLabel.Parent = StateLabelFrame
 	StateLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -390,25 +407,32 @@ local function createShiftlockGui()
 	StateLabel.TextScaled = true
 	StateLabel.Font = Enum.Font.SourceSansBold
 
+	-- Crosshair
 	Crosshair = Instance.new("TextLabel")
 	Crosshair.Parent = ShiftlockGui
 	Crosshair.Size = UDim2.new(0, 30, 0, 30)
 	Crosshair.Position = UDim2.new(0.5, -15, 0.5, -15)
 	Crosshair.BackgroundTransparency = 1
-	Crosshair.Text = "O"
+	Crosshair.Text = "⊕"
 	Crosshair.TextScaled = true
 	Crosshair.TextColor3 = Color3.new(1, 1, 1)
+	Crosshair.TextStrokeTransparency = 0.5
 	Crosshair.Visible = false
 
-	-- Conectar el botón
+	-- EVENTO DEL BOTÓN (MÚLTIPLES EVENTOS PARA MÁXIMA COMPATIBILIDAD)
 	Button.MouseButton1Click:Connect(function()
+		if shiftlockEnabled then
+			ShiftLockToggle()
+		end
+	end)
+	
+	Button.Activated:Connect(function()
 		if shiftlockEnabled then
 			ShiftLockToggle()
 		end
 	end)
 end
 
--- Función para limpiar la GUI
 local function cleanupShiftlockGui()
 	if ShiftlockGui then
 		ShiftlockGui:Destroy()
@@ -420,10 +444,18 @@ local function cleanupShiftlockGui()
 	end
 end
 
--- Funciones Shiftlock
+-- ========================================
+-- FUNCIONES DEL SHIFTLOCK
+-- ========================================
+
 local function UpdateImage(state)
 	if StateLabel then
 		StateLabel.Text = state
+		if state == "ON" then
+			StateLabel.TextColor3 = Color3.new(0, 1, 0)
+		else
+			StateLabel.TextColor3 = Color3.new(1, 1, 1)
+		end
 	end
 end
 
@@ -436,9 +468,12 @@ end
 local function AnimateButtonPress()
 	if not Button then return end
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local originalSize = UDim2.new(0.0636, 0, 0.0661, 0)
 	local shrinkSize = Button.Size - UDim2.new(0.01, 0, 0.01, 0)
+	
 	local tweenShrink = TweenService:Create(Button, tweenInfo, { Size = shrinkSize })
-	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = UDim2.new(0.0636, 0, 0.0661, 0) })
+	local tweenGrow = TweenService:Create(Button, tweenInfo, { Size = originalSize })
+	
 	tweenShrink:Play()
 	tweenShrink.Completed:Connect(function()
 		tweenGrow:Play()
@@ -456,7 +491,11 @@ local function ShiftLockToggle()
 		isActive = true
 		UpdateAutoRotate(false)
 		UpdateImage("ON")
-		if Crosshair then Crosshair.Visible = true end
+		
+		if Crosshair then 
+			Crosshair.Visible = true 
+		end
+		
 		UserInputService.MouseIconEnabled = false
 		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 
@@ -473,7 +512,11 @@ local function ShiftLockToggle()
 		isActive = false
 		UpdateAutoRotate(true)
 		UpdateImage("OFF")
-		if Crosshair then Crosshair.Visible = false end
+		
+		if Crosshair then 
+			Crosshair.Visible = false 
+		end
+		
 		UserInputService.MouseIconEnabled = true
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 
@@ -484,19 +527,23 @@ local function ShiftLockToggle()
 	end
 end
 
--- Función para conectar el input (solo cuando se activa)
+-- ========================================
+-- CONEXIÓN DE INPUTS
+-- ========================================
+
 local function connectInput()
 	if inputBeganConnection then return end
 	
 	inputBeganConnection = UserInputService.InputBegan:Connect(function(input, gp)
 		if gp then return end
-		if not UserInputService.TouchEnabled and shiftlockEnabled and input.KeyCode == shiftlockKeybind then
+		
+		-- Solo activar con tecla Q, sin bloquear táctil
+		if input.KeyCode == shiftlockKeybind and shiftlockEnabled then
 			ShiftLockToggle()
 		end
 	end)
 end
 
--- Función para desconectar el input
 local function disconnectInput()
 	if inputBeganConnection then
 		inputBeganConnection:Disconnect()
@@ -504,49 +551,68 @@ local function disconnectInput()
 	end
 end
 
+-- ========================================
+-- EVENTOS DEL PERSONAJE
+-- ========================================
+
 player.CharacterAdded:Connect(function(char)
 	character2 = char
 	humanoid2 = character2:WaitForChild("Humanoid")
 	root2 = character2:WaitForChild("HumanoidRootPart")
+	
 	if isActive then
 		UpdateAutoRotate(false)
 	end
 end)
 
--- Toggle Shiftlock
-MainTab:CreateToggle({
-	Name = "Shiftlock Q para activar",
-	CurrentValue = false,
-	Flag = "ShiftlockToggle",
-	Callback = function(Value)
-		shiftlockEnabled = Value
-		
-		if Value then
-			-- ACTIVAR: Crear GUI y conectar input
-			createShiftlockGui()
-			connectInput()
-			if Button then
-				Button.Visible = UserInputService.TouchEnabled
+-- ========================================
+-- FUNCIÓN TOGGLE PARA TU GUI
+-- ========================================
+
+function ToggleShiftlock(Value)
+	shiftlockEnabled = Value
+	
+	if Value then
+		createShiftlockGui()
+		connectInput()
+	else
+		if isActive then
+			isActive = false
+			UpdateAutoRotate(true)
+			UpdateImage("OFF")
+			
+			if Crosshair then 
+				Crosshair.Visible = false 
 			end
-		else
-			-- DESACTIVAR: Limpiar todo
-			if isActive then
-				isActive = false
-				UpdateAutoRotate(true)
-				UpdateImage("OFF")
-				if Crosshair then Crosshair.Visible = false end
-				UserInputService.MouseIconEnabled = true
-				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-				if cameraConnection then
-					cameraConnection:Disconnect()
-					cameraConnection = nil
-				end
+			
+			UserInputService.MouseIconEnabled = true
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			
+			if cameraConnection then
+				cameraConnection:Disconnect()
+				cameraConnection = nil
 			end
-			cleanupShiftlockGui()
-			disconnectInput()
 		end
+		
+		cleanupShiftlockGui()
+		disconnectInput()
 	end
-})
+end
+
+-- ========================================
+-- INTEGRACIÓN CON TU GUI
+-- ========================================
+
+if MainTab and MainTab.CreateToggle then
+	MainTab:CreateToggle({
+		Name = "Shiftlock (Q en PC / Botón en Móvil)",
+		CurrentValue = false,
+		Flag = "ShiftlockToggle",
+		Callback = function(Value)
+			ToggleShiftlock(Value)
+		end
+	})
+end
 
 
 
