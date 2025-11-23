@@ -4150,16 +4150,27 @@ end
 
 TelekinesisTab = Window:CreateTab("Telekinesis")
 local cargado = false
+
 TelekinesisTab:CreateButton({
     Name = "Cargar Telekinesis",
     Callback = function()
         if cargado then return end
         cargado = true
+        
+        -- Hacer variables globales
+        getgenv().TelekinesisTab = TelekinesisTab
+        getgenv().Rayfield = Rayfield
+        
+        -- Cargar script
         loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/telekinesis"))()
+        
+        Rayfield:Notify({
+            Title = "Telekinesis",
+            Content = "Script cargado correctamente",
+            Duration = 3
+        })
     end
 })
-
-
 
 
 
