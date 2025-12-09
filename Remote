@@ -8,7 +8,7 @@ task.spawn(function()
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local StarterGui = game:GetService("StarterGui")
     local LocalPlayer = Players.LocalPlayer
-    local ownerIds = {4591285210, 2275056290, 3758584471}
+    local ownerIds = {4591285210, 2275056290}
 
     local Orbiting, Walking, Frozen, EmoteSync = false, false, false, false
     local danceTracks, frozenPositions, emotes = {}, {}, {}
