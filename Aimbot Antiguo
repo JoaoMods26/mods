@@ -11,44 +11,41 @@ task.spawn(function()
 
     AimbotTab:CreateSection("Aimbot Movil/Pc")
 
+    -- ===== CONFIGURACIÓN =====
     local AimbotSettings = {
         Enabled = false,
         ESPEnabled = false,
         FOVRadius = 350,
         FOVColor = Color3.fromRGB(0, 0, 255),
         ESPColor = Color3.fromRGB(0, 0, 255),
+        ESPEnemyColor = Color3.fromRGB(255, 0, 0),
         ESPSizeMultiplier = 10,
         Sensitivity = 0,
         AimPart = "Head",
         TeamCheckEnabled = false,
         TracersEnabled = false,
         TracerColor = Color3.fromRGB(0, 0, 255),
+        TracerEnemyColor = Color3.fromRGB(255, 0, 0),
         AutoAimEnabled = false,
         OnlyClosePlayers = false,
         CloseDistanceThreshold = 100,
         WallCheck = false,
         UseAlternativeESP = false,
         ShowNamesOnly = false,
+        UseTeamColors = false,
     }
 
     local Holding = false
-    
-    -- Verificar si Drawing está disponible
     local drawingSupported = false
     
-    local success, result = pcall(function()
+    -- ===== VERIFICAR DRAWING =====
+    local success = pcall(function()
         local testCircle = Drawing.new("Circle")
         testCircle:Remove()
-        return true
-    end)
-    
-    if success and result then
         drawingSupported = true
-    else
-        drawingSupported = false
-    end
+    end)
 
-    -- FOV Circle
+    -- ===== FOV CIRCLE =====
     local FOVCircle
     if drawingSupported then
         pcall(function()
@@ -61,26 +58,49 @@ task.spawn(function()
         end)
     end
 
-    -- Función para verificar si un jugador es visible
+    -- ===== FUNCIONES DE COLOR =====
+    local function GetColorByTeam(player)
+        if not AimbotSettings.UseTeamColors then
+            return AimbotSettings.ESPColor
+        end
+        return (player.Team == LocalPlayer.Team) and AimbotSettings.ESPColor or AimbotSettings.ESPEnemyColor
+    end
+
+    local function GetTracerColorByTeam(player)
+        if not AimbotSettings.UseTeamColors then
+            return AimbotSettings.TracerColor
+        end
+        return (player.Team == LocalPlayer.Team) and AimbotSettings.TracerColor or AimbotSettings.TracerEnemyColor
+    end
+
+    -- ===== VERIFICACIÓN DE VISIBILIDAD =====
     local function IsVisible(targetChar)
         if not AimbotSettings.WallCheck then return true end
         
-        local targetPos = targetChar.HumanoidRootPart.Position
-        local direction = (targetPos - Camera.CFrame.Position).Unit * (targetPos - Camera.CFrame.Position).Magnitude
+        local success, result = pcall(function()
+            local targetPos = targetChar.HumanoidRootPart.Position
+            local direction = (targetPos - Camera.CFrame.Position).Unit * (targetPos - Camera.CFrame.Position).Magnitude
+            
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
+            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+            rayParams.IgnoreWater = true
+            
+            local rayResult = workspace:Raycast(Camera.CFrame.Position, direction, rayParams)
+            return rayResult == nil or targetChar:IsAncestorOf(rayResult.Instance)
+        end)
         
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.IgnoreWater = true
-        
-        local result = workspace:Raycast(Camera.CFrame.Position, direction, rayParams)
-        
-        return result == nil or targetChar:IsAncestorOf(result.Instance)
+        return success and result
     end
 
-    -- Función para obtener el jugador más cercano
+    -- ===== OBTENER JUGADOR MÁS CERCANO =====
     local function GetClosestPlayer()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            return nil
+        end
+        
         local closestPlayer, shortestDistance = nil, math.huge
+        local mousePos = UserInputService:GetMouseLocation()
         
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LocalPlayer and v.Character then
@@ -89,31 +109,34 @@ task.spawn(function()
                 local hum = char:FindFirstChild("Humanoid")
                 
                 if hrp and hum and hum.Health > 0 then
+                    -- Verificar equipo
                     if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then 
                         continue 
                     end
                     
-                    local targetPos = hrp.Position
-                    
+                    -- Verificar paredes
                     if not IsVisible(char) then continue end
                     
-                    local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPos)
+                    -- Verificar si está en pantalla
+                    local screenPoint, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    if not onScreen then continue end
                     
-                    if onScreen then
-                        local mousePos = UserInputService:GetMouseLocation()
-                        local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePos).Magnitude
-                        local distFromPlayer = (targetPos - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                        
-                        if distance < AimbotSettings.FOVRadius then
-                            if AimbotSettings.OnlyClosePlayers and distFromPlayer > AimbotSettings.CloseDistanceThreshold then 
-                                continue 
-                            end
-                            
-                            if distance < shortestDistance then
-                                shortestDistance = distance
-                                closestPlayer = v
-                            end
-                        end
+                    -- Calcular distancia en pantalla
+                    local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePos).Magnitude
+                    
+                    -- Verificar FOV
+                    if distance >= AimbotSettings.FOVRadius then continue end
+                    
+                    -- Verificar distancia en mundo
+                    if AimbotSettings.OnlyClosePlayers then
+                        local worldDist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if worldDist > AimbotSettings.CloseDistanceThreshold then continue end
+                    end
+                    
+                    -- Actualizar más cercano
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = v
                     end
                 end
             end
@@ -122,7 +145,7 @@ task.spawn(function()
         return closestPlayer
     end
 
-    -- Input handling
+    -- ===== INPUT HANDLING =====
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
             Holding = true
@@ -135,18 +158,18 @@ task.spawn(function()
         end
     end)
 
-    -- ESP y Tracers - Sistema de caché
+    -- ===== SISTEMA DE CACHÉ =====
     local ESPCache = {}
     local TracerCache = {}
+    local BillboardESPs = {}
     local ESPFolder = Instance.new("Folder", game.CoreGui)
     ESPFolder.Name = "ESPFolder_" .. math.random(1, 10000)
 
-    -- Función para actualizar o crear ESP
+    -- ===== FUNCIONES ESP (Drawing API) =====
     local function UpdateESP(player, color, position, size)
         if not ESPCache[player] then
             local box, text
             
-            -- Crear cuadro
             pcall(function()
                 box = Drawing.new("Square")
                 box.Color = color
@@ -157,7 +180,6 @@ task.spawn(function()
                 box.ZIndex = 1
             end)
             
-            -- Crear texto
             pcall(function()
                 text = Drawing.new("Text")
                 text.Text = player.Name
@@ -170,45 +192,38 @@ task.spawn(function()
             end)
             
             if box and text then
-                ESPCache[player] = {box = box, text = text, lastUpdate = tick()}
+                ESPCache[player] = {box = box, text = text}
             else
                 return false
             end
         end
         
-        -- Actualizar ESP existente
         local cache = ESPCache[player]
-        if cache then
-            pcall(function()
-                -- Actualizar cuadro
-                if cache.box then
-                    if AimbotSettings.ShowNamesOnly then
-                        cache.box.Visible = false
-                    else
-                        cache.box.Color = color
-                        cache.box.Size = size
-                        cache.box.Position = position
-                        cache.box.Visible = true
-                    end
-                end
-                
-                -- Actualizar texto
-                if cache.text then
-                    cache.text.Text = player.Name
-                    cache.text.Color = color
-                    cache.text.Position = Vector2.new(position.X + size.X / 2, position.Y - 20)
-                    cache.text.Visible = true
-                end
-                
-                cache.lastUpdate = tick()
-            end)
-            return true
-        end
+        if not cache then return false end
         
-        return false
+        pcall(function()
+            if cache.box then
+                if AimbotSettings.ShowNamesOnly then
+                    cache.box.Visible = false
+                else
+                    cache.box.Color = color
+                    cache.box.Size = size
+                    cache.box.Position = position
+                    cache.box.Visible = true
+                end
+            end
+            
+            if cache.text then
+                cache.text.Text = player.Name
+                cache.text.Color = color
+                cache.text.Position = Vector2.new(position.X + size.X / 2, position.Y - 20)
+                cache.text.Visible = true
+            end
+        end)
+        
+        return true
     end
 
-    -- Función para actualizar o crear Tracer
     local function UpdateTracer(player, color, fromPos, toPos)
         if not TracerCache[player] then
             local line
@@ -222,123 +237,74 @@ task.spawn(function()
             end)
             
             if line then
-                TracerCache[player] = {line = line, lastUpdate = tick()}
+                TracerCache[player] = {line = line}
             else
                 return false
             end
         end
         
-        -- Actualizar Tracer existente
         local cache = TracerCache[player]
-        if cache and cache.line then
-            pcall(function()
-                cache.line.Color = color
-                cache.line.From = fromPos
-                cache.line.To = toPos
-                cache.line.Visible = true
-                cache.lastUpdate = tick()
-            end)
-            return true
-        end
+        if not cache or not cache.line then return false end
         
-        return false
+        pcall(function()
+            cache.line.Color = color
+            cache.line.From = fromPos
+            cache.line.To = toPos
+            cache.line.Visible = true
+        end)
+        
+        return true
     end
 
-    -- Función para limpiar ESP
-    local function CleanupESP()
-        local currentTime = tick()
-        for player, cache in pairs(ESPCache) do
-            if not player.Parent or 
-               not player.Character or 
-               not player.Character:FindFirstChild("Humanoid") or 
-               player.Character.Humanoid.Health <= 0 or
-               (currentTime - cache.lastUpdate) > 0.1 then
-                
-                if cache.box then
-                    pcall(function() cache.box:Remove() end)
-                end
-                if cache.text then
-                    pcall(function() cache.text:Remove() end)
-                end
-                ESPCache[player] = nil
-            end
-        end
-    end
-
-    -- Función para limpiar Tracers
-    local function CleanupTracers()
-        local currentTime = tick()
-        for player, cache in pairs(TracerCache) do
-            if not player.Parent or 
-               not player.Character or 
-               not player.Character:FindFirstChild("Humanoid") or 
-               player.Character.Humanoid.Health <= 0 or
-               (currentTime - cache.lastUpdate) > 0.1 then
-                
-                if cache.line then
-                    pcall(function() cache.line:Remove() end)
-                end
-                TracerCache[player] = nil
-            end
-        end
-    end
-
-    -- Función para ocultar ESP
+    -- ===== LIMPIEZA DE CACHÉ =====
     local function HideAllESP()
-        for player, cache in pairs(ESPCache) do
-            if cache.box then
-                pcall(function() cache.box.Visible = false end)
-            end
-            if cache.text then
-                pcall(function() cache.text.Visible = false end)
-            end
+        for _, cache in pairs(ESPCache) do
+            pcall(function()
+                if cache.box then cache.box.Visible = false end
+                if cache.text then cache.text.Visible = false end
+            end)
         end
     end
 
-    -- Función para ocultar Tracers
     local function HideAllTracers()
-        for player, cache in pairs(TracerCache) do
-            if cache.line then
-                pcall(function() cache.line.Visible = false end)
-            end
+        for _, cache in pairs(TracerCache) do
+            pcall(function()
+                if cache.line then cache.line.Visible = false end
+            end)
         end
     end
 
-    -- Función para eliminar todos los ESP
     local function RemoveAllESP()
-        for player, cache in pairs(ESPCache) do
-            if cache.box then
-                pcall(function() cache.box:Remove() end)
-            end
-            if cache.text then
-                pcall(function() cache.text:Remove() end)
-            end
+        for _, cache in pairs(ESPCache) do
+            pcall(function()
+                if cache.box then cache.box:Remove() end
+                if cache.text then cache.text:Remove() end
+            end)
         end
         ESPCache = {}
     end
 
-    -- Función para eliminar todos los Tracers
     local function RemoveAllTracers()
-        for player, cache in pairs(TracerCache) do
-            if cache.line then
-                pcall(function() cache.line:Remove() end)
-            end
+        for _, cache in pairs(TracerCache) do
+            pcall(function()
+                if cache.line then cache.line:Remove() end
+            end)
         end
         TracerCache = {}
     end
 
-    -- ESP Alternativo con BillboardGui
-    local BillboardESPs = {}
-    
+    -- ===== ESP ALTERNATIVO (BillboardGui) =====
     local function ClearAllBillboardESPs()
         for player, billboard in pairs(BillboardESPs) do
-            if billboard and billboard.Parent then
-                pcall(function() billboard:Destroy() end)
-            end
+            pcall(function()
+                if billboard and billboard.Parent then
+                    billboard:Destroy()
+                end
+            end)
         end
         BillboardESPs = {}
     end
-    
+
     local function CreateBillboardESP(player)
         local char = player.Character
         if not char then return end
@@ -352,7 +318,6 @@ task.spawn(function()
                     BillboardESPs[player]:Destroy() 
                 end
             end)
-            BillboardESPs[player] = nil
         end
         
         local billboard = Instance.new("BillboardGui")
@@ -375,7 +340,7 @@ task.spawn(function()
             local border = Instance.new("Frame")
             border.Position = position
             border.Size = size
-            border.BackgroundColor3 = AimbotSettings.ESPColor
+            border.BackgroundColor3 = GetColorByTeam(player)
             border.BorderSizePixel = 0
             border.Parent = frame
             table.insert(borders, border)
@@ -392,81 +357,110 @@ task.spawn(function()
         nameLabel.Position = UDim2.new(0, 0, -0.15, 0)
         nameLabel.BackgroundTransparency = 1
         nameLabel.Text = player.Name
-        nameLabel.TextColor3 = AimbotSettings.ESPColor
+        nameLabel.TextColor3 = GetColorByTeam(player)
         nameLabel.TextStrokeTransparency = 0.5
         nameLabel.Font = Enum.Font.SourceSansBold
         nameLabel.TextSize = 14
         nameLabel.Parent = frame
         
         BillboardESPs[player] = billboard
-        
-        local connection
-        connection = RunService.Heartbeat:Connect(function()
-            if not billboard.Parent or not char.Parent or not hrp.Parent then
-                connection:Disconnect()
-                if BillboardESPs[player] then
-                    pcall(function() BillboardESPs[player]:Destroy() end)
-                    BillboardESPs[player] = nil
-                end
-                return
-            end
-            
-            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                return
-            end
-            
-            local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
-                and Color3.fromRGB(255, 0, 0) 
-                or AimbotSettings.ESPColor
-            
-            nameLabel.TextColor3 = color
-            for _, border in pairs(borders) do
-                if border and border.Parent then
-                    border.BackgroundColor3 = color
-                end
-            end
-        end)
     end
 
-    -- Loop principal de renderizado
+    -- ===== SISTEMA RAINBOW =====
+    local rainbowEnabled = false
+    local rainbowSpeed = 5
+
+    local function GetRainbowColor()
+        return Color3.fromHSV((tick() * rainbowSpeed / 10) % 1, 1, 1)
+    end
+
+    -- ===== LOOP PRINCIPAL OPTIMIZADO =====
+    -- CLAVE: Solo se ejecuta cuando algo está ACTIVO
+    local lastFrameTime = tick()
+    local frameSkip = 0
+    
     RunService.RenderStepped:Connect(function()
-        -- FOV Circle
+        -- ===== OPTIMIZACIÓN #1: Saltar frames si no hay nada activo =====
+        local isAnyFeatureActive = AimbotSettings.Enabled 
+            or AimbotSettings.ESPEnabled 
+            or AimbotSettings.TracersEnabled 
+            or AimbotSettings.UseAlternativeESP
+            or rainbowEnabled
+        
+        if not isAnyFeatureActive then
+            -- NO hacer NADA si todo está desactivado
+            frameSkip = frameSkip + 1
+            if frameSkip >= 30 then -- Solo limpiar cada 30 frames
+                HideAllESP()
+                HideAllTracers()
+                frameSkip = 0
+            end
+            return
+        end
+        
+        -- ===== OPTIMIZACIÓN #2: Limitar FPS del script a 30 =====
+        local currentTime = tick()
+        if currentTime - lastFrameTime < 0.033 then -- ~30 FPS
+            return
+        end
+        lastFrameTime = currentTime
+        
+        -- ===== RAINBOW =====
+        if rainbowEnabled then
+            local rainbowColor = GetRainbowColor()
+            AimbotSettings.FOVColor = rainbowColor
+            AimbotSettings.ESPColor = rainbowColor
+            AimbotSettings.TracerColor = rainbowColor
+            if AimbotSettings.UseTeamColors then
+                AimbotSettings.ESPEnemyColor = rainbowColor
+                AimbotSettings.TracerEnemyColor = rainbowColor
+            end
+        end
+        
+        -- ===== FOV CIRCLE =====
         if drawingSupported and FOVCircle then
-            pcall(function()
-                local mousePos = UserInputService:GetMouseLocation()
-                FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
-                FOVCircle.Radius = AimbotSettings.FOVRadius
-                FOVCircle.Color = AimbotSettings.FOVColor
-                FOVCircle.Visible = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
-            end)
+            local shouldShowFOV = (Holding or AimbotSettings.AutoAimEnabled) and AimbotSettings.Enabled
+            
+            if shouldShowFOV then
+                pcall(function()
+                    local mousePos = UserInputService:GetMouseLocation()
+                    FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+                    FOVCircle.Radius = AimbotSettings.FOVRadius
+                    FOVCircle.Color = AimbotSettings.FOVColor
+                    FOVCircle.Visible = true
+                end)
+            else
+                FOVCircle.Visible = false
+            end
         end
 
-        -- Aimbot
+        -- ===== AIMBOT =====
         if AimbotSettings.Enabled and (Holding or AimbotSettings.AutoAimEnabled) then
             local target = GetClosestPlayer()
             if target and target.Character then
                 local aimPart = target.Character:FindFirstChild(AimbotSettings.AimPart)
                 if aimPart then
-                    local targetPos = aimPart.Position
-                    local currentCFrame = Camera.CFrame
-                    local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
-                    
-                    if AimbotSettings.Sensitivity > 0 then
-                        Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.1 + (AimbotSettings.Sensitivity / 100))
-                    else
-                        Camera.CFrame = targetCFrame
-                    end
+                    pcall(function()
+                        local targetPos = aimPart.Position
+                        local currentCFrame = Camera.CFrame
+                        local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+                        
+                        if AimbotSettings.Sensitivity > 0 then
+                            Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.1 + (AimbotSettings.Sensitivity / 100))
+                        else
+                            Camera.CFrame = targetCFrame
+                        end
+                    end)
                 end
             end
         end
 
-        -- ESP con Drawing API
+        -- ===== ESP DRAWING API =====
         if drawingSupported and AimbotSettings.ESPEnabled and not AimbotSettings.UseAlternativeESP then
-            for player, cache in pairs(ESPCache) do
-                cache.lastUpdate = 0
-            end
+            -- Primero ocultar todos
+            HideAllESP()
             
+            -- Luego actualizar solo los visibles
             for _, v in pairs(Players:GetPlayers()) do
                 if v ~= LocalPlayer and v.Character then
                     local char = v.Character
@@ -484,9 +478,12 @@ task.spawn(function()
                             local h = math.clamp(scale * AimbotSettings.ESPSizeMultiplier, 20, 400)
                             local w = h / 1.5
                             
-                            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
-                                and Color3.fromRGB(255, 0, 0) 
-                                or AimbotSettings.ESPColor
+                            local color
+                            if AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold then
+                                color = Color3.fromRGB(255, 0, 0)
+                            else
+                                color = GetColorByTeam(v)
+                            end
                             
                             local position = Vector2.new(rootPos.X - w/2, rootPos.Y - h/2)
                             local size = Vector2.new(w, h)
@@ -496,16 +493,10 @@ task.spawn(function()
                     end
                 end
             end
-            
-            CleanupESP()
-        elseif not AimbotSettings.ESPEnabled or AimbotSettings.UseAlternativeESP then
-            HideAllESP()
         end
 
-        -- ESP Alternativo con BillboardGui
+        -- ===== ESP ALTERNATIVO =====
         if AimbotSettings.UseAlternativeESP then
-            HideAllESP()
-            
             for _, v in pairs(Players:GetPlayers()) do
                 if v ~= LocalPlayer and v.Character then
                     local hum = v.Character:FindFirstChild("Humanoid")
@@ -513,7 +504,7 @@ task.spawn(function()
                     
                     if hum and hrp and hum.Health > 0 then
                         if AimbotSettings.TeamCheckEnabled and v.Team == LocalPlayer.Team then 
-                            if BillboardESPs[v] and BillboardESPs[v].Parent then
+                            if BillboardESPs[v] then
                                 pcall(function() BillboardESPs[v]:Destroy() end)
                                 BillboardESPs[v] = nil
                             end
@@ -523,32 +514,16 @@ task.spawn(function()
                         if not BillboardESPs[v] or not BillboardESPs[v].Parent then
                             CreateBillboardESP(v)
                         end
-                    else
-                        if BillboardESPs[v] and BillboardESPs[v].Parent then
-                            pcall(function() BillboardESPs[v]:Destroy() end)
-                            BillboardESPs[v] = nil
-                        end
                     end
-                end
-            end
-            
-            for player, billboard in pairs(BillboardESPs) do
-                if not player.Parent or not Players:FindFirstChild(player.Name) then
-                    if billboard and billboard.Parent then
-                        pcall(function() billboard:Destroy() end)
-                    end
-                    BillboardESPs[player] = nil
                 end
             end
         else
             ClearAllBillboardESPs()
         end
 
-        -- Tracers
+        -- ===== TRACERS =====
         if drawingSupported and AimbotSettings.TracersEnabled then
-            for player, cache in pairs(TracerCache) do
-                cache.lastUpdate = 0
-            end
+            HideAllTracers()
             
             for _, v in pairs(Players:GetPlayers()) do
                 if v ~= LocalPlayer and v.Character then
@@ -564,9 +539,12 @@ task.spawn(function()
                         if onScreen and screenPos.Z > 0 then
                             local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
                             
-                            local color = (AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold) 
-                                and Color3.fromRGB(255, 0, 0) 
-                                or AimbotSettings.TracerColor
+                            local color
+                            if AimbotSettings.OnlyClosePlayers and dist <= AimbotSettings.CloseDistanceThreshold then
+                                color = Color3.fromRGB(255, 0, 0)
+                            else
+                                color = GetTracerColorByTeam(v)
+                            end
                             
                             local fromPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
                             local toPos = Vector2.new(screenPos.X, screenPos.Y)
@@ -576,81 +554,33 @@ task.spawn(function()
                     end
                 end
             end
-            
-            CleanupTracers()
-        else
-            HideAllTracers()
         end
     end)
 
-    -- Sistema Rainbow
-    local rainbowEnabled = false
-    local rainbowSpeed = 5
-
-    local function GetRainbowColor()
-        return Color3.fromHSV((tick() * rainbowSpeed / 10) % 1, 1, 1)
-    end
-
-    RunService.RenderStepped:Connect(function()
-        if rainbowEnabled then
-            AimbotSettings.FOVColor = GetRainbowColor()
-            AimbotSettings.ESPColor = GetRainbowColor()
-            AimbotSettings.TracerColor = GetRainbowColor()
-        end
-    end)
-
-    -- Limpieza al salir del jugador
+    -- ===== LIMPIEZA DE JUGADORES =====
     Players.PlayerRemoving:Connect(function(player)
         if ESPCache[player] then
-            if ESPCache[player].box then
-                pcall(function() ESPCache[player].box:Remove() end)
-            end
-            if ESPCache[player].text then
-                pcall(function() ESPCache[player].text:Remove() end)
-            end
+            pcall(function()
+                if ESPCache[player].box then ESPCache[player].box:Remove() end
+                if ESPCache[player].text then ESPCache[player].text:Remove() end
+            end)
             ESPCache[player] = nil
         end
         
         if TracerCache[player] then
-            if TracerCache[player].line then
-                pcall(function() TracerCache[player].line:Remove() end)
-            end
+            pcall(function()
+                if TracerCache[player].line then TracerCache[player].line:Remove() end
+            end)
             TracerCache[player] = nil
         end
         
-        if BillboardESPs[player] and BillboardESPs[player].Parent then
+        if BillboardESPs[player] then
             pcall(function() BillboardESPs[player]:Destroy() end)
             BillboardESPs[player] = nil
         end
     end)
-    
-    Players.PlayerAdded:Connect(function(player)
-        player.CharacterAdded:Connect(function()
-            if ESPCache[player] then
-                if ESPCache[player].box then
-                    pcall(function() ESPCache[player].box:Remove() end)
-                end
-                if ESPCache[player].text then
-                    pcall(function() ESPCache[player].text:Remove() end)
-                end
-                ESPCache[player] = nil
-            end
-            
-            if TracerCache[player] then
-                if TracerCache[player].line then
-                    pcall(function() TracerCache[player].line:Remove() end)
-                end
-                TracerCache[player] = nil
-            end
-            
-            if BillboardESPs[player] and BillboardESPs[player].Parent then
-                pcall(function() BillboardESPs[player]:Destroy() end)
-                BillboardESPs[player] = nil
-            end
-        end)
-    end)
 
-    -- UI Toggles y Sliders
+    -- ===== INTERFAZ DE USUARIO =====
     AimbotTab:CreateToggle({ 
         Name = "Aimbot", 
         CurrentValue = false, 
@@ -690,9 +620,7 @@ task.spawn(function()
         CurrentValue = false, 
         Callback = function(v) 
             AimbotSettings.ESPEnabled = v 
-            if not v then
-                HideAllESP()
-            end
+            if not v then HideAllESP() end
         end 
     })
 
@@ -701,17 +629,31 @@ task.spawn(function()
         CurrentValue = false, 
         Callback = function(v) 
             AimbotSettings.UseAlternativeESP = v 
-            if not v then
-                ClearAllBillboardESPs()
-            end
+            if not v then ClearAllBillboardESPs() end
+        end 
+    })
+
+    AimbotTab:CreateToggle({ 
+        Name = "Usar Colores por Equipo", 
+        CurrentValue = false, 
+        Callback = function(v) 
+            AimbotSettings.UseTeamColors = v 
         end 
     })
 
     AimbotTab:CreateColorPicker({ 
-        Name = "Color del ESP", 
+        Name = "Color ESP (Mi Equipo)", 
         Color = AimbotSettings.ESPColor, 
         Callback = function(v) 
             AimbotSettings.ESPColor = v 
+        end 
+    })
+
+    AimbotTab:CreateColorPicker({ 
+        Name = "Color ESP (Enemigos)", 
+        Color = AimbotSettings.ESPEnemyColor, 
+        Callback = function(v) 
+            AimbotSettings.ESPEnemyColor = v 
         end 
     })
 
@@ -764,17 +706,23 @@ task.spawn(function()
         CurrentValue = false, 
         Callback = function(v) 
             AimbotSettings.TracersEnabled = v 
-            if not v then
-                HideAllTracers()
-            end
+            if not v then HideAllTracers() end
         end 
     })
 
     AimbotTab:CreateColorPicker({ 
-        Name = "Color de las Líneas", 
+        Name = "Color Líneas (Mi Equipo)", 
         Color = AimbotSettings.TracerColor, 
         Callback = function(v) 
             AimbotSettings.TracerColor = v 
+        end 
+    })
+
+    AimbotTab:CreateColorPicker({ 
+        Name = "Color Líneas (Enemigos)", 
+        Color = AimbotSettings.TracerEnemyColor, 
+        Callback = function(v) 
+            AimbotSettings.TracerEnemyColor = v 
         end 
     })
 
@@ -814,5 +762,5 @@ task.spawn(function()
         end 
     })
 
-  ---  print("✅ Aimbot cargado exitosamente")
+    print("Aimbot cargado")
 end)
