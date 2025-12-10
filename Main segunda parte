@@ -664,55 +664,163 @@ end
 
 
 -- Caminar en el aire
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
 local isWalkingInAir = false
 local floorPart = nil
 local heartbeatConnection = nil
 
-local function isTouchingGround()
-	local ray = Ray.new(root.Position, Vector3.new(0, -5, 0))
-	local hitPart = workspace:FindPartOnRay(ray, character)
-	return hitPart and hitPart.CanCollide
+-- Detectar si está tocando suelo REAL (no nuestra plataforma)
+local function isTouchingRealGround()
+    local character = player.Character
+    if not character then return false end
+    
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not root or not humanoid then return false end
+    
+    -- Raycast para detectar suelo real
+    local rayOrigin = root.Position
+    local rayDirection = Vector3.new(0, -4, 0)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {character, floorPart}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.IgnoreWater = true
+    
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    
+    -- Verificar si hay suelo real colisionable
+    if raycastResult and raycastResult.Instance then
+        local hitPart = raycastResult.Instance
+        -- Ignorar nuestra plataforma
+        if hitPart ~= floorPart and hitPart.CanCollide then
+            return true
+        end
+    end
+    
+    return false
 end
 
+-- Crear el piso invisible
 local function createFloor()
-	if not floorPart then
-		floorPart = Instance.new("Part")
-		floorPart.Size = Vector3.new(50, 1, 50)
-		floorPart.Anchored = true
-		floorPart.CanCollide = true
-		floorPart.Transparency = 1
-		floorPart.Parent = workspace
-	end
+    if floorPart then
+        floorPart:Destroy()
+    end
+    
+    floorPart = Instance.new("Part")
+    floorPart.Name = "InvisibleFloor_JmodsUniversal"
+    floorPart.Size = Vector3.new(10, 0.5, 10)
+    floorPart.Anchored = true
+    floorPart.CanCollide = true
+    floorPart.Transparency = 1
+    floorPart.Material = Enum.Material.SmoothPlastic
+    floorPart.CastShadow = false
+    floorPart.Parent = workspace
+    
+    -- Posición inicial debajo del jugador
+    local character = player.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local root = character.HumanoidRootPart
+        floorPart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 3, root.Position.Z)
+    end
+end
+
+-- Limpiar el piso
+local function destroyFloor()
+    if floorPart then
+        floorPart:Destroy()
+        floorPart = nil
+    end
+end
+
+-- Limpiar la conexión
+local function disconnectHeartbeat()
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
 end
 
 MainTab:CreateToggle({
-	Name = "Caminar en el aire",
-	CurrentValue = isWalkingInAir,
-	Flag = "walkInAirToggle",
-	Callback = function(Value)
-		isWalkingInAir = Value
+    Name = "Caminar en el aire",
+    CurrentValue = false,
+    Flag = "walkInAirToggle",
+    Callback = function(Value)
+        isWalkingInAir = Value
 
-		if isWalkingInAir then
-			createFloor()
-			if not heartbeatConnection then
-				heartbeatConnection = RunService.Heartbeat:Connect(function()
-					if isWalkingInAir and floorPart and not isTouchingGround() then
-						floorPart.Position = root.Position - Vector3.new(0, 3, 0)
-					end
-				end)
-			end
-		else
-			if floorPart then
-				floorPart:Destroy()
-				floorPart = nil
-			end
-			if heartbeatConnection then
-				heartbeatConnection:Disconnect()
-				heartbeatConnection = nil
-			end
-		end
-	end,
+        if isWalkingInAir then
+            -- Activar caminar en el aire
+            createFloor()
+            disconnectHeartbeat()
+            
+            heartbeatConnection = RunService.Heartbeat:Connect(function()
+                if not isWalkingInAir then
+                    disconnectHeartbeat()
+                    destroyFloor()
+                    return
+                end
+                
+                local character = player.Character
+                if not character then return end
+                
+                local root = character:FindFirstChild("HumanoidRootPart")
+                local humanoid = character:FindFirstChild("Humanoid")
+                if not root or not floorPart or not humanoid then return end
+                
+                -- Verificar si está en suelo real
+                local onRealGround = isTouchingRealGround()
+                
+                if onRealGround then
+                    -- Si está en suelo real, mover la plataforma lejos
+                    floorPart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 1000, root.Position.Z)
+                else
+                    -- Si está en el aire, mantener la plataforma debajo
+                    -- La plataforma sigue al jugador horizontalmente pero mantiene altura relativa
+                    local targetY = root.Position.Y - 3
+                    
+                    -- Si la plataforma está muy lejos verticalmente, reposicionarla
+                    local distance = math.abs(floorPart.Position.Y - targetY)
+                    if distance > 5 then
+                        floorPart.CFrame = CFrame.new(root.Position.X, targetY, root.Position.Z)
+                    else
+                        -- Solo actualizar posición horizontal para mantener estabilidad
+                        floorPart.CFrame = CFrame.new(root.Position.X, floorPart.Position.Y, root.Position.Z)
+                    end
+                end
+            end)
+            
+        else
+            -- Desactivar caminar en el aire
+            disconnectHeartbeat()
+            destroyFloor()
+        end
+    end,
 })
+
+-- Limpiar al morir o cambiar de personaje
+player.CharacterAdded:Connect(function(newChar)
+    task.wait(0.3)
+    
+    if isWalkingInAir then
+        destroyFloor()
+        disconnectHeartbeat()
+        task.wait(0.2)
+        createFloor()
+    end
+end)
+
+-- Limpiar al salir del juego
+game:GetService("Players").PlayerRemoving:Connect(function(playerWhoLeft)
+    if playerWhoLeft == player then
+        disconnectHeartbeat()
+        destroyFloor()
+    end
+end)
+
+
 
 -- Mutear sonidos excepto voz
 local mutedSounds = {}
