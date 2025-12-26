@@ -1658,40 +1658,265 @@ Button = MainTab:CreateButton({
 
 ----Autoclicker----
 
-local mouse = game.Players.LocalPlayer:GetMouse()
 
--- Estados
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- ====================================
+-- DETECTAR SI ES MÓVIL
+-- ====================================
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- ====================================
+-- VARIABLES DE ESTADO
+-- ====================================
 local autoClicking = false
 local toggleEnabled = false
 local clickDelay = 0.1
+local lastClickTime = 0
+local connection = nil
 
--- Función de click más natural
-local function performClick()
-    -- Método 1: Usar mouse1click (más natural)
-    pcall(function()
-        mouse1click()
-    end)
+-- Variables para móvil
+local touchGui = nil
+local touchButton = nil
+local touchPosition = Vector2.new(0, 0)
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+
+function createMobileTouchGui()
+    if not isMobile then return end
     
-    -- Método 2: Si no funciona el anterior, usar fireclickdetector
-    if mouse.Target then
-        local clickDetector = mouse.Target:FindFirstChildOfClass("ClickDetector") or mouse.Target.Parent:FindFirstChildOfClass("ClickDetector")
-        if clickDetector then
-            pcall(function()
-                fireclickdetector(clickDetector)
+    -- Crear ScreenGui
+    touchGui = Instance.new("ScreenGui")
+    touchGui.Name = "AutoClickerTouchGui"
+    touchGui.ResetOnSpawn = false
+    touchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Crear botón circular
+    touchButton = Instance.new("ImageButton")
+    touchButton.Name = "TouchButton"
+    touchButton.Size = UDim2.new(0, 80, 0, 80)
+    touchButton.Position = UDim2.new(0.5, -40, 0.7, -40)
+    touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    touchButton.BorderSizePixel = 0
+    touchButton.Image = ""
+    touchButton.Parent = touchGui
+    
+    -- Hacer circular
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = touchButton
+    
+    -- Borde de neón
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 255, 255)
+    stroke.Thickness = 3
+    stroke.Parent = touchButton
+    
+    -- Ícono en el centro
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.new(1, 0, 1, 0)
+    icon.BackgroundTransparency = 1
+    icon.Text = "CLICK"
+    icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    icon.TextSize = 18
+    icon.Font = Enum.Font.GothamBold
+    icon.Parent = touchButton
+    
+    -- Indicador de estado
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusLabel"
+    statusLabel.Size = UDim2.new(0, 100, 0, 25)
+    statusLabel.Position = UDim2.new(0.5, -50, 1, 10)
+    statusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    statusLabel.BorderSizePixel = 0
+    statusLabel.Text = "OFF"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+    statusLabel.TextSize = 14
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.Parent = touchButton
+    
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 8)
+    statusCorner.Parent = statusLabel
+    
+
+    touchButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = touchButton.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
             end)
         end
+    end)
+    
+    touchButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch and dragging then
+            local delta = input.Position - dragStart
+            touchButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+
+    touchButton.MouseButton1Click:Connect(function()
+        if not dragging then
+            autoClicking = not autoClicking
+            
+            -- Actualizar visual
+            if autoClicking then
+                stroke.Color = Color3.fromRGB(0, 255, 0)
+                touchButton.BackgroundColor3 = Color3.fromRGB(25, 55, 25)
+                statusLabel.Text = "ON"
+                statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                icon.Text = "ON"
+            else
+                stroke.Color = Color3.fromRGB(0, 255, 255)
+                touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                statusLabel.Text = "OFF"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+                icon.Text = "CLICK"
+            end
+        end
+    end)
+    
+    -- Animación de pulso
+    spawn(function()
+        while touchButton and touchButton.Parent do
+            if autoClicking then
+                for i = 1, 10 do
+                    stroke.Thickness = 3 + (i * 0.3)
+                    task.wait(0.03)
+                end
+                for i = 10, 1, -1 do
+                    stroke.Thickness = 3 + (i * 0.3)
+                    task.wait(0.03)
+                end
+            else
+                task.wait(0.1)
+            end
+        end
+    end)
+    
+    touchGui.Parent = player:WaitForChild("PlayerGui")
+end
+
+
+function performClick()
+    local currentTime = tick()
+    
+    if currentTime - lastClickTime < clickDelay then
+        return
+    end
+    
+    lastClickTime = currentTime
+    
+    if isMobile then
+        -- CLICK EN LA POSICIÓN DEL BOTÓN TÁCTIL
+        local buttonPos = touchButton.AbsolutePosition
+        local buttonSize = touchButton.AbsoluteSize
+        local centerX = buttonPos.X + (buttonSize.X / 2)
+        local centerY = buttonPos.Y + (buttonSize.Y / 2)
+        
+        pcall(function()
+            local VIM = game:GetService("VirtualInputManager")
+            VIM:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+            task.wait(0.01)
+            VIM:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+        end)
+        
+        -- Efecto visual de click
+        spawn(function()
+            local originalSize = touchButton.Size
+            touchButton.Size = UDim2.new(0, 75, 0, 75)
+            task.wait(0.05)
+            touchButton.Size = originalSize
+        end)
+    else
+        -- MÉTODO PARA PC
+        pcall(function()
+            mouse1click()
+        end)
+        
+        if mouse.Target then
+            pcall(function()
+                local clickDetector = mouse.Target:FindFirstChildOfClass("ClickDetector")
+                if not clickDetector and mouse.Target.Parent then
+                    clickDetector = mouse.Target.Parent:FindFirstChildOfClass("ClickDetector")
+                end
+                
+                if clickDetector then
+                    fireclickdetector(clickDetector)
+                end
+            end)
+        end
+        
+        pcall(function()
+            local VIM = game:GetService("VirtualInputManager")
+            VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.01)
+            VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end)
     end
 end
 
--- Bucle principal del autoclicker
-spawn(function()
-    while true do
+
+function startAutoClicker()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    
+    connection = RunService.Heartbeat:Connect(function()
         if autoClicking and toggleEnabled then
             performClick()
         end
-        wait(clickDelay)
+    end)
+end
+
+function stopAutoClicker()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    autoClicking = false
+end
+
+
+player.CharacterRemoving:Connect(function()
+    stopAutoClicker()
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    if plr == player then
+        stopAutoClicker()
+        if touchGui then
+            touchGui:Destroy()
+        end
     end
 end)
+
+
+if isMobile then
+    createMobileTouchGui()
+end
+
+
 
 -- 1. TOGGLE PRINCIPAL
 MainTab:CreateToggle({
@@ -1700,28 +1925,71 @@ MainTab:CreateToggle({
     Flag = "AutoClickerToggle",
     Callback = function(Value)
         toggleEnabled = Value
-        if not Value then
-            autoClicking = false
+        
+        if Value then
+            autoClicking = true
+            startAutoClicker()
+            
+            -- Actualizar visual del botón móvil
+            if isMobile and touchButton then
+                local stroke = touchButton:FindFirstChildOfClass("UIStroke")
+                if stroke then
+                    stroke.Color = Color3.fromRGB(0, 255, 0)
+                end
+                touchButton.BackgroundColor3 = Color3.fromRGB(25, 55, 25)
+                local statusLabel = touchButton:FindFirstChild("StatusLabel")
+                if statusLabel then
+                    statusLabel.Text = "ON"
+                    statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                end
+                local icon = touchButton:FindFirstChildOfClass("TextLabel")
+                if icon and icon.Name ~= "StatusLabel" then
+                    icon.Text = "ON"
+                end
+            end
+        else
+            stopAutoClicker()
+            
+            -- Resetear botón móvil
+            if isMobile and touchButton then
+                autoClicking = false
+                local stroke = touchButton:FindFirstChildOfClass("UIStroke")
+                if stroke then
+                    stroke.Color = Color3.fromRGB(0, 255, 255)
+                end
+                touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                local statusLabel = touchButton:FindFirstChild("StatusLabel")
+                if statusLabel then
+                    statusLabel.Text = "OFF"
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+                end
+                local icon = touchButton:FindFirstChildOfClass("TextLabel")
+                if icon and icon.Name ~= "StatusLabel" then
+                    icon.Text = "CLICK"
+                end
+            end
         end
     end,
 })
 
--- 2. KEYBIND PARA ACTIVAR/DESACTIVAR
-MainTab:CreateKeybind({
-    Name = "Activar Auto Click",
-    CurrentKeybind = "E",
-    HoldToInteract = false,
-    Flag = "AutoClickerKeybind",
-    Callback = function()
-        if toggleEnabled then
-            autoClicking = not autoClicking
-        end
-    end,
-})
+-- 2. KEYBIND (solo para PC)
+if not isMobile then
+    MainTab:CreateKeybind({
+        Name = "Tecla de Activacion",
+        CurrentKeybind = "E",
+        HoldToInteract = false,
+        Flag = "AutoClickerKeybind",
+        Callback = function(pressed)
+            if toggleEnabled then
+                autoClicking = not autoClicking
+            end
+        end,
+    })
+end
 
 -- 3. SLIDER DE VELOCIDAD
 MainTab:CreateSlider({
-    Name = "Velocidad AutoClicker",
+    Name = "Velocidad (CPS)",
     Range = {0.01, 1},
     Increment = 0.01,
     Suffix = "s",
@@ -1800,7 +2068,7 @@ local function FreezeCharacter()
 end
 
 
-local function UnfreezeCharacter()
+ function UnfreezeCharacter()
 	local char = player.Character
 	if char then
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -1813,14 +2081,14 @@ local function UnfreezeCharacter()
 end
 
 -- Crear GUI táctil (móvil)
-local function CreateTouchGui()
+ function CreateTouchGui()
 	if guiFrames then return end
 	guiFrames = Instance.new("ScreenGui")
 	guiFrames.Name = "FreecamMobileGui"
 	guiFrames.ResetOnSpawn = false
 	guiFrames.Parent = player:WaitForChild("PlayerGui")
 
-	local function CreateButton(name, pos, keycode)
+	 function CreateButton(name, pos, keycode)
 		local btn = Instance.new("TextButton")
 		btn.Name = name
 		btn.Size = UDim2.new(0, 60, 0, 60)
@@ -1846,7 +2114,7 @@ local function CreateTouchGui()
 	CreateButton("Q", UDim2.new(1, -220, 1, -200), Enum.KeyCode.Q)
 end
 
-local function RemoveTouchGui()
+function RemoveTouchGui()
 	if guiFrames then
 		guiFrames:Destroy()
 		guiFrames = nil
@@ -1854,7 +2122,7 @@ local function RemoveTouchGui()
 end
 
 -- Calcular vector de movimiento
-local function CalculateMoveVector()
+ function CalculateMoveVector()
 	local moveVec = Vector3.zero
 	if keysHeld[Enum.KeyCode.W] then moveVec += Vector3.new(0, 0, -1) end
 	if keysHeld[Enum.KeyCode.S] then moveVec += Vector3.new(0, 0, 1) end
@@ -1867,7 +2135,7 @@ end
 
 local renderConn = nil
 
-local function EnableFreecam()
+ function EnableFreecam()
 	if freecamEnabled then return end
 	freecamEnabled = true
     
@@ -1911,7 +2179,7 @@ local function EnableFreecam()
 	end)
 end
 
-local function DisableFreecam()
+ function DisableFreecam()
     if not freecamEnabled then return end
     freecamEnabled = false
 
@@ -2113,7 +2381,7 @@ getgenv().AnchoredStatus = false
 local anchorConnection
 
 -- Función para anclar o desanclar todas las partes del personaje
-local function setAnchored(state)
+function setAnchored(state)
     local character = LocalPlayer.Character
     if character then
         for _, part in ipairs(character:GetDescendants()) do
