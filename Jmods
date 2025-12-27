@@ -1683,29 +1683,33 @@ local connection = nil
 -- Variables para móvil
 local touchGui = nil
 local touchButton = nil
-local touchPosition = Vector2.new(0, 0)
 local dragging = false
 local dragStart = nil
 local startPos = nil
 
-
+-- ====================================
+-- CREAR GUI TÁCTIL FLOTANTE (SOLO MÓVIL)
+-- ====================================
 function createMobileTouchGui()
     if not isMobile then return end
+    if touchGui then return end -- Evitar duplicados
     
     -- Crear ScreenGui
     touchGui = Instance.new("ScreenGui")
     touchGui.Name = "AutoClickerTouchGui"
     touchGui.ResetOnSpawn = false
     touchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    touchGui.DisplayOrder = 999
     
-    -- Crear botón circular
-    touchButton = Instance.new("ImageButton")
+    -- Crear botón circular (área de clicks)
+    touchButton = Instance.new("Frame")
     touchButton.Name = "TouchButton"
-    touchButton.Size = UDim2.new(0, 80, 0, 80)
-    touchButton.Position = UDim2.new(0.5, -40, 0.7, -40)
-    touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    touchButton.Size = UDim2.new(0, 100, 0, 100)
+    touchButton.Position = UDim2.new(0.5, -50, 0.65, -50)
+    touchButton.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    touchButton.BackgroundTransparency = 0.3
     touchButton.BorderSizePixel = 0
-    touchButton.Image = ""
+    touchButton.Active = true
     touchButton.Parent = touchGui
     
     -- Hacer circular
@@ -1713,41 +1717,80 @@ function createMobileTouchGui()
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = touchButton
     
-    -- Borde de neón
+    -- Borde de neón animado
     local stroke = Instance.new("UIStroke")
+    stroke.Name = "NeonStroke"
     stroke.Color = Color3.fromRGB(0, 255, 255)
-    stroke.Thickness = 3
+    stroke.Thickness = 4
+    stroke.Transparency = 0
     stroke.Parent = touchButton
     
-    -- Ícono en el centro
+    -- Gradiente de fondo
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 200))
+    }
+    gradient.Rotation = 45
+    gradient.Parent = touchButton
+    
+    -- Ícono/Texto central
     local icon = Instance.new("TextLabel")
-    icon.Size = UDim2.new(1, 0, 1, 0)
+    icon.Name = "Icon"
+    icon.Size = UDim2.new(1, 0, 0.7, 0)
+    icon.Position = UDim2.new(0, 0, 0, 0)
     icon.BackgroundTransparency = 1
-    icon.Text = "CLICK"
+    icon.Text = "🎯"
     icon.TextColor3 = Color3.fromRGB(255, 255, 255)
-    icon.TextSize = 18
+    icon.TextSize = 40
     icon.Font = Enum.Font.GothamBold
+    icon.TextTransparency = 0.2
     icon.Parent = touchButton
     
-    -- Indicador de estado
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Name = "StatusLabel"
-    statusLabel.Size = UDim2.new(0, 100, 0, 25)
-    statusLabel.Position = UDim2.new(0.5, -50, 1, 10)
-    statusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    statusLabel.BorderSizePixel = 0
-    statusLabel.Text = "OFF"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-    statusLabel.TextSize = 14
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.Parent = touchButton
+    -- Texto "CLICK AQUÍ"
+    local clickText = Instance.new("TextLabel")
+    clickText.Name = "ClickText"
+    clickText.Size = UDim2.new(1, 0, 0.3, 0)
+    clickText.Position = UDim2.new(0, 0, 0.7, 0)
+    clickText.BackgroundTransparency = 1
+    clickText.Text = "CLICK AQUÍ"
+    clickText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    clickText.TextSize = 12
+    clickText.Font = Enum.Font.GothamBold
+    clickText.TextTransparency = 0.2
+    clickText.Parent = touchButton
     
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 8)
-    statusCorner.Parent = statusLabel
+    -- Contador de clicks
+    local clickCounter = Instance.new("TextLabel")
+    clickCounter.Name = "ClickCounter"
+    clickCounter.Size = UDim2.new(0, 120, 0, 30)
+    clickCounter.Position = UDim2.new(0.5, -60, 1, 10)
+    clickCounter.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    clickCounter.BackgroundTransparency = 0.2
+    clickCounter.BorderSizePixel = 0
+    clickCounter.Text = "Clicks: 0"
+    clickCounter.TextColor3 = Color3.fromRGB(0, 255, 255)
+    clickCounter.TextSize = 14
+    clickCounter.Font = Enum.Font.GothamBold
+    clickCounter.Parent = touchButton
     
-
-    touchButton.InputBegan:Connect(function(input)
+    local counterCorner = Instance.new("UICorner")
+    counterCorner.CornerRadius = UDim.new(0, 10)
+    counterCorner.Parent = clickCounter
+    
+    -- Variable para contar clicks
+    local clickCount = 0
+    touchButton:SetAttribute("ClickCount", clickCount)
+    
+    -- ====================================
+    -- SISTEMA DE ARRASTRE
+    -- ====================================
+    local dragButton = Instance.new("ImageButton")
+    dragButton.Size = UDim2.new(1, 0, 1, 0)
+    dragButton.BackgroundTransparency = 1
+    dragButton.Parent = touchButton
+    
+    dragButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -1761,7 +1804,7 @@ function createMobileTouchGui()
         end
     end)
     
-    touchButton.InputChanged:Connect(function(input)
+    dragButton.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch and dragging then
             local delta = input.Position - dragStart
             touchButton.Position = UDim2.new(
@@ -1773,38 +1816,21 @@ function createMobileTouchGui()
         end
     end)
     
-
-    touchButton.MouseButton1Click:Connect(function()
-        if not dragging then
-            autoClicking = not autoClicking
-            
-            -- Actualizar visual
-            if autoClicking then
-                stroke.Color = Color3.fromRGB(0, 255, 0)
-                touchButton.BackgroundColor3 = Color3.fromRGB(25, 55, 25)
-                statusLabel.Text = "ON"
-                statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                icon.Text = "ON"
-            else
-                stroke.Color = Color3.fromRGB(0, 255, 255)
-                touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-                statusLabel.Text = "OFF"
-                statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-                icon.Text = "CLICK"
-            end
-        end
-    end)
-    
-    -- Animación de pulso
+    -- ====================================
+    -- ANIMACIÓN DE PULSO CONTINUO
+    -- ====================================
     spawn(function()
         while touchButton and touchButton.Parent do
             if autoClicking then
+                -- Pulso de escala
                 for i = 1, 10 do
-                    stroke.Thickness = 3 + (i * 0.3)
+                    touchButton.Size = UDim2.new(0, 100 + i, 0, 100 + i)
+                    stroke.Thickness = 4 + (i * 0.2)
                     task.wait(0.03)
                 end
                 for i = 10, 1, -1 do
-                    stroke.Thickness = 3 + (i * 0.3)
+                    touchButton.Size = UDim2.new(0, 100 + i, 0, 100 + i)
+                    stroke.Thickness = 4 + (i * 0.2)
                     task.wait(0.03)
                 end
             else
@@ -1813,10 +1839,40 @@ function createMobileTouchGui()
         end
     end)
     
+    -- ====================================
+    -- ANIMACIÓN DE ROTACIÓN DEL GRADIENTE
+    -- ====================================
+    spawn(function()
+        while touchButton and touchButton.Parent do
+            if autoClicking then
+                for angle = 0, 360, 5 do
+                    gradient.Rotation = angle
+                    task.wait(0.03)
+                end
+            else
+                task.wait(0.1)
+            end
+        end
+    end)
+    
+    -- Montar en PlayerGui
     touchGui.Parent = player:WaitForChild("PlayerGui")
 end
 
+-- ====================================
+-- DESTRUIR GUI TÁCTIL
+-- ====================================
+function destroyMobileTouchGui()
+    if touchGui then
+        touchGui:Destroy()
+        touchGui = nil
+        touchButton = nil
+    end
+end
 
+-- ====================================
+-- EJECUTAR CLICK
+-- ====================================
 function performClick()
     local currentTime = tick()
     
@@ -1826,13 +1882,14 @@ function performClick()
     
     lastClickTime = currentTime
     
-    if isMobile then
-        -- CLICK EN LA POSICIÓN DEL BOTÓN TÁCTIL
+    if isMobile and touchButton then
+        -- OBTENER POSICIÓN CENTRAL DEL BOTÓN TÁCTIL
         local buttonPos = touchButton.AbsolutePosition
         local buttonSize = touchButton.AbsoluteSize
         local centerX = buttonPos.X + (buttonSize.X / 2)
         local centerY = buttonPos.Y + (buttonSize.Y / 2)
         
+        -- Ejecutar click en esa posición
         pcall(function()
             local VIM = game:GetService("VirtualInputManager")
             VIM:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
@@ -1840,15 +1897,54 @@ function performClick()
             VIM:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
         end)
         
-        -- Efecto visual de click
+        -- Actualizar contador
+        local currentCount = touchButton:GetAttribute("ClickCount") or 0
+        currentCount = currentCount + 1
+        touchButton:SetAttribute("ClickCount", currentCount)
+        
+        local counter = touchButton:FindFirstChild("ClickCounter")
+        if counter then
+            counter.Text = "Clicks: " .. tostring(currentCount)
+        end
+        
+        -- Efecto visual de click (onda expansiva)
         spawn(function()
-            local originalSize = touchButton.Size
-            touchButton.Size = UDim2.new(0, 75, 0, 75)
-            task.wait(0.05)
-            touchButton.Size = originalSize
+            local ripple = Instance.new("Frame")
+            ripple.Size = UDim2.new(0, 20, 0, 20)
+            ripple.Position = UDim2.new(0.5, -10, 0.5, -10)
+            ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            ripple.BackgroundTransparency = 0.5
+            ripple.BorderSizePixel = 0
+            ripple.ZIndex = 10
+            ripple.Parent = touchButton
+            
+            local rippleCorner = Instance.new("UICorner")
+            rippleCorner.CornerRadius = UDim.new(1, 0)
+            rippleCorner.Parent = ripple
+            
+            -- Animación de expansión
+            for i = 1, 10 do
+                ripple.Size = UDim2.new(0, 20 + (i * 10), 0, 20 + (i * 10))
+                ripple.Position = UDim2.new(0.5, -(10 + (i * 5)), 0.5, -(10 + (i * 5)))
+                ripple.BackgroundTransparency = 0.5 + (i * 0.05)
+                task.wait(0.02)
+            end
+            
+            ripple:Destroy()
         end)
+        
+        -- Flash del ícono
+        spawn(function()
+            local icon = touchButton:FindFirstChild("Icon")
+            if icon then
+                icon.TextTransparency = 0
+                task.wait(0.05)
+                icon.TextTransparency = 0.2
+            end
+        end)
+        
     else
-        -- MÉTODO PARA PC
+        -- MÉTODO PARA PC (click donde está el mouse)
         pcall(function()
             mouse1click()
         end)
@@ -1868,14 +1964,16 @@ function performClick()
         
         pcall(function()
             local VIM = game:GetService("VirtualInputManager")
-            VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            VIM:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 0)
             task.wait(0.01)
-            VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            VIM:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 0)
         end)
     end
 end
 
-
+-- ====================================
+-- INICIAR AUTO CLICKER
+-- ====================================
 function startAutoClicker()
     if connection then
         connection:Disconnect()
@@ -1889,6 +1987,9 @@ function startAutoClicker()
     end)
 end
 
+-- ====================================
+-- DETENER AUTO CLICKER
+-- ====================================
 function stopAutoClicker()
     if connection then
         connection:Disconnect()
@@ -1897,7 +1998,9 @@ function stopAutoClicker()
     autoClicking = false
 end
 
-
+-- ====================================
+-- LIMPIEZA AL MORIR/SALIR
+-- ====================================
 player.CharacterRemoving:Connect(function()
     stopAutoClicker()
 end)
@@ -1905,18 +2008,15 @@ end)
 Players.PlayerRemoving:Connect(function(plr)
     if plr == player then
         stopAutoClicker()
-        if touchGui then
-            touchGui:Destroy()
-        end
+        destroyMobileTouchGui()
     end
 end)
 
-
-if isMobile then
-    createMobileTouchGui()
-end
-
-
+-- ====================================
+-- ====================================
+-- CONTROLES DE LA INTERFAZ PRINCIPAL
+-- ====================================
+-- ====================================
 
 -- 1. TOGGLE PRINCIPAL
 MainTab:CreateToggle({
@@ -1925,49 +2025,20 @@ MainTab:CreateToggle({
     Flag = "AutoClickerToggle",
     Callback = function(Value)
         toggleEnabled = Value
+        autoClicking = Value
         
         if Value then
-            autoClicking = true
+            -- ACTIVAR: Crear botón si es móvil e iniciar clicker
+            if isMobile then
+                createMobileTouchGui()
+            end
             startAutoClicker()
-            
-            -- Actualizar visual del botón móvil
-            if isMobile and touchButton then
-                local stroke = touchButton:FindFirstChildOfClass("UIStroke")
-                if stroke then
-                    stroke.Color = Color3.fromRGB(0, 255, 0)
-                end
-                touchButton.BackgroundColor3 = Color3.fromRGB(25, 55, 25)
-                local statusLabel = touchButton:FindFirstChild("StatusLabel")
-                if statusLabel then
-                    statusLabel.Text = "ON"
-                    statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                end
-                local icon = touchButton:FindFirstChildOfClass("TextLabel")
-                if icon and icon.Name ~= "StatusLabel" then
-                    icon.Text = "ON"
-                end
-            end
         else
-            stopAutoClicker()
-            
-            -- Resetear botón móvil
-            if isMobile and touchButton then
-                autoClicking = false
-                local stroke = touchButton:FindFirstChildOfClass("UIStroke")
-                if stroke then
-                    stroke.Color = Color3.fromRGB(0, 255, 255)
-                end
-                touchButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-                local statusLabel = touchButton:FindFirstChild("StatusLabel")
-                if statusLabel then
-                    statusLabel.Text = "OFF"
-                    statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-                end
-                local icon = touchButton:FindFirstChildOfClass("TextLabel")
-                if icon and icon.Name ~= "StatusLabel" then
-                    icon.Text = "CLICK"
-                end
+            -- DESACTIVAR: Destruir botón si es móvil y detener clicker
+            if isMobile then
+                destroyMobileTouchGui()
             end
+            stopAutoClicker()
         end
     end,
 })
@@ -1989,7 +2060,7 @@ end
 
 -- 3. SLIDER DE VELOCIDAD
 MainTab:CreateSlider({
-    Name = "Velocidad (CPS)",
+    Name = "Velocidad",
     Range = {0.01, 1},
     Increment = 0.01,
     Suffix = "s",
@@ -1999,6 +2070,8 @@ MainTab:CreateSlider({
         clickDelay = Value
     end,
 })
+
+
 
 ----Camara libre---
 
