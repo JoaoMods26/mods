@@ -476,3 +476,11 @@ boton= Juegostab:CreateButton({
        loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/veko'))()
    end,
 })
+
+boton= Juegostab:CreateButton({
+   Name = "Death ball(JDeath ballMods)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Death%20ball'))()
+   end,
+})
+
