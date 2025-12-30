@@ -1427,4 +1427,434 @@ MainTab:CreateKeybind({
 
 
 
+----
 
+
+-- Variables para guardar configuraciones originales
+local originalSettings = {
+    Lighting = {},
+    Terrain = {},
+    Rendering = {},
+    Materials = {},
+    Parts = {},
+    MeshParts = {},
+    Particles = {},
+    Explosions = {},
+    PostEffects = {}
+}
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local MaterialService = game:GetService("MaterialService")
+local ME = Players.LocalPlayer
+local fpsBoosterActive = false
+local descendantConnection = nil
+local modifiedInstances = {}
+
+-- Guardar configuraciones originales
+function SaveOriginalSettings()
+    -- Lighting
+    originalSettings.Lighting.GlobalShadows = Lighting.GlobalShadows
+    originalSettings.Lighting.FogEnd = Lighting.FogEnd
+    originalSettings.Lighting.ShadowSoftness = Lighting.ShadowSoftness
+    if sethiddenproperty then
+        originalSettings.Lighting.Technology = Lighting.Technology
+    end
+    
+    -- Terrain
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        originalSettings.Terrain.WaterWaveSize = terrain.WaterWaveSize
+        originalSettings.Terrain.WaterWaveSpeed = terrain.WaterWaveSpeed
+        originalSettings.Terrain.WaterReflectance = terrain.WaterReflectance
+        originalSettings.Terrain.WaterTransparency = terrain.WaterTransparency
+        
+        -- CORRECCIÓN: Guardar Decoration para restaurar el pasto
+        if sethiddenproperty then
+            pcall(function()
+                originalSettings.Terrain.Decoration = gethiddenproperty(terrain, "Decoration")
+            end)
+        end
+    end
+    
+    -- Rendering
+    originalSettings.Rendering.QualityLevel = settings().Rendering.QualityLevel
+    originalSettings.Rendering.MeshPartDetailLevel = settings().Rendering.MeshPartDetailLevel
+    
+    -- Materials
+    originalSettings.Materials.Use2022Materials = MaterialService.Use2022Materials
+end
+
+-- Restaurar configuraciones originales
+function RestoreOriginalSettings()
+    -- Lighting
+    Lighting.GlobalShadows = originalSettings.Lighting.GlobalShadows
+    Lighting.FogEnd = originalSettings.Lighting.FogEnd
+    Lighting.ShadowSoftness = originalSettings.Lighting.ShadowSoftness
+    if sethiddenproperty and originalSettings.Lighting.Technology then
+        sethiddenproperty(Lighting, "Technology", originalSettings.Lighting.Technology)
+    end
+    
+    -- Terrain
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = originalSettings.Terrain.WaterWaveSize
+        terrain.WaterWaveSpeed = originalSettings.Terrain.WaterWaveSpeed
+        terrain.WaterReflectance = originalSettings.Terrain.WaterReflectance
+        terrain.WaterTransparency = originalSettings.Terrain.WaterTransparency
+        
+        -- CORRECCIÓN: Restaurar Decoration para que vuelva el pasto
+        if sethiddenproperty and originalSettings.Terrain.Decoration ~= nil then
+            pcall(function()
+                sethiddenproperty(terrain, "Decoration", originalSettings.Terrain.Decoration)
+            end)
+        end
+    end
+    
+    -- Rendering
+    settings().Rendering.QualityLevel = originalSettings.Rendering.QualityLevel
+    settings().Rendering.MeshPartDetailLevel = originalSettings.Rendering.MeshPartDetailLevel
+    
+    -- Materials
+    MaterialService.Use2022Materials = originalSettings.Materials.Use2022Materials
+    
+    -- Restaurar instancias modificadas
+    for inst, data in pairs(modifiedInstances) do
+        if inst and inst.Parent then
+            pcall(function()
+                if inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Smoke") or inst:IsA("Fire") or inst:IsA("Sparkles") then
+                    inst.Enabled = data.Enabled
+                elseif inst:IsA("PostEffect") then
+                    inst.Enabled = data.Enabled
+                elseif inst:IsA("BasePart") and not inst:IsA("MeshPart") then
+                    inst.Material = data.Material
+                    inst.Reflectance = data.Reflectance
+                elseif inst:IsA("MeshPart") then
+                    inst.RenderFidelity = data.RenderFidelity
+                    inst.Reflectance = data.Reflectance
+                    inst.Material = data.Material
+                    inst.Transparency = data.Transparency
+                elseif inst:IsA("SpecialMesh") then
+                    inst.MeshId = data.MeshId
+                    inst.TextureId = data.TextureId
+                elseif inst:IsA("FaceInstance") then
+                    inst.Transparency = data.Transparency
+                    inst.Shiny = data.Shiny
+                elseif inst:IsA("Model") then
+                    inst.LevelOfDetail = data.LevelOfDetail
+                end
+            end)
+        end
+    end
+    
+    modifiedInstances = {}
+end
+
+-- Verificar si una instancia debe ser ignorada
+function ShouldIgnore(Inst)
+    if Inst:IsDescendantOf(Players) then return true end
+    if ME.Character and Inst:IsDescendantOf(ME.Character) then return true end
+    if Inst:IsA("BackpackItem") or Inst:FindFirstAncestorWhichIsA("BackpackItem") then return true end
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= ME and v.Character and Inst:IsDescendantOf(v.Character) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Aplicar optimizaciones a una instancia
+function OptimizeInstance(Inst)
+    if ShouldIgnore(Inst) then return end
+    
+    pcall(function()
+        if Inst:IsA("ParticleEmitter") or Inst:IsA("Trail") or Inst:IsA("Smoke") or Inst:IsA("Fire") or Inst:IsA("Sparkles") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {Enabled = Inst.Enabled}
+            end
+            Inst.Enabled = false
+            
+        elseif Inst:IsA("PostEffect") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {Enabled = Inst.Enabled}
+            end
+            Inst.Enabled = false
+            
+        elseif Inst:IsA("Explosion") then
+            Inst.BlastPressure = 1
+            Inst.BlastRadius = 1
+            
+        elseif Inst:IsA("SpecialMesh") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {
+                    MeshId = Inst.MeshId,
+                    TextureId = Inst.TextureId
+                }
+            end
+            Inst.TextureId = ""
+            
+        elseif Inst:IsA("FaceInstance") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {
+                    Transparency = Inst.Transparency,
+                    Shiny = Inst.Shiny
+                }
+            end
+            Inst.Transparency = 1
+            Inst.Shiny = 1
+            
+        elseif Inst:IsA("BasePart") and not Inst:IsA("MeshPart") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {
+                    Material = Inst.Material,
+                    Reflectance = Inst.Reflectance
+                }
+            end
+            Inst.Material = Enum.Material.Plastic
+            Inst.Reflectance = 0
+            
+        elseif Inst:IsA("MeshPart") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {
+                    RenderFidelity = Inst.RenderFidelity,
+                    Reflectance = Inst.Reflectance,
+                    Material = Inst.Material,
+                    Transparency = Inst.Transparency
+                }
+            end
+            Inst.RenderFidelity = Enum.RenderFidelity.Performance
+            Inst.Reflectance = 0
+            Inst.Material = Enum.Material.Plastic
+            
+        elseif Inst:IsA("Model") then
+            if not modifiedInstances[Inst] then
+                modifiedInstances[Inst] = {
+                    LevelOfDetail = Inst.LevelOfDetail
+                }
+            end
+            Inst.LevelOfDetail = Enum.ModelLevelOfDetail.StreamingMesh
+        end
+    end)
+end
+
+-- Aplicar todas las optimizaciones
+function ApplyOptimizations()
+    -- Optimizaciones de Lighting
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.ShadowSoftness = 0
+    if sethiddenproperty then
+        sethiddenproperty(Lighting, "Technology", 2)
+    end
+    
+    -- Optimizaciones de Terrain
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 0
+        if sethiddenproperty then
+            sethiddenproperty(terrain, "Decoration", false)
+        end
+    end
+    
+    -- Optimizaciones de Rendering
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
+    
+    -- Optimizaciones de Materials
+    MaterialService.Use2022Materials = false
+    
+    -- FPS Cap
+    if setfpscap then
+        setfpscap(1e6)
+    end
+    
+    -- Optimizar todas las instancias existentes
+    for _, v in pairs(game:GetDescendants()) do
+        OptimizeInstance(v)
+    end
+end
+
+-- Guardar configuraciones originales al inicio
+SaveOriginalSettings()
+
+
+
+-- Toggle principal
+MainTab:CreateToggle({
+    Name = "Activar FPS Booster",
+    CurrentValue = false,
+    Callback = function(state)
+        fpsBoosterActive = state
+        
+        if state then
+            -- Activar optimizaciones
+            ApplyOptimizations()
+            
+            -- Conectar evento para nuevas instancias
+            if descendantConnection then
+                descendantConnection:Disconnect()
+            end
+            
+            descendantConnection = game.DescendantAdded:Connect(function(inst)
+                task.wait(0.5)
+                if fpsBoosterActive then
+                    OptimizeInstance(inst)
+                end
+            end)
+            
+        else
+            -- Desactivar optimizaciones
+            if descendantConnection then
+                descendantConnection:Disconnect()
+                descendantConnection = nil
+            end
+            
+            RestoreOriginalSettings()
+        end
+    end
+})
+
+
+
+
+-- ======================================
+-- SERVICES / PLAYER
+-- ======================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+
+-- ======================================
+-- BLOQUE 1: FAKELAG + FALLING
+-- ======================================
+
+-- FakeLag vars
+local FakeLagEnabled = false
+local FakeLagThread = nil
+local FakeLagWaitTime = 0.05
+local FakeLagDelayTime = 0.4
+
+-- Falling vars
+local FallingEnabled = false
+
+
+-- ---------- FakeLag functions ----------
+function StartFakeLag()
+	if FakeLagThread then return end
+
+	FakeLagThread = task.spawn(function()
+		while FakeLagEnabled do
+			local char = LocalPlayer.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+			if hrp then
+				hrp.Anchored = true
+				task.wait(FakeLagDelayTime)
+				hrp.Anchored = false
+			end
+
+			task.wait(FakeLagWaitTime)
+		end
+		FakeLagThread = nil
+	end)
+end
+
+function StopFakeLag()
+	FakeLagEnabled = false
+
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		hrp.Anchored = false
+	end
+end
+
+
+-- ---------- Falling function (TOGGLE) ----------
+function SetFalling(state)
+	local char = LocalPlayer.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	FallingEnabled = state
+	humanoid.PlatformStand = state
+
+	if state then
+		humanoid:Move(Vector3.new(0, -50, 0))
+	end
+end
+
+
+-- ---------- JmodsLib Toggles (FakeLag + Falling) ----------
+MainTab:CreateToggle({
+	Name = "FakeLag",
+	CurrentValue = false,
+	Flag = "FakeLagToggle",
+	Callback = function(state)
+		FakeLagEnabled = state
+		if state then
+			StartFakeLag()
+		else
+			StopFakeLag()
+		end
+	end
+})
+
+MainTab:CreateToggle({
+	Name = "Caer",
+	CurrentValue = false,
+	Flag = "FallingToggle",
+	Callback = function(state)
+		SetFalling(state)
+	end
+})
+
+
+-- ======================================
+-- BLOQUE 2: EQUIP ALL TOOLS (SEPARADO)
+-- ======================================
+
+-- Equip vars
+local ToolsEquipped = false
+
+
+-- ---------- Equip / Unequip function ----------
+function ToggleEquipAllTools()
+	local char = LocalPlayer.Character
+	local backpack = LocalPlayer:FindFirstChild("Backpack")
+	if not char or not backpack then return end
+
+	if not ToolsEquipped then
+		for _, tool in ipairs(backpack:GetChildren()) do
+			if tool:IsA("Tool") then
+				tool.Parent = char
+			end
+		end
+		ToolsEquipped = true
+	else
+		for _, tool in ipairs(char:GetChildren()) do
+			if tool:IsA("Tool") then
+				tool.Parent = backpack
+			end
+		end
+		ToolsEquipped = false
+	end
+end
+
+
+-- ---------- JmodsLib Toggle (Equip All) ----------
+MainTab:CreateToggle({
+	Name = "Equipar todas las herramientas",
+	CurrentValue = false,
+	Flag = "EquipAllToolsToggle",
+	Callback = function(state)
+		if state ~= ToolsEquipped then
+			ToggleEquipAllTools()
+		end
+	end
+})
