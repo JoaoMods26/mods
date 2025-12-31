@@ -1,9 +1,4 @@
 -- // Fantasma
--- ========================================
--- FANTASMA
--- ========================================
-
--- // Servicios
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -331,14 +326,8 @@ MainTab:CreateToggle({
 
 
 
--- ========================================
--- SHIFTLOCK NUEVO - INTEGRACIÓN INMEDIATA
--- Se crea exactamente donde lo colocas en el código
--- ========================================
 
--- ========================================
--- MÓDULO DE SERVICIOS
--- ========================================
+-- SHIFTLOCK
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -346,9 +335,6 @@ local Services = {
     TweenService = game:GetService("TweenService")
 }
 
--- ========================================
--- MÓDULO DE ESTADO
--- ========================================
 local State = {
     enabled = false,
     active = false,
@@ -361,9 +347,7 @@ local State = {
     uiElements = {}
 }
 
--- ========================================
--- MÓDULO DE CONFIGURACIÓN
--- ========================================
+
 local Config = {
     keybind = Enum.KeyCode.Q,
     crosshairSymbol = "⊕",
@@ -373,9 +357,7 @@ local Config = {
     showMobileButton = true
 }
 
--- ========================================
--- MÓDULO DE UTILIDADES
--- ========================================
+
 local Utils = {}
 
 function Utils.cleanupConnections()
@@ -409,9 +391,6 @@ function Utils.isValidForShiftlock()
     return validSubject and validType
 end
 
--- ========================================
--- MÓDULO DE INTERFAZ
--- ========================================
 local UI = {}
 
 function UI.create()
@@ -540,9 +519,6 @@ function UI.destroy()
     State.uiElements = {}
 end
 
--- ========================================
--- MÓDULO DE ROTACIÓN
--- ========================================
 local Rotation = {}
 
 function Rotation.start()
@@ -598,9 +574,6 @@ function Rotation.stop()
     end
 end
 
--- ========================================
--- MÓDULO DE INPUT
--- ========================================
 local Input = {}
 
 function Input.setup()
@@ -624,9 +597,6 @@ function Input.cleanup()
     end
 end
 
--- ========================================
--- MÓDULO PRINCIPAL (CORE)
--- ========================================
 ShiftlockCore = {}
 
 function ShiftlockCore.activate()
@@ -689,9 +659,6 @@ function ShiftlockCore.disable()
     Input.cleanup()
 end
 
--- ========================================
--- EVENTOS DE PERSONAJE
--- ========================================
 State.player.CharacterAdded:Connect(function(newCharacter)
     task.wait(0.5)
     Utils.updateCharacterReferences()
@@ -702,9 +669,6 @@ State.player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
--- ========================================
--- FUNCIÓN PRINCIPAL PARA TU GUI
--- ========================================
 function ToggleShiftlock(value)
     if value then
         ShiftlockCore.enable()
@@ -713,9 +677,6 @@ function ToggleShiftlock(value)
     end
 end
 
--- ========================================
--- INTEGRACIÓN INMEDIATA (SIN DELAYS)
--- ========================================
 if MainTab and MainTab.CreateToggle then
     MainTab:CreateToggle({
         Name = "Shiftlock Nuevo (Q)",
@@ -727,9 +688,7 @@ if MainTab and MainTab.CreateToggle then
     })
 end
 
--- ========================================
--- FUNCIONES GLOBALES
--- ========================================
+
 getgenv().NewShiftlock = {
     Enable = ShiftlockCore.enable,
     Disable = ShiftlockCore.disable,
@@ -1722,16 +1681,10 @@ MainTab:CreateToggle({
 
 
 
--- ======================================
--- SERVICES / PLAYER
--- ======================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 
--- ======================================
--- BLOQUE 1: FAKELAG + FALLING
--- ======================================
 
 -- FakeLag vars
 local FakeLagEnabled = false
@@ -1775,7 +1728,6 @@ function StopFakeLag()
 end
 
 
--- ---------- Falling function (TOGGLE) ----------
 function SetFalling(state)
 	local char = LocalPlayer.Character
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
@@ -1790,7 +1742,6 @@ function SetFalling(state)
 end
 
 
--- ---------- JmodsLib Toggles (FakeLag + Falling) ----------
 MainTab:CreateToggle({
 	Name = "FakeLag",
 	CurrentValue = false,
@@ -1815,15 +1766,11 @@ MainTab:CreateToggle({
 })
 
 
--- ======================================
--- BLOQUE 2: EQUIP ALL TOOLS (SEPARADO)
--- ======================================
 
 -- Equip vars
 local ToolsEquipped = false
 
 
--- ---------- Equip / Unequip function ----------
 function ToggleEquipAllTools()
 	local char = LocalPlayer.Character
 	local backpack = LocalPlayer:FindFirstChild("Backpack")
@@ -1846,8 +1793,6 @@ function ToggleEquipAllTools()
 	end
 end
 
-
--- ---------- JmodsLib Toggle (Equip All) ----------
 MainTab:CreateToggle({
 	Name = "Equipar todas las herramientas",
 	CurrentValue = false,
