@@ -2751,7 +2751,7 @@ local perroTargetDistance = 4
 
 local antiCaidaConnection
 
-local function ActivarAntiCaida()
+ function ActivarAntiCaida()
     local Jugador = game.Players.LocalPlayer
     local personaje = Jugador.Character or Jugador.CharacterAdded:Wait()
     local Raiz = personaje:WaitForChild("HumanoidRootPart")
@@ -2773,14 +2773,14 @@ local function ActivarAntiCaida()
     end)
 end
 
-local function DesactivarAntiCaida()
+function DesactivarAntiCaida()
     if antiCaidaConnection then
         antiCaidaConnection:Disconnect()
         antiCaidaConnection = nil
     end
 end
 
-local function VerificarYActualizarAntiCaida()
+function VerificarYActualizarAntiCaida()
     if doggyEnabled or pataEnabled or cariEnabled or wataEnabled or perroEnabled then
         if not antiCaidaConnection then
             ActivarAntiCaida()
@@ -2790,7 +2790,7 @@ local function VerificarYActualizarAntiCaida()
     end
 end
 
-local function SetNoCollision(char, state)
+ function SetNoCollision(char, state)
     if state then
         savedCollisions[char] = {}
         for _, part in ipairs(char:GetDescendants()) do
@@ -2811,7 +2811,7 @@ local function SetNoCollision(char, state)
     end
 end
 
-local function PlayWata(target)
+ function PlayWata(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -2847,7 +2847,7 @@ local function PlayWata(target)
     end)
 end
 
-local function StopWata()
+ function StopWata()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -2873,7 +2873,7 @@ local function StopWata()
     end
 end
 
-local function PlayCari(target)
+ function PlayCari(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
@@ -2909,7 +2909,7 @@ local function PlayCari(target)
     end)
 end
 
-local function StopCari()
+ function StopCari()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -2935,7 +2935,7 @@ local function StopCari()
     end
 end
 
-local function findPlayerByPartialName(name)
+ function findPlayerByPartialName(name)
     name = name:lower()
     for _, player in ipairs(game.Players:GetPlayers()) do
         local usernameMatch = player.Name:lower():sub(1, #name) == name
@@ -3085,7 +3085,7 @@ JugadoresTab:CreateInput({
                 characterAddedConnection:Disconnect()
             end
             
-            local function onTargetCharacterAdded(character)
+             function onTargetCharacterAdded(character)
                 task.wait(0.5)
                 
                 if doggyEnabled then
@@ -3127,7 +3127,7 @@ JugadoresTab:CreateInput({
 local selectorTool = nil
 local isToolActive = false
 
-local function CreateSelectorTool()
+ function CreateSelectorTool()
     if selectorTool then
         selectorTool:Destroy()
         selectorTool = nil
@@ -3346,7 +3346,7 @@ local sitToggle = false
 local isSitting = false
 local originalStats = {}
 
-local function clearAlign(localChar)
+ function clearAlign(localChar)
     if not localChar then return end
     local root = localChar:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -3704,7 +3704,6 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
 
 
 
