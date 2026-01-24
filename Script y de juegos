@@ -247,6 +247,13 @@ boton= Juegostab:CreateButton({
 })
 
 boton= Juegostab:CreateButton({
+   Name = "Lunn Hub (Murder Mystery 2)",
+   Callback = function()
+       loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimbot-I-Player-Role-ESP-I-Autofarm-I-Dupe-I-More-Features-91025"))()()
+   end,
+})
+
+boton= Juegostab:CreateButton({
    Name = "AutoFarm Pelotas(Murder Mystery 2)",
    Callback = function()
        loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/beachball-farm.lua"))()
