@@ -710,6 +710,7 @@ local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -769,7 +770,7 @@ function CreateMobileControls()
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    MobileGui.Parent = CoreGui 
 
     local ButtonSize = UDim2.new(0, 80, 0, 80)
 
