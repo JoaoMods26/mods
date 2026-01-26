@@ -1158,32 +1158,33 @@ local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
- 
+local CoreGui = game:GetService("CoreGui")
+
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
 local RootPart = Character:FindFirstChild("HumanoidRootPart")
- 
+
 local FlyEnabled = false
 local FlySpeed = 50
 local Connection
 local MobileGui = nil
- 
+
 local MobileMove = {
     Up = false,
     Down = false,
 }
- 
+
 -- Variable para el stick de movimiento nativo
 local moveVector = Vector3.zero
- 
+
 -- Función para actualizar el personaje y sus componentes
 local function UpdateCharacter(newCharacter)
     Character = newCharacter
     Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
     RootPart = Character:FindFirstChild("HumanoidRootPart")
 end
- 
+
 -- Actualizar referencias cuando el personaje cambia
 LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     newCharacter:WaitForChild("HumanoidRootPart")
@@ -1194,11 +1195,11 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
         ToggleFly(true)
     end
 end)
- 
+
 -- Capturar el movimiento del stick nativo de Roblox
 local function getMobileMovement()
     local moveDirection = Vector3.zero
- 
+
     -- Obtiene el MoveVector desde el ControlModule de Roblox
     pcall(function()
         local playerModule = LocalPlayer.PlayerScripts:WaitForChild("PlayerModule")
@@ -1207,62 +1208,162 @@ local function getMobileMovement()
             moveDirection = controls:GetMoveVector()
         end
     end)
- 
+
     return moveDirection
 end
- 
--- Crear controles móviles (solo Up/Down)
+
+-- Crear controles móviles (solo Up/Down) DIRECTAMENTE EN COREGUI
 local function CreateMobileControls()
     if not UIS.TouchEnabled or MobileGui then return end
- 
+
+    -- Limpiar GUI anterior si existe
+    local oldGui = CoreGui:FindFirstChild("JmodsFlyControls")
+    if oldGui then oldGui:Destroy() end
+    task.wait()
+
+    -- CREAR DIRECTAMENTE EN COREGUI
     MobileGui = Instance.new("ScreenGui")
-    MobileGui.Name = "MobileFlyControls"
+    MobileGui.Name = "JmodsFlyControls"
+    MobileGui.IgnoreGuiInset = true
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
- 
+    MobileGui.DisplayOrder = 999999
+    MobileGui.Parent = CoreGui  -- DIRECTAMENTE EN COREGUI
+    
     local ButtonSize = UDim2.new(0, 80, 0, 80)
- 
+
     local function CreateButton(name, position, text, onPress, onRelease)
         local Button = Instance.new("TextButton")
         Button.Name = name
         Button.Size = ButtonSize
         Button.Position = position
+        Button.AnchorPoint = Vector2.new(0.5, 0.5)
         Button.Text = text
         Button.TextScaled = true
         Button.Font = Enum.Font.GothamBold
         Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         Button.TextColor3 = Color3.new(1, 1, 1)
+        Button.BorderSizePixel = 0
         Button.AutoButtonColor = false
+        Button.ZIndex = 1000
+        Button.BackgroundTransparency = 0.3
         Button.Parent = MobileGui
- 
+
+        -- Sombra
+        local Shadow = Instance.new("ImageLabel")
+        Shadow.Name = "Shadow"
+        Shadow.BackgroundTransparency = 1
+        Shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
+        Shadow.Size = UDim2.new(1, 8, 1, 8)
+        Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+        Shadow.Image = "rbxassetid://5554236805"
+        Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+        Shadow.ImageTransparency = 0.5
+        Shadow.ScaleType = Enum.ScaleType.Slice
+        Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
+        Shadow.ZIndex = 999
+        Shadow.Parent = Button
+
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0.2, 0)
         corner.Parent = Button
- 
+
+        -- Gradiente
+        local Gradient = Instance.new("UIGradient")
+        Gradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 70, 70)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 40, 40))
+        }
+        Gradient.Rotation = 90
+        Gradient.Parent = Button
+
+        -- Eventos
         Button.MouseButton1Down:Connect(function()
             onPress()
-            Button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+            Button.BackgroundTransparency = 0.1
+            Button.Size = UDim2.new(0, 75, 0, 75)
         end)
- 
+
         Button.MouseButton1Up:Connect(function()
             onRelease()
-            Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            Button.BackgroundTransparency = 0.3
+            Button.Size = ButtonSize
         end)
- 
+
+        Button.TouchTap:Connect(function()
+            onPress()
+            task.wait(0.1)
+            onRelease()
+        end)
+
+        Button.TouchLongPress:Connect(function()
+            onPress()
+        end)
+
         return Button
     end
- 
+
     -- Botones de subir y bajar (derecha de la pantalla)
-    CreateButton("Up", UDim2.new(1, -100, 1, -200), "▲", 
+    CreateButton("Up", UDim2.new(1, -60, 0.7, 0), "▲", 
         function() MobileMove.Up = true end, 
         function() MobileMove.Up = false end
     )
-    CreateButton("Down", UDim2.new(1, -100, 1, -100), "▼", 
+    
+    CreateButton("Down", UDim2.new(1, -60, 0.85, 0), "▼", 
         function() MobileMove.Down = true end, 
         function() MobileMove.Down = false end
     )
+
+    -- Indicador de estado de vuelo
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "FlyStatus"
+    StatusLabel.Size = UDim2.new(0, 150, 0, 30)
+    StatusLabel.Position = UDim2.new(0.5, 0, 0.05, 0)
+    StatusLabel.AnchorPoint = Vector2.new(0.5, 0)
+    StatusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    StatusLabel.BackgroundTransparency = 0.3
+    StatusLabel.BorderSizePixel = 0
+    StatusLabel.Text = "🚀 MODO VUELO ACTIVO"
+    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    StatusLabel.TextScaled = true
+    StatusLabel.Font = Enum.Font.GothamBold
+    StatusLabel.ZIndex = 1000
+    StatusLabel.Parent = MobileGui
+
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0.3, 0)
+    StatusCorner.Parent = StatusLabel
+
+    local StatusGradient = Instance.new("UIGradient")
+    StatusGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    StatusGradient.Rotation = 90
+    StatusGradient.Parent = StatusLabel
+
+    -- Animación de parpadeo para el indicador
+    task.spawn(function()
+        while MobileGui and MobileGui.Parent do
+            StatusLabel.TextTransparency = 0
+            task.wait(0.5)
+            if not MobileGui or not MobileGui.Parent then break end
+            StatusLabel.TextTransparency = 0.3
+            task.wait(0.5)
+        end
+    end)
+
+    -- Efecto rainbow en el indicador
+    local hue = 0
+    task.spawn(function()
+        while MobileGui and MobileGui.Parent do
+            hue = (hue + 0.005) % 1
+            local color = Color3.fromHSV(hue, 0.8, 1)
+            StatusLabel.TextColor3 = color
+            task.wait()
+        end
+    end)
 end
- 
+
 local function DestroyMobileControls()
     if MobileGui then
         MobileGui:Destroy()
@@ -1272,34 +1373,34 @@ local function DestroyMobileControls()
         MobileMove[key] = false
     end
 end
- 
+
 -- Toggle Fly
 function ToggleFly(state)
     if not RootPart or not Humanoid then
         return
     end
- 
+
     FlyEnabled = state
- 
+
     if FlyEnabled then
         -- Activar controles móviles si es touch (solo Up/Down)
         if UIS.TouchEnabled then
             CreateMobileControls()
         end
- 
+
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
         Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
- 
+
         Connection = RunService.RenderStepped:Connect(function()
             local MoveDirection = Vector3.new()
             local cameraCFrame = Workspace.CurrentCamera.CFrame
             local up = Vector3.new(0, 1, 0)
- 
+
             -- Para PC - Movimiento horizontal con WASD
             if not UIS.TouchEnabled then
                 local forward = cameraCFrame.LookVector
                 local right = cameraCFrame.RightVector
- 
+
                 if UIS:IsKeyDown(Enum.KeyCode.W) then MoveDirection = MoveDirection + forward end
                 if UIS:IsKeyDown(Enum.KeyCode.S) then MoveDirection = MoveDirection - forward end
                 if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDirection = MoveDirection - right end
@@ -1310,13 +1411,13 @@ function ToggleFly(state)
                 if mobileMove.Magnitude > 0 then
                     local lookVector = cameraCFrame.LookVector
                     local rightVector = cameraCFrame.RightVector
- 
+
                     -- Convertir el input del stick a dirección mundial
                     local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
                     MoveDirection = MoveDirection + worldDirection
                 end
             end
- 
+
             -- Movimiento vertical (PC y Móvil)
             if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then 
                 MoveDirection = MoveDirection + up 
@@ -1324,7 +1425,7 @@ function ToggleFly(state)
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then 
                 MoveDirection = MoveDirection - up 
             end
- 
+
             -- Aplicar velocidad
             if MoveDirection.Magnitude == 0 then
                 RootPart.Velocity = Vector3.new(0, 0, 0)
@@ -1337,15 +1438,15 @@ function ToggleFly(state)
             Connection:Disconnect()
             Connection = nil
         end
- 
+
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
         Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
- 
+
         -- Desactivar controles móviles si estaban activos
         DestroyMobileControls()
     end
 end
- 
+
 -- UI Rayfield
 FlyToggle = MainTab:CreateToggle({
     Name = "Volar Gravedad 0",
@@ -1354,7 +1455,7 @@ FlyToggle = MainTab:CreateToggle({
         ToggleFly(state)
     end
 })
- 
+
 FlySpeedSlider = MainTab:CreateSlider({
     Name = "Velocidad Gravedad 0",
     Range = {0, 300},
