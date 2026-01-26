@@ -36,7 +36,7 @@ local buttons = {}
 local heartbeatConnection = nil
 
 -- // Función para crear la GUI móvil (SOLO cuando se activa ghost)
-local function createMobileGui()
+function createMobileGui()
 	if screenGui then
 		screenGui:Destroy()
 		screenGui = nil
@@ -71,7 +71,7 @@ local function createMobileGui()
 end
 
 -- // Función para limpiar la GUI móvil
-local function cleanupMobileGui()
+ function cleanupMobileGui()
 	if screenGui then
 		screenGui:Destroy()
 		screenGui = nil
@@ -80,7 +80,7 @@ local function cleanupMobileGui()
 end
 
 -- // Funciones originales
-local function createPlatform(position)
+function createPlatform(position)
 	if platform then platform:Destroy() end
 	platform = Instance.new("Part")
 	platform.Name = "PlayerPlatform"
@@ -94,7 +94,7 @@ local function createPlatform(position)
 	platform.Parent = workspace
 end
 
-local function createGhostPart(position)
+ function createGhostPart(position)
 	if workspace:FindFirstChild("GhostPart") then
 		workspace.GhostPart:Destroy()
 	end
@@ -130,7 +130,7 @@ local function createGhostPart(position)
 	camera.CameraType = Enum.CameraType.Custom
 end
 
-local function updateGhostPartMovement()
+ function updateGhostPartMovement()
 	if not isGhostMode or not ghostPart then return end
 	local moveDirection = Vector3.new(0, 0, 0)
 	local speed = 60
@@ -162,7 +162,7 @@ local function updateGhostPartMovement()
 end
 
 -- Función para activar el loop de movimiento
-local function connectHeartbeat()
+function connectHeartbeat()
 	if heartbeatConnection then return end
 	heartbeatConnection = RunService.Heartbeat:Connect(function()
 		updateGhostPartMovement()
@@ -170,7 +170,7 @@ local function connectHeartbeat()
 end
 
 -- Función para desactivar el loop de movimiento
-local function disconnectHeartbeat()
+ function disconnectHeartbeat()
 	if heartbeatConnection then
 		heartbeatConnection:Disconnect()
 		heartbeatConnection = nil
@@ -178,7 +178,7 @@ local function disconnectHeartbeat()
 end
 
 -- Función para guardar transparencias originales
-local function saveOriginalTransparencies()
+ function saveOriginalTransparencies()
 	originalTransparencies = {}
 	
 	for _, obj in pairs(character:GetDescendants()) do
@@ -197,7 +197,7 @@ local function saveOriginalTransparencies()
 end
 
 -- Función para restaurar transparencias originales
-local function restoreOriginalTransparencies()
+function restoreOriginalTransparencies()
 	for obj, transparency in pairs(originalTransparencies) do
 		if obj and obj.Parent then
 			obj.Transparency = transparency
@@ -218,7 +218,7 @@ local function restoreOriginalTransparencies()
 	originalTransparencies = {}
 end
 
-local function teleportAndGhost()
+ function teleportAndGhost()
 	if isGhostMode then
 		-- DESACTIVAR GHOST MODE
 		humanoidRootPart.CFrame = ghostPart and CFrame.new(ghostPart.Position + Vector3.new(0, 3, 0)) or CFrame.new(0, 100, 0)
@@ -704,7 +704,337 @@ getgenv().ToggleShiftlock = ToggleShiftlock
 
 
 
+---Volar autos
+--Volar autos y normal
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
+local RootPart = Character:FindFirstChild("HumanoidRootPart")
+
+local FlyEnabled = false
+local FlySpeed = 50
+local Connection
+local SeatConnection
+local MobileGui = nil
+local OriginalPlatformStand = false
+local CurrentSeat = nil
+local VehicleInitialRotation = nil
+local SeatOffset = nil
+
+local MobileMove = {
+    Up = false,
+    Down = false,
+}
+
+local moveVector = Vector3.zero
+
+function UpdateCharacter(newCharacter)
+    Character = newCharacter
+    Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
+    RootPart = Character:FindFirstChild("HumanoidRootPart")
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    newCharacter:WaitForChild("HumanoidRootPart")
+    newCharacter:WaitForChild("Humanoid")
+    UpdateCharacter(newCharacter)
+    if FlyEnabled then
+        ToggleFly(false)
+        ToggleFly(true)
+    end
+end)
+
+function getMobileMovement()
+    local moveDirection = Vector3.zero
+
+    pcall(function()
+        local playerModule = LocalPlayer.PlayerScripts:WaitForChild("PlayerModule")
+        local controls = require(playerModule:WaitForChild("ControlModule"))
+        if controls then
+            moveDirection = controls:GetMoveVector()
+        end
+    end)
+
+    return moveDirection
+end
+
+function CreateMobileControls()
+    if not UIS.TouchEnabled or MobileGui then return end
+
+    MobileGui = Instance.new("ScreenGui")
+    MobileGui.Name = "MobileFlyControls"
+    MobileGui.ResetOnSpawn = false
+    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local ButtonSize = UDim2.new(0, 80, 0, 80)
+
+     function CreateButton(name, position, text, onPress, onRelease)
+        local Button = Instance.new("TextButton")
+        Button.Name = name
+        Button.Size = ButtonSize
+        Button.Position = position
+        Button.Text = text
+        Button.TextScaled = true
+        Button.Font = Enum.Font.GothamBold
+        Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Button.TextColor3 = Color3.new(1, 1, 1)
+        Button.AutoButtonColor = false
+        Button.Parent = MobileGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0.2, 0)
+        corner.Parent = Button
+
+        local shadow = Instance.new("ImageLabel")
+        shadow.Name = "Shadow"
+        shadow.BackgroundTransparency = 1
+        shadow.Position = UDim2.new(0, 0, 0, 2)
+        shadow.Size = UDim2.new(1, 0, 1, 0)
+        shadow.Image = "rbxasset://textures/ui/Controls/DesignSystem/Shadow_Circle.png"
+        shadow.ImageColor3 = Color3.new(0, 0, 0)
+        shadow.ImageTransparency = 0.7
+        shadow.ZIndex = 0
+        shadow.Parent = Button
+
+        Button.MouseButton1Down:Connect(function()
+            onPress()
+            Button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        end)
+
+        Button.MouseButton1Up:Connect(function()
+            onRelease()
+            Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        end)
+
+        return Button
+    end
+
+    CreateButton("Up", UDim2.new(1, -100, 1, -200), "▲", 
+        function() MobileMove.Up = true end, 
+        function() MobileMove.Up = false end
+    )
+    CreateButton("Down", UDim2.new(1, -100, 1, -100), "▼", 
+        function() MobileMove.Down = true end, 
+        function() MobileMove.Down = false end
+    )
+end
+
+function DestroyMobileControls()
+    if MobileGui then
+        MobileGui:Destroy()
+        MobileGui = nil
+    end
+    for key in pairs(MobileMove) do
+        MobileMove[key] = false
+    end
+end
+
+function ToggleFly(state)
+    if not RootPart or not Humanoid then
+        return
+    end
+
+    FlyEnabled = state
+
+    if FlyEnabled then
+        if Humanoid.Sit and Humanoid.SeatPart then
+            CurrentSeat = Humanoid.SeatPart
+            
+            local vehicle = CurrentSeat:FindFirstAncestorOfClass("Model")
+            local vehiclePart = vehicle and vehicle.PrimaryPart or CurrentSeat
+            VehicleInitialRotation = vehiclePart.CFrame - vehiclePart.Position
+            
+            SeatOffset = CurrentSeat.CFrame:ToObjectSpace(RootPart.CFrame)
+        end
+
+        if UIS.TouchEnabled then
+            CreateMobileControls()
+        end
+
+        OriginalPlatformStand = Humanoid.PlatformStand
+        
+        if not CurrentSeat then
+            Humanoid.PlatformStand = true
+            Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        end
+
+        SeatConnection = RunService.Heartbeat:Connect(function()
+            if CurrentSeat and CurrentSeat.Parent then
+                if not Humanoid.Sit then
+                    Humanoid.Sit = true
+                end
+                
+                if Humanoid.SeatPart ~= CurrentSeat then
+                    if CurrentSeat:IsA("VehicleSeat") or CurrentSeat:IsA("Seat") then
+                        CurrentSeat:Sit(Humanoid)
+                    end
+                end
+                
+                if SeatOffset then
+                    RootPart.CFrame = CurrentSeat.CFrame * SeatOffset
+                end
+            end
+        end)
+
+        Connection = RunService.RenderStepped:Connect(function()
+            local MoveDirection = Vector3.new()
+            local cameraCFrame = Workspace.CurrentCamera.CFrame
+            local up = Vector3.new(0, 1, 0)
+
+            if CurrentSeat and CurrentSeat.Parent then
+                local seat = CurrentSeat
+                local vehicle = seat:FindFirstAncestorOfClass("Model")
+                local vehiclePart = vehicle and vehicle.PrimaryPart or seat
+
+                local cameraForward = cameraCFrame.LookVector
+                local cameraRight = cameraCFrame.RightVector
+
+                if not UIS.TouchEnabled then
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then MoveDirection = MoveDirection + cameraForward end
+                    if UIS:IsKeyDown(Enum.KeyCode.S) then MoveDirection = MoveDirection - cameraForward end
+                    if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDirection = MoveDirection - cameraRight end
+                    if UIS:IsKeyDown(Enum.KeyCode.D) then MoveDirection = MoveDirection + cameraRight end
+                else
+                    -- Entrada de movimiento (Móvil)
+                    local mobileMove = getMobileMovement()
+                    if mobileMove.Magnitude > 0 then
+                        local worldDirection = (cameraRight * mobileMove.X) + (cameraForward * -mobileMove.Z)
+                        MoveDirection = MoveDirection + worldDirection
+                    end
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then 
+                    MoveDirection = MoveDirection + up 
+                end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then 
+                    MoveDirection = MoveDirection - up 
+                end
+
+                local currentPosition = vehiclePart.Position
+
+                if MoveDirection.Magnitude == 0 then
+                    vehiclePart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                else
+                    vehiclePart.AssemblyLinearVelocity = MoveDirection.Unit * FlySpeed
+                end
+                
+                vehiclePart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                vehiclePart.CFrame = CFrame.new(currentPosition) * VehicleInitialRotation
+
+            else
+                if Humanoid.PlatformStand == false then
+                    Humanoid.PlatformStand = true
+                end
+
+                if not UIS.TouchEnabled then
+                    local forward = cameraCFrame.LookVector
+                    local right = cameraCFrame.RightVector
+
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then MoveDirection = MoveDirection + forward end
+                    if UIS:IsKeyDown(Enum.KeyCode.S) then MoveDirection = MoveDirection - forward end
+                    if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDirection = MoveDirection - right end
+                    if UIS:IsKeyDown(Enum.KeyCode.D) then MoveDirection = MoveDirection + right end
+                else
+                    local mobileMove = getMobileMovement()
+                    if mobileMove.Magnitude > 0 then
+                        local lookVector = cameraCFrame.LookVector
+                        local rightVector = cameraCFrame.RightVector
+                        local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
+                        MoveDirection = MoveDirection + worldDirection
+                    end
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then 
+                    MoveDirection = MoveDirection + up 
+                end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or MobileMove.Down then 
+                    MoveDirection = MoveDirection - up 
+                end
+
+                local currentPosition = RootPart.Position
+
+                if MoveDirection.Magnitude == 0 then
+                    RootPart.Velocity = Vector3.new(0, 0, 0)
+                else
+                    RootPart.Velocity = MoveDirection.Unit * FlySpeed
+                end
+                
+                local cameraLook = cameraCFrame.LookVector
+                local horizontalLook = Vector3.new(cameraLook.X, 0, cameraLook.Z)
+                
+                if horizontalLook.Magnitude > 0.01 then
+                    horizontalLook = horizontalLook.Unit
+                    -- Crear rotación instantánea mirando hacia la cámara
+                    local targetCFrame = CFrame.new(currentPosition, currentPosition + horizontalLook)
+                    RootPart.CFrame = targetCFrame
+                else
+                    -- Mantener rotación actual si mira directo arriba/abajo
+                    RootPart.CFrame = CFrame.new(currentPosition) * (RootPart.CFrame - RootPart.Position)
+                end
+                
+                RootPart.RotVelocity = Vector3.new(0, 0, 0)
+            end
+        end)
+    else
+        local wasSeated = CurrentSeat ~= nil
+        local savedSeat = CurrentSeat
+        
+        if Connection then
+            Connection:Disconnect()
+            Connection = nil
+        end
+
+        if SeatConnection then
+            SeatConnection:Disconnect()
+            SeatConnection = nil
+        end
+
+        if not wasSeated then
+            Humanoid.PlatformStand = OriginalPlatformStand
+            Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+        else
+            if savedSeat and savedSeat.Parent then
+                task.wait(0.05)
+                if savedSeat:IsA("VehicleSeat") or savedSeat:IsA("Seat") then
+                    savedSeat:Sit(Humanoid)
+                end
+                Humanoid.Sit = true
+            end
+        end
+
+        CurrentSeat = nil
+        VehicleInitialRotation = nil
+        SeatOffset = nil
+
+        DestroyMobileControls()
+    end
+end
+
+FlyToggle = MainTab:CreateToggle({
+    Name = "Volar en Vehiculos",
+    CurrentValue = false,
+    Callback = function(state)
+        ToggleFly(state)
+    end
+})
+
+FlySpeedSlider = MainTab:CreateSlider({
+    Name = "Velociddad Volar en Vehiculos",
+    Range = {0, 1000},
+    Increment = 5,
+    Suffix = " Velocidad",
+    CurrentValue = FlySpeed,
+    Callback = function(value)
+        FlySpeed = value
+    end
+})
 
 
 
@@ -723,7 +1053,7 @@ local floorPart = nil
 local heartbeatConnection = nil
 
 -- Detectar si está tocando suelo REAL (no nuestra plataforma)
-local function isTouchingRealGround()
+ function isTouchingRealGround()
     local character = player.Character
     if not character then return false end
     
@@ -755,7 +1085,7 @@ local function isTouchingRealGround()
 end
 
 -- Crear el piso invisible
-local function createFloor()
+ function createFloor()
     if floorPart then
         floorPart:Destroy()
     end
@@ -779,7 +1109,7 @@ local function createFloor()
 end
 
 -- Limpiar el piso
-local function destroyFloor()
+function destroyFloor()
     if floorPart then
         floorPart:Destroy()
         floorPart = nil
@@ -787,7 +1117,7 @@ local function destroyFloor()
 end
 
 -- Limpiar la conexión
-local function disconnectHeartbeat()
+function disconnectHeartbeat()
     if heartbeatConnection then
         heartbeatConnection:Disconnect()
         heartbeatConnection = nil
@@ -876,13 +1206,13 @@ end)
 local mutedSounds = {}
 local toggleActive = false
 
-local function isVoiceSound(sound)
+ function isVoiceSound(sound)
 	if sound:IsDescendantOf(VoiceChatService) then return true end
 	local name = sound.Name:lower()
 	return name:find("voice") or name:find("vc")
 end
 
-local function muteAllExceptVoice()
+ function muteAllExceptVoice()
 	for _, sound in ipairs(game:GetDescendants()) do
 		if sound:IsA("Sound") and not isVoiceSound(sound) then
 			if sound.Playing and sound.Volume > 0 then
@@ -893,7 +1223,7 @@ local function muteAllExceptVoice()
 	end
 end
 
-local function unmuteAll()
+ function unmuteAll()
 	for sound, vol in pairs(mutedSounds) do
 		if sound and sound.Parent then
 			sound.Volume = vol
@@ -984,7 +1314,7 @@ local cameraUnlocked = false -- INICIALMENTE FALSO
 local originalCameraSettings = {}
 
 -- Función para forzar el control de cámara
-local function enableCameraControl()
+ function enableCameraControl()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:WaitForChild("Humanoid")
 
@@ -1083,7 +1413,7 @@ local baseJumpPower = 50
 local originalStats = {}
 
 -- Función para aplicar boost
-local function applyBoost()
+ function applyBoost()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
 	if humanoid then
@@ -1103,7 +1433,7 @@ local function applyBoost()
 end
 
 -- Restaurar valores originales
-local function restoreStats()
+ function restoreStats()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
 	if humanoid and originalStats.saved then
@@ -1166,7 +1496,7 @@ local antiFlingEnabled = false
 local characterConnections = {}
 local collisionLoop
 
-local function SetNoCollision(character)
+ function SetNoCollision(character)
 	for _, item in pairs(character:GetDescendants()) do
 		if item:IsA("BasePart") and item.CanCollide then
 			item.CanCollide = false
@@ -1174,7 +1504,7 @@ local function SetNoCollision(character)
 	end
 end
 
-local function OnCharacterAdded(player, character)
+ function OnCharacterAdded(player, character)
 	if not antiFlingEnabled or player == LocalPlayer then return end
 	SetNoCollision(character)
 
@@ -1188,7 +1518,7 @@ local function OnCharacterAdded(player, character)
 	characterConnections[player] = conn
 end
 
-local function EnableAntiFling()
+ function EnableAntiFling()
 	-- Inicial
 	for _, player in pairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer then
@@ -1224,7 +1554,7 @@ local function EnableAntiFling()
 	end)
 end
 
-local function DisableAntiFling()
+function DisableAntiFling()
 	for _, conn in pairs(characterConnections) do
 		if typeof(conn) == "RBXScriptConnection" then
 			conn:Disconnect()
