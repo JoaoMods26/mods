@@ -2,7 +2,6 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 
 -- // Variables de jugador
 local player = Players.LocalPlayer
@@ -36,6 +35,7 @@ local buttons = {}
 -- // Conexión del loop de movimiento (SE ACTIVA SOLO CUANDO SE USA)
 local heartbeatConnection = nil
 
+-- // Función para crear la GUI móvil (SOLO cuando se activa ghost)
 function createMobileGui()
 	if screenGui then
 		screenGui:Destroy()
@@ -45,40 +45,8 @@ function createMobileGui()
 
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "GhostMobileControls"
-	screenGui.ResetOnSpawn = false
-	
-	-- Intentar CoreGui primero, si falla usar PlayerGui
-	local success = pcall(function()
-		screenGui.Parent = CoreGui
-	end)
-	
-	if not success then
-		screenGui.Parent = player:WaitForChild("PlayerGui")
-	end
-	
+	screenGui.Parent = player:WaitForChild("PlayerGui")
 	screenGui.Enabled = false
-
-	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
-
-	for i, dir in ipairs(directions) do
-		local button = Instance.new("TextButton")
-		button.Size = UDim2.new(0, 60, 0, 60)
-		button.Position = UDim2.new(0, 10 + (i-1)*65, 1, -70)
-		button.Text = dir[2]
-		button.BackgroundTransparency = 0.3
-		button.TextScaled = true
-		button.Name = dir[1]
-		button.Parent = screenGui
-		buttons[dir[1]] = button
-
-		button.MouseButton1Down:Connect(function()
-			moveFlags[dir[1]] = true
-		end)
-		button.MouseButton1Up:Connect(function()
-			moveFlags[dir[1]] = false
-		end)
-	end
-end
 
 	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
 
@@ -365,7 +333,6 @@ local Services = {
     RunService = game:GetService("RunService"),
     UserInputService = game:GetService("UserInputService"),
     TweenService = game:GetService("TweenService")
-    CoreGui = game:GetService("CoreGui")
 }
 
 local State = {
@@ -429,11 +396,13 @@ local UI = {}
 function UI.create()
     UI.destroy()
     
+    local playerGui = State.player:WaitForChild("PlayerGui")
+    
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "NewShiftlockUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = Services.CoreGui  -- <--- CAMBIA ESTA LÍNEA
+    screenGui.Parent = playerGui
     
     State.uiElements.screenGui = screenGui
     
@@ -741,7 +710,6 @@ local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -801,7 +769,7 @@ function CreateMobileControls()
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = CoreGui 
+    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
     local ButtonSize = UDim2.new(0, 80, 0, 80)
 
