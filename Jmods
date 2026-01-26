@@ -390,7 +390,6 @@ Slider = MainTab:CreateSlider({
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 
 -- Variables compartidas
 local player = Players.LocalPlayer
@@ -1219,7 +1218,7 @@ local function CreateMobileControls()
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = CoreGui
+    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
  
     local ButtonSize = UDim2.new(0, 80, 0, 80)
  
