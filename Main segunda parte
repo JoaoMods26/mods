@@ -333,6 +333,7 @@ local Services = {
     RunService = game:GetService("RunService"),
     UserInputService = game:GetService("UserInputService"),
     TweenService = game:GetService("TweenService")
+    CoreGui = game:GetService("CoreGui")
 }
 
 local State = {
@@ -396,13 +397,11 @@ local UI = {}
 function UI.create()
     UI.destroy()
     
-    local playerGui = State.player:WaitForChild("PlayerGui")
-    
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "NewShiftlockUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = playerGui
+    screenGui.Parent = Services.CoreGui  -- <--- CAMBIA ESTA LÍNEA
     
     State.uiElements.screenGui = screenGui
     
