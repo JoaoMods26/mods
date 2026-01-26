@@ -2,6 +2,7 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
 -- // Variables de jugador
 local player = Players.LocalPlayer
@@ -35,7 +36,6 @@ local buttons = {}
 -- // Conexión del loop de movimiento (SE ACTIVA SOLO CUANDO SE USA)
 local heartbeatConnection = nil
 
--- // Función para crear la GUI móvil (SOLO cuando se activa ghost)
 function createMobileGui()
 	if screenGui then
 		screenGui:Destroy()
@@ -45,7 +45,7 @@ function createMobileGui()
 
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "GhostMobileControls"
-	screenGui.Parent = player:WaitForChild("PlayerGui")
+	screenGui.Parent = CoreGui  -- <--- CAMBIA SOLO ESTA LÍNEA
 	screenGui.Enabled = false
 
 	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
