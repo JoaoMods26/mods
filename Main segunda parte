@@ -45,8 +45,40 @@ function createMobileGui()
 
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "GhostMobileControls"
-	screenGui.Parent = CoreGui  -- <--- CAMBIA SOLO ESTA LÍNEA
+	screenGui.ResetOnSpawn = false
+	
+	-- Intentar CoreGui primero, si falla usar PlayerGui
+	local success = pcall(function()
+		screenGui.Parent = CoreGui
+	end)
+	
+	if not success then
+		screenGui.Parent = player:WaitForChild("PlayerGui")
+	end
+	
 	screenGui.Enabled = false
+
+	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
+
+	for i, dir in ipairs(directions) do
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(0, 60, 0, 60)
+		button.Position = UDim2.new(0, 10 + (i-1)*65, 1, -70)
+		button.Text = dir[2]
+		button.BackgroundTransparency = 0.3
+		button.TextScaled = true
+		button.Name = dir[1]
+		button.Parent = screenGui
+		buttons[dir[1]] = button
+
+		button.MouseButton1Down:Connect(function()
+			moveFlags[dir[1]] = true
+		end)
+		button.MouseButton1Up:Connect(function()
+			moveFlags[dir[1]] = false
+		end)
+	end
+end
 
 	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
 
