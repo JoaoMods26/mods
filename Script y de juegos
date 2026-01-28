@@ -480,7 +480,7 @@ boton= Juegostab:CreateButton({
 boton= Juegostab:CreateButton({
    Name = "Veneyork(JVenecofarMods)",
    Callback = function()
-       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/veko'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/aaaaaaaa'))() ---https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/veko
    end,
 })
 
