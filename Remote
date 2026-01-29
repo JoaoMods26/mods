@@ -1,72 +1,302 @@
 task.spawn(function()
     repeat task.wait() until game:IsLoaded()
 
+    local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
-    local HttpService = game:GetService("HttpService")
+    local UserInputService = game:GetService("UserInputService")
+    local TweenService = game:GetService("TweenService")
+    local CoreGui = game:GetService("CoreGui")
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local StarterGui = game:GetService("StarterGui")
     local LocalPlayer = Players.LocalPlayer
-    local ownerIds = {4591285210, 2275056290}
-
+    
+    local FIREBASE_URL = "https://admxd-d6c49-default-rtdb.firebaseio.com"
+    local ownerIds = {4591285210}
+    local adminIds = {8929351324, 9132360437}
+    
+    local detectedFollowers = {}
+    local heartbeatActive = false
+    local heartbeatInterval = 2
     local Orbiting, Walking, Frozen, EmoteSync = false, false, false, false
-    local danceTracks, frozenPositions, emotes = {}, {}, {}
+    local danceTracks, emotes = {}, {}
     local emoteSyncTracks = {}
     local lastCommandTime = 0
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
     local targetForEmoteSync = nil
-
+    local currentServerId = game.JobId
+    local lastCleanupTime = 0
+    local cleanupInterval = 30
+    
+    local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
+    
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
         emotes = HttpService:JSONDecode(data)
     end)
-
+    
     local function IsOwner(userId)
         for _, id in ipairs(ownerIds) do
             if userId == id then return true end
         end
         return false
     end
-
-    local function GetOwnerPlayer()
-        for _, id in ipairs(ownerIds) do
-            local player = Players:GetPlayerByUserId(id)
-            if player then return player end
+    
+    local function IsAdmin(userId)
+        for _, id in ipairs(adminIds) do
+            if userId == id then return true end
+        end
+        return false
+    end
+    
+    local function GetRole(userId)
+        if IsOwner(userId) then return "Owner" end
+        if IsAdmin(userId) then return "Admin" end
+        return "Follower"
+    end
+    
+    local isOwner = IsOwner(LocalPlayer.UserId)
+    local isAdmin = IsAdmin(LocalPlayer.UserId)
+    local myUserId = tostring(LocalPlayer.UserId)
+    
+    local FirebaseAPI = {}
+    
+    function FirebaseAPI:Request(method, path, data)
+        local url = FIREBASE_URL .. path
+        if not url:match("%.json$") then
+            url = url .. ".json"
+        end
+        
+        local success, result = pcall(function()
+            if method == "GET" then
+                return request({
+                    Url = url,
+                    Method = "GET",
+                    Headers = {["Content-Type"] = "application/json"}
+                })
+            elseif method == "PUT" then
+                return request({
+                    Url = url,
+                    Method = "PUT",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(data)
+                })
+            elseif method == "PATCH" then
+                return request({
+                    Url = url,
+                    Method = "PATCH",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(data)
+                })
+            elseif method == "DELETE" then
+                return request({
+                    Url = url,
+                    Method = "DELETE",
+                    Headers = {["Content-Type"] = "application/json"}
+                })
+            elseif method == "POST" then
+                return request({
+                    Url = url,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(data)
+                })
+            end
+        end)
+        
+        if success and result and result.Body and result.Body ~= "" then
+            local ok, decoded = pcall(function()
+                return HttpService:JSONDecode(result.Body)
+            end)
+            if ok then return decoded end
         end
         return nil
     end
-
-    local function GetTargetPlayer(name)
-        if name then
-            name = name:lower()
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Name:lower():sub(1, #name) == name then
-                    return p
+    
+    function FirebaseAPI:Get(path)
+        return self:Request("GET", path)
+    end
+    
+    function FirebaseAPI:Set(path, data)
+        return self:Request("PUT", path, data)
+    end
+    
+    function FirebaseAPI:Update(path, data)
+        return self:Request("PATCH", path, data)
+    end
+    
+    function FirebaseAPI:Delete(path)
+        return self:Request("DELETE", path)
+    end
+    
+    function FirebaseAPI:Post(path, data)
+        return self:Request("POST", path, data)
+    end
+    
+    local function CleanupOldData()
+        local currentTime = tick()
+        
+        if isOwner or isAdmin then
+            task.spawn(function()
+                while true do
+                    task.wait(2)
+                    pcall(function()
+                        local userType = isOwner and "owners" or "admins"
+                        FirebaseAPI:Set("/heartbeats/" .. userType .. "/" .. myUserId .. "/self", {
+                            name = LocalPlayer.Name,
+                            serverId = currentServerId,
+                            timestamp = tick(),
+                            role = isOwner and "Owner" or "Admin"
+                        })
+                    end)
+                end
+            end)
+        end
+        
+        -- 🧹 Limpiar followers inactivos cada 3 minutos
+        task.spawn(function()
+            while true do
+                task.wait(180)
+                
+                pcall(function()
+                    local cleanupTime = tick()
+                    
+                    for _, ownerId in ipairs(ownerIds) do
+                        local ownerIdStr = tostring(ownerId)
+                        local heartbeats = FirebaseAPI:Get("/heartbeats/owners/" .. ownerIdStr)
+                        
+                        if heartbeats and type(heartbeats) == "table" then
+                            for userId, data in pairs(heartbeats) do
+                                if userId ~= "self" and type(data) == "table" then
+                                    if data.timestamp and (cleanupTime - data.timestamp) > 180 then
+                                        FirebaseAPI:Delete("/heartbeats/owners/" .. ownerIdStr .. "/" .. userId)
+                                        print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    for _, adminId in ipairs(adminIds) do
+                        local adminIdStr = tostring(adminId)
+                        local heartbeats = FirebaseAPI:Get("/heartbeats/admins/" .. adminIdStr)
+                        
+                        if heartbeats and type(heartbeats) == "table" then
+                            for userId, data in pairs(heartbeats) do
+                                if userId ~= "self" and type(data) == "table" then
+                                    if data.timestamp and (cleanupTime - data.timestamp) > 180 then
+                                        FirebaseAPI:Delete("/heartbeats/admins/" .. adminIdStr .. "/" .. userId)
+                                        print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+        
+        -- Limpiar ejecuciones viejas
+        task.spawn(function()
+            for _, userType in ipairs({"owners", "admins"}) do
+                local executions = FirebaseAPI:Get("/executions/" .. userType)
+                if executions and type(executions) == "table" then
+                    for userId, userExecs in pairs(executions) do
+                        if type(userExecs) == "table" then
+                            for execId, execData in pairs(userExecs) do
+                                if type(execData) == "table" and execData.timestamp and (currentTime - execData.timestamp) > 2 then
+                                    FirebaseAPI:Delete("/executions/" .. userType .. "/" .. userId .. "/" .. execId)
+                                end
+                            end
+                        end
+                    end
                 end
             end
+        end)
+        
+        -- Limpiar comandos después de 1 segundo
+        task.spawn(function()
+            for _, userType in ipairs({"owners", "admins"}) do
+                local commands = FirebaseAPI:Get("/commands/" .. userType)
+                if commands and type(commands) == "table" then
+                    for userId, userCmds in pairs(commands) do
+                        if type(userCmds) == "table" then
+                            for serverId, serverCmds in pairs(userCmds) do
+                                if type(serverCmds) == "table" then
+                                    for cmdId, cmdData in pairs(serverCmds) do
+                                        if type(cmdData) == "table" and cmdData.timestamp and (currentTime - cmdData.timestamp) > 1 then
+                                            FirebaseAPI:Delete("/commands/" .. userType .. "/" .. userId .. "/" .. serverId .. "/" .. cmdId)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- Limpiar pings viejos
+        task.spawn(function()
+            for _, userType in ipairs({"owners", "admins"}) do
+                local pings = FirebaseAPI:Get("/pings/" .. userType)
+                if pings and type(pings) == "table" then
+                    for userId, userPings in pairs(pings) do
+                        if type(userPings) == "table" then
+                            for pingId, pingData in pairs(userPings) do
+                                if type(pingData) == "table" and pingData.timestamp and (currentTime - pingData.timestamp) > 3 then
+                                    FirebaseAPI:Delete("/pings/" .. userType .. "/" .. userId .. "/" .. pingId)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- Limpiar brings viejos
+        task.spawn(function()
+            for _, userType in ipairs({"owners", "admins"}) do
+                local brings = FirebaseAPI:Get("/bring/" .. userType)
+                if brings and type(brings) == "table" then
+                    for userId, userBrings in pairs(brings) do
+                        if type(userBrings) == "table" then
+                            for serverId, serverBrings in pairs(userBrings) do
+                                if type(serverBrings) == "table" then
+                                    for bringId, bringData in pairs(serverBrings) do
+                                        if type(bringData) == "table" and bringData.timestamp and (currentTime - bringData.timestamp) > 3 then
+                                            FirebaseAPI:Delete("/bring/" .. userType .. "/" .. userId .. "/" .. serverId .. "/" .. bringId)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+    -- Loop de limpieza automática
+    task.spawn(function()
+        while true do
+            task.wait(cleanupInterval)
+            CleanupOldData()
         end
-        return GetOwnerPlayer()
+    end)
+    
+    local function GetPlayerByUserId(userId)
+        return Players:GetPlayerByUserId(tonumber(userId))
     end
 
-    local function GetTargetPlayers(name)
-        local targets = {}
-        if name then
-            name = name:lower()
-            for _, p in ipairs(Players:GetPlayers()) do
-                if not IsOwner(p.UserId) and p.Name:lower():sub(1, #name) == name then
-                    table.insert(targets, p)
-                end
-            end
-        else
-            for _, p in ipairs(Players:GetPlayers()) do
-                if not IsOwner(p.UserId) then
-                    table.insert(targets, p)
-                end
-            end
+    local function GetTargetPlayer(targetUserId)
+        if targetUserId then
+            local player = GetPlayerByUserId(targetUserId)
+            if player then return player end
         end
-        return targets
+        return nil
     end
 
     local function StartAntiSeatLoop()
@@ -84,27 +314,64 @@ task.spawn(function()
         end)
     end
 
-    local function TeleportToPlayer(name)
-        local target = GetTargetPlayer(name)
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local pos = target.Character.HumanoidRootPart.Position
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 6, 0))
+    local function TeleportToPlayer(targetUserId)
+    local target = GetTargetPlayer(targetUserId)
+    if not target or not target.Character then return end
+    
+    local targetChar = target.Character
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local myHRP = char:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+    
+    -- Esperar a que el personaje objetivo esté cargado
+    local targetHRP = targetChar:WaitForChild("HumanoidRootPart", 3)
+    if not targetHRP then return end
+    
+    pcall(function()
+        local wasAnchored = myHRP.Anchored
+        local originalCanCollide = myHRP.CanCollide
+        
+        myHRP.Anchored = true
+        myHRP.CanCollide = false
+        myHRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        myHRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        
+        -- Más intentos para mejor compatibilidad con streaming
+        for i = 1, 15 do
+            if not targetHRP or not targetHRP.Parent then break end
+            
+            local targetPos = targetHRP.Position
+            local finalPos = targetPos + Vector3.new(0, 6, 0)
+            
+            myHRP.CFrame = CFrame.new(finalPos)
+            myHRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            myHRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            
+            if i % 3 == 0 then
+                task.wait(0.025)
             end
         end
-    end
-
+        
+        task.wait(0.12)
+        
+        if myHRP and myHRP.Parent then
+            myHRP.CanCollide = originalCanCollide
+            myHRP.Anchored = wasAnchored
+        end
+    end)
+end
     local function StopOrbit()
         Orbiting = false
         RunService:UnbindFromRenderStep("OrbitAroundTarget")
     end
 
-    local function StartOrbit(name)
-        if IsOwner(LocalPlayer.UserId) then return end
+    local function StartOrbit(targetUserId)
         StopOrbit()
         Orbiting = true
         StartAntiSeatLoop()
-        local target = GetTargetPlayer(name)
+        local target = GetTargetPlayer(targetUserId)
         if not target then Orbiting = false return end
 
         RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function()
@@ -127,12 +394,11 @@ task.spawn(function()
         RunService:UnbindFromRenderStep("WalkToTarget")
     end
 
-    local function WalkToPlayer(name)
-        if IsOwner(LocalPlayer.UserId) then return end
+    local function WalkToPlayer(targetUserId)
         StopWalking()
         Walking = true
         StartAntiSeatLoop()
-        local target = GetTargetPlayer(name)
+        local target = GetTargetPlayer(targetUserId)
         if not target then Walking = false return end
 
         RunService:BindToRenderStep("WalkToTarget", Enum.RenderPriority.Character.Value, function()
@@ -145,7 +411,6 @@ task.spawn(function()
     end
 
     local function FreezeAll()
-        if IsOwner(LocalPlayer.UserId) then return end
         Frozen = true
         RunService:BindToRenderStep("FreezePlayers", Enum.RenderPriority.Camera.Value, function()
             if not Frozen then return end
@@ -157,7 +422,6 @@ task.spawn(function()
     end
 
     local function UnfreezeAll()
-        if IsOwner(LocalPlayer.UserId) then return end
         Frozen = false
         RunService:UnbindFromRenderStep("FreezePlayers")
         local char = LocalPlayer.Character
@@ -175,9 +439,7 @@ task.spawn(function()
         local rawId = tostring(random.animationid or "")
         local extractedId = rawId:match("id=(%d+)")
 
-        if not extractedId then
-            return
-        end
+        if not extractedId then return end
 
         local anim = Instance.new("Animation")
         anim.AnimationId = "rbxassetid://" .. extractedId
@@ -202,7 +464,6 @@ task.spawn(function()
         EmoteSync = false
         targetForEmoteSync = nil
         
-        -- Detener y limpiar todas las animaciones sincronizadas activas
         for _, track in pairs(emoteSyncTracks) do
             pcall(function()
                 if track and track.IsPlaying then
@@ -219,35 +480,23 @@ task.spawn(function()
         RunService:UnbindFromRenderStep("EmoteSyncDetector")
     end
 
-    local function StartEmoteSync(name)
-        if IsOwner(LocalPlayer.UserId) then return end
-        
+    local function StartEmoteSync(targetUserId)
         StopEmoteSync()
         EmoteSync = true
-        targetForEmoteSync = GetOwnerPlayer()
+        targetForEmoteSync = GetTargetPlayer(targetUserId)
         
         if not targetForEmoteSync then 
             EmoteSync = false 
             return 
         end
         
-        -- Verificar si debe aplicarse solo a jugador específico
-        if name then
-            local playerName = LocalPlayer.Name:lower()
-            if not (playerName:sub(1, #name) == name:lower()) then
-                EmoteSync = false
-                return
-            end
-        end
-        
         local lastAnimationId = ""
         local lastAnimationSpeed = 1
         local basicAnimationIds = {}
         local isCapturingBasicAnims = true
-        local currentSyncedTrack = nil -- Track actual que estamos sincronizando
+        local currentSyncedTrack = nil
         
-        -- Capturar animaciones básicas del owner durante los primeros 5 segundos
-        task.spawn(function()
+        task.spawn(function()   
             local captureStartTime = tick()
             while isCapturingBasicAnims and (tick() - captureStartTime) < 5 do
                 task.wait(0.5)
@@ -259,7 +508,6 @@ task.spawn(function()
                             for _, track in pairs(animator:GetPlayingAnimationTracks()) do
                                 if track.Animation and track.Animation.AnimationId then
                                     local animId = track.Animation.AnimationId
-                                    -- Marcar animaciones con prioridad Core, Idle o Movement como básicas
                                     if track.Priority == Enum.AnimationPriority.Core or 
                                        track.Priority == Enum.AnimationPriority.Idle or
                                        track.Priority == Enum.AnimationPriority.Movement then
@@ -275,19 +523,15 @@ task.spawn(function()
         end)
         
         local lastCheckTime = 0
-        local checkCooldown = 0.3 -- Cooldown para evitar detecciones múltiples
-        local speedCheckInterval = 0.1 -- Intervalo para verificar cambios de velocidad
+        local checkCooldown = 0.3
+        local speedCheckInterval = 0.1
         local lastSpeedCheck = 0
         
         RunService:BindToRenderStep("EmoteSyncDetector", Enum.RenderPriority.Character.Value, function()
-            if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then 
-                return 
-            end
+            if not EmoteSync or not targetForEmoteSync or not targetForEmoteSync.Character then return end
             
             local currentTime = tick()
-            if currentTime - lastCheckTime < checkCooldown then
-                return
-            end
+            if currentTime - lastCheckTime < checkCooldown then return end
             
             local targetHumanoid = targetForEmoteSync.Character:FindFirstChildOfClass("Humanoid")
             local myCharacter = LocalPlayer.Character
@@ -298,7 +542,6 @@ task.spawn(function()
             local targetAnimator = targetHumanoid:FindFirstChildOfClass("Animator")
             if not targetAnimator then return end
             
-            -- Buscar la animación de mayor prioridad que NO sea básica
             local highestPriorityTrack = nil
             local highestPriorityValue = -1
             
@@ -307,9 +550,7 @@ task.spawn(function()
                     local animId = track.Animation.AnimationId
                     local priorityValue = track.Priority.Value
                     
-                    -- Ignorar animaciones básicas
                     if not basicAnimationIds[animId] then
-                        -- Buscar la de mayor prioridad
                         if priorityValue > highestPriorityValue then
                             highestPriorityValue = priorityValue
                             highestPriorityTrack = track
@@ -318,69 +559,49 @@ task.spawn(function()
                 end
             end
             
-            -- Si encontramos una animación válida y es diferente a la última
             if highestPriorityTrack and highestPriorityTrack.Animation.AnimationId ~= lastAnimationId then
                 lastCheckTime = currentTime
                 lastAnimationId = highestPriorityTrack.Animation.AnimationId
                 lastAnimationSpeed = highestPriorityTrack.Speed
                 
-                -- DETENER TODAS LAS ANIMACIONES NO-BÁSICAS DEL SEGUIDOR
                 local myAnimator = myHumanoid:FindFirstChildOfClass("Animator")
                 if myAnimator then
-                    -- Primero, detener tracks guardados
                     for i = #emoteSyncTracks, 1, -1 do
                         local oldTrack = emoteSyncTracks[i]
                         pcall(function()
-                            if oldTrack and oldTrack.IsPlaying then
-                                oldTrack:Stop()
-                            end
+                            if oldTrack and oldTrack.IsPlaying then oldTrack:Stop() end
                         end)
                         table.remove(emoteSyncTracks, i)
                     end
                     
-                    -- Luego, detener cualquier animación que no sea básica
                     for _, myTrack in pairs(myAnimator:GetPlayingAnimationTracks()) do
                         if myTrack.Animation and myTrack.Animation.AnimationId then
-                            local myAnimId = myTrack.Animation.AnimationId
-                            -- Si no es una animación básica MÍA, detenerla
                             if myTrack.Priority.Value > Enum.AnimationPriority.Movement.Value then
-                                pcall(function()
-                                    myTrack:Stop()
-                                end)
+                                pcall(function() myTrack:Stop() end)
                             end
                         end
                     end
                 end
                 
-                -- Esperar un frame para asegurar limpieza
                 task.wait()
                 
-                -- Cargar y reproducir la nueva animación
                 pcall(function()
                     local newAnim = Instance.new("Animation")
                     newAnim.AnimationId = highestPriorityTrack.Animation.AnimationId
                     local newTrack = myHumanoid:LoadAnimation(newAnim)
                     
-                    -- Copiar propiedades
                     newTrack.Priority = highestPriorityTrack.Priority
                     newTrack.Looped = highestPriorityTrack.Looped
-                    
-                    -- Reproducir
                     newTrack:Play()
-                    
-                    -- SINCRONIZAR VELOCIDAD DE ANIMACIÓN
                     newTrack:AdjustSpeed(highestPriorityTrack.Speed)
                     
-                    -- Sincronizar tiempo si es relevante
                     if highestPriorityTrack.TimePosition > 0 and highestPriorityTrack.TimePosition < 0.5 then
                         newTrack.TimePosition = highestPriorityTrack.TimePosition
                     end
                     
-                    -- Guardar referencia del track actual
                     currentSyncedTrack = newTrack
                     table.insert(emoteSyncTracks, newTrack)
                     
-                    -- Limpiar cuando termine (si no es looped)
                     if not newTrack.Looped then
                         newTrack.Ended:Connect(function()
                             for i, t in ipairs(emoteSyncTracks) do
@@ -395,14 +616,12 @@ task.spawn(function()
                         end)
                     end
                 end)
-            -- Verificar cambios de velocidad en la animación actual
             elseif highestPriorityTrack and currentTime - lastSpeedCheck > speedCheckInterval then
                 lastSpeedCheck = currentTime
                 
-                -- Si la velocidad del owner cambió, actualizar la del seguidor
                 if currentSyncedTrack and currentSyncedTrack.IsPlaying then
                     local currentSpeed = highestPriorityTrack.Speed
-                    if math.abs(currentSpeed - lastAnimationSpeed) > 0.01 then -- Tolerancia de 0.01
+                    if math.abs(currentSpeed - lastAnimationSpeed) > 0.01 then
                         lastAnimationSpeed = currentSpeed
                         pcall(function()
                             currentSyncedTrack:AdjustSpeed(currentSpeed)
@@ -413,7 +632,6 @@ task.spawn(function()
         end)
     end
 
-    -- SISTEMA DE CHAT MEJORADO
     local function SendChatMessage(message)
         pcall(function()
             local textChannel = TextChatService:FindFirstChild("TextChannels")
@@ -445,203 +663,2062 @@ task.spawn(function()
             })
         end)
     end
-
-    local function SetupCommandDetection()
-        local commandHandlers = {}
+    
+    function ProcessCommand(cmdData)
+        local message = cmdData.command
+        local senderUserId = cmdData.senderUserId
         
-        local function setupChattedHandler(player)
-            if IsOwner(player.UserId) then
-                local connection
-                connection = player.Chatted:Connect(function(message)
-                    local currentTime = tick()
-                    if currentTime - lastCommandTime < commandCooldown then return end
-                    lastCommandTime = currentTime
-                    
-                    ProcessOwnerCommand(message)
-                end)
-                commandHandlers[player] = connection
-            end
-        end
-
-        local function setupTextChatHandler()
-            pcall(function()
-                if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                    local textChannels = TextChatService:WaitForChild("TextChannels", 2)
-                    if textChannels then
-                        for _, channel in ipairs(textChannels:GetChildren()) do
-                            if channel:IsA("TextChannel") then
-                                channel.MessageReceived:Connect(function(textChatMessage)
-                                    local player = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
-                                    if player and IsOwner(player.UserId) then
-                                        local currentTime = tick()
-                                        if currentTime - lastCommandTime < commandCooldown then return end
-                                        lastCommandTime = currentTime
-                                        
-                                        ProcessOwnerCommand(textChatMessage.Text)
-                                    end
-                                end)
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            setupChattedHandler(player)
-        end
-        
-        setupTextChatHandler()
-
-        Players.PlayerAdded:Connect(setupChattedHandler)
-        Players.PlayerRemoving:Connect(function(player)
-            if commandHandlers[player] then
-                commandHandlers[player]:Disconnect()
-                commandHandlers[player] = nil
-            end
-        end)
-    end
-
-    function ProcessOwnerCommand(message)
         if message:sub(1,3) == "/e " then message = message:sub(4) end
 
-        local args = {}
-        for word in message:lower():gmatch("%S+") do table.insert(args, word) end
-        local cmd = args[1]
-        local arg = args[2]
-
-        if cmd == ".t" then TeleportToPlayer(arg)
-        elseif cmd == ".u" then StartOrbit(arg)
-        elseif cmd == ".uu" then StopOrbit()
-        elseif cmd == ".w" then WalkToPlayer(arg)
-        elseif cmd == ".ww" then StopWalking()
-
-        elseif cmd == ".q" then
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        FreezeAll()
-                    end
-                else
-                    FreezeAll()
-                end
-            end
-
-        elseif cmd == ".qq" then
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        UnfreezeAll()
-                    end
-                else
-                    UnfreezeAll()
-                end
-            end
+        local parts = {}
+        for word in message:gmatch("%S+") do table.insert(parts, word) end
         
-        elseif cmd == ".b" then
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        DoRandomDance(LocalPlayer)
-                    end
-                else
-                    DoRandomDance(LocalPlayer)
+        local prefijo = parts[1] or ""
+        local cmd = prefijo:lower()
+        local victimaInput = parts[2] and parts[2]:lower() or nil
+        local destinoOMensaje = parts[3] or nil
+
+        local function CanExecuteCommand()
+            local senderRole = GetRole(tonumber(senderUserId))
+            local myRole = GetRole(LocalPlayer.UserId)
+            
+            if myRole == "Owner" then
+                return false
+            end
+            
+            if myRole == "Admin" and senderRole == "Admin" then
+                return false
+            end
+            
+            if myRole == "Admin" and senderRole == "Owner" then
+                return true
+            end
+            
+            if myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
+                return true
+            end
+            
+            return false
+        end
+        
+        if not CanExecuteCommand() then return end
+
+        local function BuscarJugador(nombreInput)
+            if not nombreInput or #nombreInput < 3 then return nil end
+            
+            nombreInput = nombreInput:lower()
+            
+            for _, player in ipairs(Players:GetPlayers()) do
+                local username = player.Name:lower()
+                local displayname = player.DisplayName:lower()
+                
+                if username == nombreInput or displayname == nombreInput then
+                    return player
                 end
-            end
-
-        elseif cmd == ".bb" then
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        StopAllDancesOn(LocalPlayer)
-                    end
-                else
-                    StopAllDancesOn(LocalPlayer)
+                
+                if username:sub(1, #nombreInput) == nombreInput then
+                    return player
                 end
-            end
-
-        elseif cmd == ".p" then
-            if not IsOwner(LocalPlayer.UserId) then
-                StartEmoteSync(arg)
-            end
-
-        elseif cmd == ".pp" then
-            if not IsOwner(LocalPlayer.UserId) then
-                StopEmoteSync()
-            end
-
-        elseif cmd == ".r" then 
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        if LocalPlayer.Character then
-                            LocalPlayer.Character:BreakJoints()
-                        end
-                    end
-                else
-                    if LocalPlayer.Character then
-                        LocalPlayer.Character:BreakJoints()
-                    end
-                end
-            end
-
-        elseif cmd == ".s" then 
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        local char = LocalPlayer.Character
-                        if char then
-                            local hum = char:FindFirstChildOfClass("Humanoid")
-                            if hum then
-                                hum.Sit = true
-                            end
-                        end
-                    end
-                else
-                    local char = LocalPlayer.Character
-                    if char then
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum then
-                            hum.Sit = true
-                        end
-                    end
-                end
-            end
-
-        elseif cmd == ".k" then 
-            if not IsOwner(LocalPlayer.UserId) then
-                if arg then
-                    local playerName = LocalPlayer.Name:lower()
-                    if playerName:sub(1, #arg) == arg then
-                        LocalPlayer:Kick("Expulsado por el owner")
-                    end
-                else
-                    LocalPlayer:Kick("Expulsado por el owner")
+                
+                if displayname:sub(1, #nombreInput) == nombreInput then
+                    return player
                 end
             end
             
-        elseif cmd == ".m" then 
-            if not IsOwner(LocalPlayer.UserId) and #args >= 2 then 
-                local messageToSend = table.concat(args, " ", 2)
-                SendChatMessage(messageToSend)
+            return nil
+        end
+
+        local function MeAfecta()
+            if not victimaInput then return true end
+            if #victimaInput < 3 then return false end
+            
+            local myUsername = LocalPlayer.Name:lower()
+            local myDisplayName = LocalPlayer.DisplayName:lower()
+            
+            if myUsername == victimaInput or myDisplayName == victimaInput then 
+                return true 
+            end
+            
+            if myUsername:sub(1, #victimaInput) == victimaInput then 
+                return true 
+            end
+            
+            if myDisplayName:sub(1, #victimaInput) == victimaInput then 
+                return true 
+            end
+            
+            return false
+        end
+
+        if cmd == ".t" then 
+            if MeAfecta() then
+                if destinoOMensaje then
+                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                    if targetPlayer then
+                        TeleportToPlayer(tostring(targetPlayer.UserId))
+                    end
+                else
+                    TeleportToPlayer(senderUserId)
+                end
+            end
+            
+        elseif cmd == ".u" then
+            if MeAfecta() then
+                if destinoOMensaje then
+                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                    if targetPlayer then
+                        StartOrbit(tostring(targetPlayer.UserId))
+                    end
+                else
+                    StartOrbit(senderUserId)
+                end
+            end
+            
+        elseif cmd == ".uu" then 
+            if MeAfecta() then StopOrbit() end
+            
+        elseif cmd == ".w" then
+            if MeAfecta() then
+                if destinoOMensaje then
+                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                    if targetPlayer then
+                        WalkToPlayer(tostring(targetPlayer.UserId))
+                    end
+                else
+                    WalkToPlayer(senderUserId)
+                end
+            end
+            
+        elseif cmd == ".ww" then 
+            if MeAfecta() then StopWalking() end
+            
+        elseif cmd == ".m" then
+            if MeAfecta() then
+                local mensajeFinal = ""
+                if destinoOMensaje then
+                    for i = 3, #parts do
+                        mensajeFinal = mensajeFinal .. parts[i]
+                        if i < #parts then mensajeFinal = mensajeFinal .. " " end
+                    end
+                    SendChatMessage(mensajeFinal)
+                end
+            end
+            
+        elseif cmd == ".q" then
+            if MeAfecta() then FreezeAll() end
+            
+        elseif cmd == ".qq" then
+            if MeAfecta() then UnfreezeAll() end
+            
+        elseif cmd == ".b" then
+            if MeAfecta() then DoRandomDance(LocalPlayer) end
+            
+        elseif cmd == ".bb" then
+            if MeAfecta() then StopAllDancesOn(LocalPlayer) end
+            
+        elseif cmd == ".p" then
+            if MeAfecta() then StartEmoteSync(senderUserId) end
+            
+        elseif cmd == ".pp" then
+            if MeAfecta() then StopEmoteSync() end
+            
+        elseif cmd == ".r" then 
+            if MeAfecta() then
+                if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
+            end
+            
+        elseif cmd == ".s" then 
+            if MeAfecta() then
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then hum.Sit = true end
+                end
+            end
+            
+        elseif cmd == ".k" then 
+            if MeAfecta() then
+                LocalPlayer:Kick("Expulsado por el owner/admin")
+            end
+            
+        elseif cmd == ".sc" then 
+            if MeAfecta() then
+                local SoundService = game:GetService("SoundService")
+                local SCREAM_DURATION = 3
+                local SOUND_ID = "rbxassetid://113159710536201"
+                local IMAGES = {
+                    "rbxassetid://93669941436109",
+                    "rbxassetid://135567909583165",
+                    "rbxassetid://18394342398",
+                    "rbxassetid://8804558033",
+                    "rbxassetid://17708331218"
+                }
+                
+                local guiParent
+                pcall(function()
+                    if gethui then
+                        guiParent = gethui()
+                    else
+                        guiParent = CoreGui
+                    end
+                end)
+                if not guiParent then guiParent = CoreGui end
+                
+                if guiParent:FindFirstChild("ScreamerGui") then
+                    guiParent.ScreamerGui:Destroy()
+                end
+                
+                local gui = Instance.new("ScreenGui")
+                gui.Name = "ScreamerGui"
+                gui.IgnoreGuiInset = true
+                gui.ResetOnSpawn = false
+                gui.Parent = guiParent
+                
+                local image = Instance.new("ImageLabel")
+                image.BackgroundTransparency = 1
+                image.Size = UDim2.fromScale(1, 1)
+                image.Position = UDim2.fromScale(0.5, 0.5)
+                image.AnchorPoint = Vector2.new(0.5, 0.5)
+                image.ScaleType = Enum.ScaleType.Stretch
+                image.Image = IMAGES[math.random(#IMAGES)]
+                image.Parent = gui
+                
+                local sound = Instance.new("Sound")
+                sound.SoundId = SOUND_ID
+                sound.Volume = 10
+                sound.Looped = false
+                sound.Parent = SoundService
+                sound:Play()
+                
+                task.delay(SCREAM_DURATION, function()
+                    if sound then
+                        sound:Stop()
+                        sound:Destroy()
+                    end
+                    if gui then
+                        gui:Destroy()
+                    end
+                end)
+            end
+        end  
+    end
+
+    if not isOwner and not isAdmin then
+        task.spawn(function()
+            local lastProcessedPings = {}
+            
+            while true do
+                task.wait(0.3)
+                
+                -- Escuchar pings de Owners
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local pings = FirebaseAPI:Get("/pings/owners/" .. ownerIdStr)
+                    
+                    if pings and type(pings) == "table" then
+                        for pingId, pingData in pairs(pings) do
+                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
+                                lastProcessedPings[pingId] = true
+                                
+                                -- Solo responder si el ping es para mi servidor o para todos
+                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
+                                    pcall(function()
+                                        FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
+                                            name = LocalPlayer.Name,
+                                            serverId = currentServerId,
+                                            timestamp = tick(),
+                                            responseToPing = pingId
+                                        })
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                -- Escuchar pings de Admins
+                for _, adminId in ipairs(adminIds) do
+                    local adminIdStr = tostring(adminId)
+                    local pings = FirebaseAPI:Get("/pings/admins/" .. adminIdStr)
+                    
+                    if pings and type(pings) == "table" then
+                        for pingId, pingData in pairs(pings) do
+                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
+                                lastProcessedPings[pingId] = true
+                                
+                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
+                                    pcall(function()
+                                        FirebaseAPI:Set("/heartbeats/admins/" .. adminIdStr .. "/" .. myUserId, {
+                                            name = LocalPlayer.Name,
+                                            serverId = currentServerId,
+                                            timestamp = tick(),
+                                            responseToPing = pingId
+                                        })
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+ task.spawn(function()
+            local lastProcessedBrings = {}
+            
+            while true do
+                task.wait(0.2)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
+                    
+                    if brings and type(brings) == "table" then
+                        for bringId, bringData in pairs(brings) do
+                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                                if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                    lastProcessedBrings[bringId] = true
+                                    
+                                    -- Retry múltiple para streaming
+                                    task.spawn(function()
+                                        for attempt = 1, 3 do
+                                            TeleportToPlayer(ownerIdStr)
+                                            if attempt < 3 then
+                                                task.wait(0.15)
+                                            end
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                for _, adminId in ipairs(adminIds) do
+                    local adminIdStr = tostring(adminId)
+                    local brings = FirebaseAPI:Get("/bring/admins/" .. adminIdStr .. "/" .. currentServerId)
+                    
+                    if brings and type(brings) == "table" then
+                        for bringId, bringData in pairs(brings) do
+                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                                if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                    lastProcessedBrings[bringId] = true
+                                    
+                                    -- Retry múltiple para streaming
+                                    task.spawn(function()
+                                        for attempt = 1, 3 do
+                                            TeleportToPlayer(adminIdStr)
+                                            if attempt < 3 then
+                                                task.wait(0.15)
+                                            end
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        task.spawn(function()
+            local lastProcessedCommands = {}
+            
+            while true do
+                task.wait(0.5)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
+                    
+                    if commands and type(commands) == "table" then
+                        for cmdId, cmdData in pairs(commands) do
+                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                                lastProcessedCommands[cmdId] = true
+                                if cmdData.command then
+                                    ProcessCommand({
+                                        command = cmdData.command,
+                                        senderUserId = ownerIdStr
+                                    })
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                for _, adminId in ipairs(adminIds) do
+                    local adminIdStr = tostring(adminId)
+                    local commands = FirebaseAPI:Get("/commands/admins/" .. adminIdStr .. "/" .. currentServerId)
+                    
+                    if commands and type(commands) == "table" then
+                        for cmdId, cmdData in pairs(commands) do
+                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                                lastProcessedCommands[cmdId] = true
+                                if cmdData.command then
+                                    ProcessCommand({
+                                        command = cmdData.command,
+                                        senderUserId = adminIdStr
+                                    })
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        task.spawn(function()
+            local lastProcessedExecs = {}
+            
+            while true do
+                task.wait(0.5)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
+                    
+                    if executions and type(executions) == "table" then
+                        for execId, execData in pairs(executions) do
+                            if type(execData) == "table" and not lastProcessedExecs[execId] then
+                                local shouldExecute = false
+                                
+                                if execData.target == ".all" then
+                                    shouldExecute = true
+                                elseif execData.target == ".s" and execData.serverId == currentServerId then
+                                    shouldExecute = true
+                                elseif execData.target == LocalPlayer.Name then
+                                    shouldExecute = true
+                                end
+                                
+                                if shouldExecute and execData.code then
+                                    lastProcessedExecs[execId] = true
+                                    
+                                    pcall(function()
+                                        local func = loadstring(execData.code)
+                                        if func then func() end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+    elseif isAdmin then
+        task.spawn(function()
+            local lastProcessedCommands = {}
+            
+            while true do
+                task.wait(0.5)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
+                    
+                    if commands and type(commands) == "table" then
+                        for cmdId, cmdData in pairs(commands) do
+                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                                lastProcessedCommands[cmdId] = true
+                                if cmdData.command then
+                                    ProcessCommand({
+                                        command = cmdData.command,
+                                        senderUserId = ownerIdStr
+                                    })
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        task.spawn(function()
+            local lastProcessedExecs = {}
+            
+            while true do
+                task.wait(0.5)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
+                    
+                    if executions and type(executions) == "table" then
+                        for execId, execData in pairs(executions) do
+                            if type(execData) == "table" and not lastProcessedExecs[execId] then
+                                local shouldExecute = false
+                                
+                                if execData.target == ".all" then
+                                    shouldExecute = true
+                                elseif execData.target == ".s" and execData.serverId == currentServerId then
+                                    shouldExecute = true
+                                elseif execData.target == LocalPlayer.Name then
+                                    shouldExecute = true
+                                end
+                                
+                                if shouldExecute and execData.code then
+                                    lastProcessedExecs[execId] = true
+                                    
+                                    pcall(function()
+                                        local func = loadstring(execData.code)
+                                        if func then func() end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+  task.spawn(function()
+            local lastProcessedBrings = {}
+            
+            while true do
+                task.wait(0.2)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
+                    
+                    if brings and type(brings) == "table" then
+                        for bringId, bringData in pairs(brings) do
+                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                                if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                    lastProcessedBrings[bringId] = true
+                                    
+                                    -- Retry múltiple para streaming
+                                    task.spawn(function()
+                                        for attempt = 1, 3 do
+                                            TeleportToPlayer(ownerIdStr)
+                                            if attempt < 3 then
+                                                task.wait(0.15)
+                                            end
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        task.spawn(function()
+            local lastProcessedPings = {}
+            
+            while true do
+                task.wait(0.3)
+                
+                for _, ownerId in ipairs(ownerIds) do
+                    local ownerIdStr = tostring(ownerId)
+                    local pings = FirebaseAPI:Get("/pings/owners/" .. ownerIdStr)
+                    
+                    if pings and type(pings) == "table" then
+                        for pingId, pingData in pairs(pings) do
+                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
+                                lastProcessedPings[pingId] = true
+                                
+                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
+                                    pcall(function()
+                                        FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
+                                            name = LocalPlayer.Name,
+                                            serverId = currentServerId,
+                                            timestamp = tick(),
+                                            responseToPing = pingId
+                                        })
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+if isOwner or isAdmin then
+    local toggleBind = Enum.KeyCode.L
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "JModsAdminUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.DisplayOrder = 100
+    
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    local frameWidth = isMobile and 412 or 550
+    local frameHeight = isMobile and 300 or 400
+    local shadowWidth = isMobile and 422 or 560
+    local shadowHeight = isMobile and 310 or 410
+    
+    local shadowFrame = Instance.new("Frame")
+    shadowFrame.Name = "ShadowFrame"
+    shadowFrame.Size = UDim2.new(0, shadowWidth, 0, shadowHeight)
+    shadowFrame.Position = UDim2.new(0.5, -shadowWidth/2, 0.5, -shadowHeight/2)
+    shadowFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadowFrame.BackgroundTransparency = 0.6
+    shadowFrame.BorderSizePixel = 0
+    shadowFrame.Parent = screenGui
+    
+    local shadowCorner = Instance.new("UICorner")
+    shadowCorner.CornerRadius = UDim.new(0, 12)
+    shadowCorner.Parent = shadowFrame
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
+    mainFrame.Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    local mainCorner = Instance.new("UICorner")
+        mainCorner.CornerRadius = UDim.new(0, 12)
+        mainCorner.Parent = mainFrame
+        
+        local mainGradient = Instance.new("UIGradient")
+        mainGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 28)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 20))
+        }
+        mainGradient.Rotation = 45
+        mainGradient.Parent = mainFrame
+        
+        local header = Instance.new("Frame")
+        header.Name = "Header"
+        header.Size = UDim2.new(1, 0, 0, 50)
+        header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        header.BorderSizePixel = 0
+        header.Parent = mainFrame
+        
+        local headerCorner = Instance.new("UICorner")
+        headerCorner.CornerRadius = UDim.new(0, 12)
+        headerCorner.Parent = header
+        
+        local headerGradient = Instance.new("UIGradient")
+        headerGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(88, 101, 242)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 70, 200))
+        }
+        headerGradient.Rotation = 90
+        headerGradient.Parent = header
+        
+        local headerCover = Instance.new("Frame")
+        headerCover.Size = UDim2.new(1, 0, 0, 12)
+        headerCover.Position = UDim2.new(0, 0, 1, -12)
+        headerCover.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        headerCover.BorderSizePixel = 0
+        headerCover.Parent = header
+        
+        local headerCoverGradient = Instance.new("UIGradient")
+        headerCoverGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(88, 101, 242)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 70, 200))
+        }
+        headerCoverGradient.Rotation = 90
+        headerCoverGradient.Parent = headerCover
+        
+        local logoFrame = Instance.new("Frame")
+        logoFrame.Size = UDim2.new(0, 35, 0, 35)
+        logoFrame.Position = UDim2.new(0, 10, 0.5, -17.5)
+        logoFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        logoFrame.BorderSizePixel = 0
+        logoFrame.Parent = header
+        
+        local logoCorner = Instance.new("UICorner")
+        logoCorner.CornerRadius = UDim.new(0, 8)
+        logoCorner.Parent = logoFrame
+        
+        local logoGradient = Instance.new("UIGradient")
+        logoGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 100)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 150, 50))
+        }
+        logoGradient.Rotation = 45
+        logoGradient.Parent = logoFrame
+        
+        local logoText = Instance.new("TextLabel")
+        logoText.Size = UDim2.new(1, 0, 1, 0)
+        logoText.BackgroundTransparency = 1
+        logoText.Font = Enum.Font.GothamBold
+        logoText.Text = "JM"
+        logoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        logoText.TextSize = 16
+        logoText.Parent = logoFrame
+        
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(0, 200, 1, 0)
+        title.Position = UDim2.new(0, 55, 0, 0)
+        title.BackgroundTransparency = 1
+        title.Font = Enum.Font.GothamBold
+        title.Text = "Jmods Admin"
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextSize = 18
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = header
+        
+        local subtitle = Instance.new("TextLabel")
+        subtitle.Size = UDim2.new(0, 200, 0, 15)
+        subtitle.Position = UDim2.new(0, 55, 0, 28)
+        subtitle.BackgroundTransparency = 1
+        subtitle.Font = Enum.Font.Gotham
+        subtitle.Text = isOwner and "Owner Access" or "Admin Access"
+        subtitle.TextColor3 = isOwner and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(255, 170, 100)
+        subtitle.TextSize = 11
+        subtitle.TextXAlignment = Enum.TextXAlignment.Left
+        subtitle.Parent = header
+        
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 38, 0, 38)
+        closeBtn.Position = UDim2.new(1, -85, 0.5, -19)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.Text = "×"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        closeBtn.TextSize = 20
+        closeBtn.Parent = header
+        
+        local closeCorner = Instance.new("UICorner")
+        closeCorner.CornerRadius = UDim.new(0, 8)
+        closeCorner.Parent = closeBtn
+        
+        local minimizeBtn = Instance.new("TextButton")
+        minimizeBtn.Size = UDim2.new(0, 38, 0, 38)
+        minimizeBtn.Position = UDim2.new(1, -42, 0.5, -19)
+        minimizeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+        minimizeBtn.BorderSizePixel = 0
+        minimizeBtn.Font = Enum.Font.GothamBold
+        minimizeBtn.Text = "−"
+        minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        minimizeBtn.TextSize = 20
+        minimizeBtn.Parent = header
+        
+        local minCorner = Instance.new("UICorner")
+        minCorner.CornerRadius = UDim.new(0, 8)
+        minCorner.Parent = minimizeBtn
+        
+        local tabsContainer = Instance.new("Frame")
+        tabsContainer.Size = UDim2.new(1, -20, 0, 42)
+        tabsContainer.Position = UDim2.new(0, 10, 0, 60)
+        tabsContainer.BackgroundTransparency = 1
+        tabsContainer.Parent = mainFrame
+        
+        local function CreateTab(name, position, icon)
+            local btn = Instance.new("TextButton")
+            btn.Name = name.."Tab"
+            btn.Size = UDim2.new(0, 128, 1, 0)
+            btn.Position = UDim2.new(0, position, 0, 0)
+            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+            btn.BorderSizePixel = 0
+            btn.Font = Enum.Font.GothamSemibold
+            btn.Text = icon .. " " .. name
+            btn.TextColor3 = Color3.fromRGB(140, 140, 150)
+            btn.TextSize = 13
+            btn.AutoButtonColor = false
+            btn.Parent = tabsContainer
+            
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 8)
+            corner.Parent = btn
+            
+            btn.MouseEnter:Connect(function()
+                if btn.BackgroundColor3 ~= Color3.fromRGB(88, 101, 242) then
+                    TweenService:Create(btn, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+                    }):Play()
+                end
+            end)
+            
+            btn.MouseLeave:Connect(function()
+                if btn.BackgroundColor3 ~= Color3.fromRGB(88, 101, 242) then
+                    TweenService:Create(btn, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+                    }):Play()
+                end
+            end)
+            
+            return btn
+        end
+        
+        local playersTab = CreateTab("Jugadores", 0, "👥")
+        local commandsTab = CreateTab("Comandos", 133, "⚡")
+        local executionTab = CreateTab("Ejecutador", 266, "💻")
+        local configTab = CreateTab("Config", 399, "⚙️")
+        
+        if not isOwner then
+            executionTab.Visible = false
+            configTab.Position = UDim2.new(0, 266, 0, 0)
+        end
+        
+        local contentFrame = Instance.new("Frame")
+        contentFrame.Size = UDim2.new(1, -20, 1, -118)
+        contentFrame.Position = UDim2.new(0, 10, 0, 112)
+        contentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+        contentFrame.BorderSizePixel = 0
+        contentFrame.Parent = mainFrame
+        
+        local contentCorner = Instance.new("UICorner")
+        contentCorner.CornerRadius = UDim.new(0, 10)
+        contentCorner.Parent = contentFrame
+        
+        local playersPanel = Instance.new("Frame")
+        playersPanel.Name = "PlayersPanel"
+        playersPanel.Size = UDim2.new(1, -10, 1, -10)
+        playersPanel.Position = UDim2.new(0, 5, 0, 5)
+        playersPanel.BackgroundTransparency = 1
+        playersPanel.Parent = contentFrame
+        
+        local detectBtn = Instance.new("TextButton")
+        detectBtn.Name = "DetectButton"
+        detectBtn.Size = UDim2.new(1, 0, 0, 48)
+        detectBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        detectBtn.BorderSizePixel = 0
+        detectBtn.Font = Enum.Font.GothamBold
+        detectBtn.Text = "🔍 Detectar jugadores"
+        detectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        detectBtn.TextSize = 15
+        detectBtn.AutoButtonColor = false
+        detectBtn.Parent = playersPanel
+        
+        local detectCorner = Instance.new("UICorner")
+        detectCorner.CornerRadius = UDim.new(0, 8)
+        detectCorner.Parent = detectBtn
+        
+        local detectGradient = Instance.new("UIGradient")
+        detectGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(88, 101, 242)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 70, 200))
+        }
+        detectGradient.Rotation = 90
+        detectGradient.Parent = detectBtn
+        
+        detectBtn.MouseEnter:Connect(function()
+            TweenService:Create(detectBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 50)}):Play()
+        end)
+        
+        detectBtn.MouseLeave:Connect(function()
+            TweenService:Create(detectBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 48)}):Play()
+        end)
+        
+        local playersList = Instance.new("ScrollingFrame")
+        playersList.Size = UDim2.new(1, 0, 1, -58)
+        playersList.Position = UDim2.new(0, 0, 0, 58)
+        playersList.BackgroundTransparency = 1
+        playersList.BorderSizePixel = 0
+        playersList.ScrollBarThickness = 6
+        playersList.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
+        playersList.CanvasSize = UDim2.new(0, 0, 0, 0)
+        playersList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        playersList.Parent = playersPanel
+        
+        local playersLayout = Instance.new("UIListLayout")
+        playersLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        playersLayout.Padding = UDim.new(0, 6)
+        playersLayout.Parent = playersList
+        
+        local function CreatePlayerEntry(playerName, userId, role, serverId)
+            local entry = Instance.new("Frame")
+            entry.Name = playerName
+            entry.Size = UDim2.new(1, 0, 0, 50)
+            entry.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+            entry.BorderSizePixel = 0
+            entry.Parent = playersList
+            
+            local entryCorner = Instance.new("UICorner")
+            entryCorner.CornerRadius = UDim.new(0, 8)
+            entryCorner.Parent = entry
+            
+            local entryStroke = Instance.new("UIStroke")
+            entryStroke.Color = Color3.fromRGB(40, 40, 50)
+            entryStroke.Thickness = 1
+            entryStroke.Transparency = 0.5
+            entryStroke.Parent = entry
+            
+local nameLabel = Instance.new("TextLabel")
+nameLabel.Size = UDim2.new(0, 145, 1, 0)  
+nameLabel.Position = UDim2.new(0, 15, 0, 0)
+nameLabel.BackgroundTransparency = 1
+nameLabel.Font = Enum.Font.GothamBold
+nameLabel.Text = playerName
+nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameLabel.TextSize = 13
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.TextTruncate = Enum.TextTruncate.AtEnd  
+nameLabel.Parent = entry
+
+            
+local roleLabel = Instance.new("TextLabel")
+roleLabel.Size = UDim2.new(0, 75, 0, 22)
+roleLabel.Position = UDim2.new(0, 160, 0.5, -11)  -- Mantener igual
+roleLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+roleLabel.BorderSizePixel = 0
+roleLabel.Font = Enum.Font.GothamBold
+roleLabel.Text = role
+roleLabel.TextSize = 10
+roleLabel.Parent = entry
+
+            local roleLabelCorner = Instance.new("UICorner")
+            roleLabelCorner.CornerRadius = UDim.new(0, 5)
+            roleLabelCorner.Parent = roleLabel
+            
+            if role == "Owner" then
+                roleLabel.TextColor3 = Color3.fromRGB(255, 215, 100)
+                roleLabel.BackgroundColor3 = Color3.fromRGB(60, 50, 30)
+            elseif role == "Admin" then
+                roleLabel.TextColor3 = Color3.fromRGB(255, 170, 100)
+                roleLabel.BackgroundColor3 = Color3.fromRGB(60, 40, 30)
+            else
+                roleLabel.TextColor3 = Color3.fromRGB(100, 180, 255)
+                roleLabel.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+            end
+            
+local indicator = Instance.new("Frame")
+indicator.Name = "StatusIndicator"
+indicator.Size = UDim2.new(0, 10, 0, 10)
+indicator.Position = UDim2.new(1, -180, 0.5, -5)  
+indicator.BorderSizePixel = 0
+
+if serverId == currentServerId then
+    indicator.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+else
+    indicator.BackgroundColor3 = Color3.fromRGB(180, 100, 100)
+end
+indicator.Parent = entry
+            
+            local indicatorCorner = Instance.new("UICorner")
+            indicatorCorner.CornerRadius = UDim.new(1, 0)
+            indicatorCorner.Parent = indicator
+            
+            task.spawn(function()
+                while indicator.Parent do
+                    if serverId == currentServerId then
+                        TweenService:Create(indicator, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, -1, true), {
+                            Size = UDim2.new(0, 12, 0, 12),
+                            Position = UDim2.new(1, -154, 0.5, -6),
+                            BackgroundTransparency = 0.3
+                        }):Play()
+                    end
+                    task.wait(1)
+                end
+            end)
+            
+            local myRole = GetRole(LocalPlayer.UserId)
+            local targetRole = role
+            
+            local canControl = false
+            if myRole == "Owner" and (targetRole == "Admin" or targetRole == "Follower") then
+                canControl = true
+            elseif myRole == "Admin" and targetRole == "Follower" then
+                canControl = true
+            end
+            
+            if canControl and serverId == currentServerId then
+                local goButtonLocked = false
+                local bringButtonLocked = false
+                
+                local goBtn = Instance.new("TextButton")
+goBtn.Size = UDim2.new(0, 55, 0, 28)
+goBtn.Position = UDim2.new(1, -165, 0.5, -14)  
+goBtn.BackgroundColor3 = Color3.fromRGB(100, 70, 200)
+goBtn.BorderSizePixel = 0
+goBtn.Font = Enum.Font.GothamBold
+goBtn.Text = "Ir"
+goBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+goBtn.TextSize = 11
+goBtn.AutoButtonColor = false
+goBtn.Parent = entry
+                
+                local goBtnCorner = Instance.new("UICorner")
+                goBtnCorner.CornerRadius = UDim.new(0, 6)
+                goBtnCorner.Parent = goBtn
+                
+                goBtn.MouseButton1Click:Connect(function()
+                    if goButtonLocked then return end
+                    goButtonLocked = true
+                    
+                    local targetPlayer = Players:GetPlayerByUserId(tonumber(userId))
+                    if targetPlayer and targetPlayer.Character then
+                        local targetChar = targetPlayer.Character
+                        local targetPos = nil
+                        
+                        if targetChar:IsA("Model") then
+                            local success, pivotCFrame = pcall(function()
+                                return targetChar:GetPivot()
+                            end)
+                            
+                            if success and pivotCFrame then
+                                targetPos = pivotCFrame.Position
+                            end
+                        end
+                        
+                        if not targetPos and targetChar:IsA("Model") and targetChar.PrimaryPart then
+                            local success, pos = pcall(function()
+                                return targetChar.PrimaryPart.Position
+                            end)
+                            if success then
+                                targetPos = pos
+                            end
+                        end
+                        
+                        if not targetPos then
+                            local hrp = targetChar:FindFirstChild("HumanoidRootPart")
+                            if hrp and hrp:IsA("BasePart") then
+                                local success, pos = pcall(function()
+                                    return hrp.Position
+                                end)
+                                if success then
+                                    targetPos = pos
+                                end
+                            end
+                        end
+                        
+                        if targetPos then
+                            local char = LocalPlayer.Character
+                            if char then
+                                local myHRP = char:FindFirstChild("HumanoidRootPart")
+                                if myHRP then
+                                    local finalPos = targetPos + Vector3.new(0, 3, 0)
+                                    
+                                    pcall(function()
+                                        local wasAnchored = myHRP.Anchored
+                                        local originalCanCollide = myHRP.CanCollide
+                                        
+                                        myHRP.Anchored = true
+                                        myHRP.CanCollide = false
+                                        myHRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                                        myHRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                                        
+                                        for i = 1, 8 do
+                                            if myHRP and myHRP.Parent then
+                                                myHRP.CFrame = CFrame.new(finalPos)
+                                                myHRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                                                if i % 3 == 0 then
+                                                    task.wait(0.02)
+                                                end
+                                            end
+                                        end
+                                        
+                                        task.wait(0.1)
+                                        
+                                        if myHRP and myHRP.Parent then
+                                            myHRP.CanCollide = originalCanCollide
+                                            myHRP.Anchored = wasAnchored
+                                        end
+                                    end)
+                                    
+                                    goBtn.Text = "✓"
+                                    task.wait(0.5)
+                                    goBtn.Text = "Ir"
+                                end
+                            end
+                        else
+                            goBtn.Text = "✗"
+                            task.wait(0.5)
+                            goBtn.Text = "Ir"
+                        end
+                    else
+                        goBtn.Text = "✗"
+                        task.wait(0.5)
+                        goBtn.Text = "Ir"
+                    end
+                    
+                    goButtonLocked = false
+                end)
+                
+                goBtn.MouseEnter:Connect(function()
+                    if not goButtonLocked then
+                        TweenService:Create(goBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(120, 90, 220)}):Play()
+                    end
+                end)
+                
+                goBtn.MouseLeave:Connect(function()
+                    if not goButtonLocked then
+                        TweenService:Create(goBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(100, 70, 200)}):Play()
+                    end
+                end)
+                
+local bringBtn = Instance.new("TextButton")
+bringBtn.Size = UDim2.new(0, 55, 0, 28)
+bringBtn.Position = UDim2.new(1, -100, 0.5, -14)  
+bringBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+bringBtn.BorderSizePixel = 0
+bringBtn.Font = Enum.Font.GothamBold
+bringBtn.Text = "Traer"
+bringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bringBtn.TextSize = 11
+bringBtn.AutoButtonColor = false
+bringBtn.Parent = entry
+
+                
+                local bringBtnCorner = Instance.new("UICorner")
+                bringBtnCorner.CornerRadius = UDim.new(0, 6)
+                bringBtnCorner.Parent = bringBtn
+                
+                bringBtn.MouseButton1Click:Connect(function()
+                    if bringButtonLocked then return end
+                    bringButtonLocked = true
+                    
+                    local cmdId = HttpService:GenerateGUID(false)
+                    local userType = isOwner and "owners" or "admins"
+                    local targetUserIdStr = tostring(userId)
+                    
+                    FirebaseAPI:Set("/bring/" .. userType .. "/" .. myUserId .. "/" .. currentServerId .. "/" .. cmdId, {
+                        targetUserId = targetUserIdStr,
+                        timestamp = tick()
+                    })
+                    
+                    bringBtn.Text = "✓"
+                    task.wait(0.5)
+                    bringBtn.Text = "Traer"
+                    
+                    bringButtonLocked = false
+                end)
+                
+                bringBtn.MouseEnter:Connect(function()
+                    if not bringButtonLocked then
+                        TweenService:Create(bringBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(100, 115, 255)}):Play()
+                    end
+                end)
+                
+                bringBtn.MouseLeave:Connect(function()
+                    if not bringButtonLocked then
+                        TweenService:Create(bringBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
+                    end
+                end)
+            end
+            
+            return entry
+        end
+        
+local function UpdatePlayersList()
+            -- Limpiar lista actual
+            for _, child in ipairs(playersList:GetChildren()) do
+                if child:IsA("Frame") then
+                    child:Destroy()
+                end
+            end
+            
+            local myRole = GetRole(LocalPlayer.UserId)
+            CreatePlayerEntry(LocalPlayer.Name .. " (You)", LocalPlayer.UserId, myRole, currentServerId)
+            
+            -- Mostrar otros Owners
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                if ownerIdStr ~= myUserId then
+                    local ownerHeartbeat = FirebaseAPI:Get("/heartbeats/owners/" .. ownerIdStr .. "/self")
+                    if ownerHeartbeat and type(ownerHeartbeat) == "table" then
+                        CreatePlayerEntry(
+                            ownerHeartbeat.name or "Owner",
+                            tonumber(ownerIdStr),
+                            "Owner",
+                            ownerHeartbeat.serverId or "unknown"
+                        )
+                    end
+                end
+            end
+            
+            for _, adminId in ipairs(adminIds) do
+                local adminIdStr = tostring(adminId)
+                if adminIdStr ~= myUserId then
+                    local adminHeartbeat = FirebaseAPI:Get("/heartbeats/admins/" .. adminIdStr .. "/self")
+                    if adminHeartbeat and type(adminHeartbeat) == "table" then
+                        CreatePlayerEntry(
+                            adminHeartbeat.name or "Admin",
+                            tonumber(adminIdStr),
+                            "Admin",
+                            adminHeartbeat.serverId or "unknown"
+                        )
+                    end
+                end
+            end
+            
+            local userType = isOwner and "owners" or "admins"
+            local heartbeats = FirebaseAPI:Get("/heartbeats/" .. userType .. "/" .. myUserId)
+            
+            if heartbeats and type(heartbeats) == "table" then
+                for userId, data in pairs(heartbeats) do
+                    if userId ~= "self" then
+                        local numericUserId = tonumber(userId)
+                        if numericUserId and numericUserId ~= LocalPlayer.UserId then
+                            local role = GetRole(numericUserId)
+                            if type(data) == "table" and role == "Follower" then
+                                if data.serverId == currentServerId then
+                                    CreatePlayerEntry(
+                                        data.name or "Unknown",
+                                        numericUserId,
+                                        "Follower",
+                                        data.serverId or "unknown"
+                                    )
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
-    end
+        
+detectBtn.MouseButton1Click:Connect(function()
+            detectBtn.Text = "📡 Limpiando detecciones anteriores..."
+            
+            local userType = isOwner and "owners" or "admins"
+            
+            FirebaseAPI:Delete("/heartbeats/" .. userType .. "/" .. myUserId)
+            
+            task.wait(0.3)
+            
+            detectBtn.Text = "📡 Enviando señal..."
+            
+            local pingId = HttpService:GenerateGUID(false)
+            
+            FirebaseAPI:Set("/pings/" .. userType .. "/" .. myUserId .. "/" .. pingId, {
+                serverId = currentServerId,
+                timestamp = tick()
+            })
+            
+            task.wait(1.5)
+            
+            UpdatePlayersList()
+            
+            local count = 0
+            for _, child in ipairs(playersList:GetChildren()) do
+                if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
+                    count = count + 1
+                end
+            end
+            
+            detectBtn.Text = "✓ Encontrados" .. count .. " Jugadores!"
+            task.wait(1.5)
+            detectBtn.Text = "🔍 Buscando Jugadores (Server)"
+        end)
+        
+        local commandsPanel = Instance.new("Frame")
+        commandsPanel.Name = "CommandsPanel"
+        commandsPanel.Size = UDim2.new(1, -10, 1, -10)
+        commandsPanel.Position = UDim2.new(0, 5, 0, 5)
+        commandsPanel.BackgroundTransparency = 1
+        commandsPanel.Visible = false
+        commandsPanel.Parent = contentFrame
+        
+        local commandsList = Instance.new("ScrollingFrame")
+        commandsList.Size = UDim2.new(1, 0, 1, -65)
+        commandsList.BackgroundTransparency = 1
+        commandsList.BorderSizePixel = 0
+        commandsList.ScrollBarThickness = 6
+        commandsList.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
+        commandsList.CanvasSize = UDim2.new(0, 0, 0, 0)
+        commandsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        commandsList.Parent = commandsPanel
+        
+local commandsLayout = Instance.new("UIListLayout")
+commandsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+commandsLayout.Padding = UDim.new(0, 6)  
+commandsLayout.Parent = commandsList
+        
+        local commandInputFrame = Instance.new("Frame")
+        commandInputFrame.Size = UDim2.new(1, 0, 0, 55)
+        commandInputFrame.Position = UDim2.new(0, 0, 1, -55)
+        commandInputFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        commandInputFrame.BorderSizePixel = 0
+        commandInputFrame.Parent = commandsPanel
+        
+        local inputCorner = Instance.new("UICorner")
+        inputCorner.CornerRadius = UDim.new(0, 8)
+        inputCorner.Parent = commandInputFrame
+        
+local commandInput = Instance.new("TextBox")
+commandInput.Size = UDim2.new(1, -95, 1, -12)
+commandInput.Position = UDim2.new(0, 12, 0, 6)
+commandInput.BackgroundTransparency = 1
+commandInput.Font = Enum.Font.Gotham
+commandInput.PlaceholderText = "Formato: .cmd [victima] [destino/msg] • Min 3 letras" 
+commandInput.Text = ""
+commandInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+commandInput.TextSize = 12  
+commandInput.TextXAlignment = Enum.TextXAlignment.Left
+commandInput.ClearTextOnFocus = false
+commandInput.Parent = commandInputFrame
+        
+        local sendBtn = Instance.new("TextButton")
+        sendBtn.Size = UDim2.new(0, 75, 1, -12)
+        sendBtn.Position = UDim2.new(1, -81, 0, 6)
+        sendBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        sendBtn.BorderSizePixel = 0
+        sendBtn.Font = Enum.Font.GothamBold
+        sendBtn.Text = "Ejecutar"
+        sendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sendBtn.TextSize = 13
+        sendBtn.AutoButtonColor = false
+        sendBtn.Parent = commandInputFrame
+        
+        local sendCorner = Instance.new("UICorner")
+        sendCorner.CornerRadius = UDim.new(0, 6)
+        sendCorner.Parent = sendBtn
+        
+        sendBtn.MouseEnter:Connect(function()
+            TweenService:Create(sendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(100, 115, 255)}):Play()
+        end)
+        
+        sendBtn.MouseLeave:Connect(function()
+            TweenService:Create(sendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
+        end)
+        
+local commands = {
+    {".t [Victima] [Objetivo]", "Teleport de la Victima a el Objetivo", true},
+    {".u [Victima] [Objetivo]", "Haz orbitar la victima en el objetivo", true},
+    {".uu [Victima]", "Parar de orbitar", true},
+    {".w [Victima] [Objetivo]", "Camina hacia el objetivo", true},
+    {".ww [Victima]", "Parar de Caminar", true},
+    {".q [Victima]", "Congelar a la Victima", false},
+    {".qq [Victima]", "Descongelar la victima", false},
+    {".b [Victima]", "Haz bailar a la victima", true},
+    {".bb [Victima]", "Parar de bailar la victima", true},
+    {".p [Victima]", "Sincronizar tus animaciones con la victima", true},
+    {".pp [Victima]", "Detener la sincronizacion", true},
+    {".r [Victima]", "Hacer que se reinicie lo Victima", false},
+    {".s [Victima]", "Hazla sentar", true},
+    {".k [Victima]", "Sacar del servidor", false},
+    {".sc [Victima]", "Screamer a la Victima", true},
+    {".m [Victima] [Mensaje]", "Haz q la victima envie un mensaje", false}
+}
 
-    local function CheckAndConnectPlayers()
-        if not LocalPlayer:FindFirstChild("__JmodsConnected") then
-            local marker = Instance.new("BoolValue")
-            marker.Name = "__JmodsConnected"
-            marker.Parent = LocalPlayer
+        
+for _, cmd in ipairs(commands) do
+    local entry = Instance.new("Frame")
+    entry.Size = UDim2.new(1, 0, 0, 42)  
+    entry.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    entry.BorderSizePixel = 0
+    entry.Parent = commandsList
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = entry
+    
+            
+    local cmdLabel = Instance.new("TextLabel")
+    cmdLabel.Size = UDim2.new(0, 140, 1, 0)  
+    cmdLabel.Position = UDim2.new(0, 10, 0, 0)
+    cmdLabel.BackgroundTransparency = 1
+    cmdLabel.Font = Enum.Font.Code
+    cmdLabel.Text = cmd[1]
+    cmdLabel.TextColor3 = Color3.fromRGB(120, 140, 255)
+    cmdLabel.TextSize = 11
+    cmdLabel.TextXAlignment = Enum.TextXAlignment.Left
+    cmdLabel.Parent = entry
+            
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(1, -310, 1, 0)  
+    descLabel.Position = UDim2.new(0, 155, 0, 0)  
+    descLabel.BackgroundTransparency = 1
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.Text = cmd[2]
+    descLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+    descLabel.TextSize = 11
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextWrapped = true 
+    descLabel.Parent = entry
+            
+    local permBadge = Instance.new("Frame")
+    permBadge.Size = UDim2.new(0, 75, 0, 24)  
+    permBadge.Position = UDim2.new(1, -85, 0.5, -12) 
+    permBadge.BorderSizePixel = 0
+    permBadge.Parent = entry
+    
+    local permCorner = Instance.new("UICorner")
+    permCorner.CornerRadius = UDim.new(0, 5)
+    permCorner.Parent = permBadge
+    
+    local permLabel = Instance.new("TextLabel")
+    permLabel.Size = UDim2.new(1, 0, 1, 0)
+    permLabel.BackgroundTransparency = 1
+    permLabel.Font = Enum.Font.GothamBold
+    permLabel.TextSize = 9
+    
+    if cmd[3] then
+        permLabel.Text = "ADMIN+"
+        permLabel.TextColor3 = Color3.fromRGB(255, 170, 100)
+        permBadge.BackgroundColor3 = Color3.fromRGB(60, 40, 30)
+    else
+        permLabel.Text = "OWNER"
+        permLabel.TextColor3 = Color3.fromRGB(255, 215, 100)
+        permBadge.BackgroundColor3 = Color3.fromRGB(60, 50, 30)
+        if isAdmin and not isOwner then
+            entry.BackgroundTransparency = 0.7
+            cmdLabel.TextTransparency = 0.5
+            descLabel.TextTransparency = 0.5
         end
     end
+    permLabel.Parent = permBadge
+end
+        
+        local function SendCommand(cmd)
+            if cmd == "" then return end
+            
+            if isAdmin and not isOwner then
+                local cmdPrefix = cmd:match("^(%S+)")
+                local ownerOnly = {".q", ".qq", ".r", ".k", ".m"}
+                for _, oc in ipairs(ownerOnly) do
+                    if cmdPrefix == oc then return end
+                end
+            end
+            
+            local cmdId = HttpService:GenerateGUID(false)
+            local userType = isOwner and "owners" or "admins"
+            
+            FirebaseAPI:Set("/commands/" .. userType .. "/" .. myUserId .. "/" .. currentServerId .. "/" .. cmdId, {
+                command = cmd,
+                senderUserId = myUserId,
+                timestamp = tick()
+            })
+            
+            commandInput.Text = ""
+            
+            local originalColor = sendBtn.BackgroundColor3
+            sendBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+            sendBtn.Text = "✓ Sent"
+            task.wait(0.5)
+            sendBtn.BackgroundColor3 = originalColor
+            sendBtn.Text = "Execute"
+        end
+        
+        sendBtn.MouseButton1Click:Connect(function() SendCommand(commandInput.Text) end)
+        commandInput.FocusLost:Connect(function(enter) if enter then SendCommand(commandInput.Text) end end)
+        
+        local executionPanel = Instance.new("Frame")
+        executionPanel.Name = "ExecutionPanel"
+        executionPanel.Size = UDim2.new(1, -10, 1, -10)
+        executionPanel.Position = UDim2.new(0, 5, 0, 5)
+        executionPanel.BackgroundTransparency = 1
+        executionPanel.Visible = false
+        executionPanel.Parent = contentFrame
+        
+        local execTitle = Instance.new("TextLabel")
+        execTitle.Size = UDim2.new(1, 0, 0, 30)
+        execTitle.BackgroundTransparency = 1
+        execTitle.Font = Enum.Font.GothamBold
+        execTitle.Text = "💻 Ejecutar script de forma remota"
+        execTitle.TextColor3 = Color3.fromRGB(255, 215, 100)
+        execTitle.TextSize = 16
+        execTitle.TextXAlignment = Enum.TextXAlignment.Left
+        execTitle.Parent = executionPanel
+        
+        local execSubtitle = Instance.new("TextLabel")
+        execSubtitle.Size = UDim2.new(1, 0, 0, 18)
+        execSubtitle.Position = UDim2.new(0, 0, 0, 28)
+        execSubtitle.BackgroundTransparency = 1
+        execSubtitle.Font = Enum.Font.Gotham
+        execSubtitle.Text = "Ejecuta codigo • .s = server | name = Jugador especifico"
+        execSubtitle.TextColor3 = Color3.fromRGB(150, 150, 160)
+        execSubtitle.TextSize = 11
+        execSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+        execSubtitle.Parent = executionPanel
+        
+        local targetInputFrame = Instance.new("Frame")
+        targetInputFrame.Size = UDim2.new(1, 0, 0, 40)
+        targetInputFrame.Position = UDim2.new(0, 0, 0, 52)
+        targetInputFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        targetInputFrame.BorderSizePixel = 0
+        targetInputFrame.Parent = executionPanel
+        
+        local targetCorner = Instance.new("UICorner")
+        targetCorner.CornerRadius = UDim.new(0, 8)
+        targetCorner.Parent = targetInputFrame
+        
+        local targetLabel = Instance.new("TextLabel")
+        targetLabel.Size = UDim2.new(0, 60, 1, 0)
+        targetLabel.Position = UDim2.new(0, 10, 0, 0)
+        targetLabel.BackgroundTransparency = 1
+        targetLabel.Font = Enum.Font.GothamBold
+        targetLabel.Text = "Jugador:"
+        targetLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+        targetLabel.TextSize = 12
+        targetLabel.TextXAlignment = Enum.TextXAlignment.Left
+        targetLabel.Parent = targetInputFrame
+        
+        local targetInput = Instance.new("TextBox")
+        targetInput.Size = UDim2.new(1, -80, 1, -10)
+        targetInput.Position = UDim2.new(0, 75, 0, 5)
+        targetInput.BackgroundTransparency = 1
+        targetInput.Font = Enum.Font.Gotham
+        targetInput.PlaceholderText = ".all (all) | .s (server) | PlayerName (specific)"
+        targetInput.Text = ".s"
+        targetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+        targetInput.TextSize = 12
+        targetInput.TextXAlignment = Enum.TextXAlignment.Left
+        targetInput.ClearTextOnFocus = false
+        targetInput.Parent = targetInputFrame
+        
+local TextService = game:GetService("TextService")
 
-    CheckAndConnectPlayers()
-    SetupCommandDetection()
+local codeInputFrame = Instance.new("Frame")
+codeInputFrame.Size = UDim2.new(1, 0, 1, -163)
+codeInputFrame.Position = UDim2.new(0, 0, 0, 102)
+codeInputFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+codeInputFrame.BorderSizePixel = 0
+codeInputFrame.Parent = executionPanel
+
+local codeCorner = Instance.new("UICorner")
+codeCorner.CornerRadius = UDim.new(0, 8)
+codeCorner.Parent = codeInputFrame
+
+local codeBorder = Instance.new("UIStroke")
+codeBorder.Color = Color3.fromRGB(88, 101, 242)
+codeBorder.Thickness = 2
+codeBorder.Transparency = 0.5
+codeBorder.Parent = codeInputFrame
+
+
+local lineCounterScroll = Instance.new("ScrollingFrame")
+lineCounterScroll.Size = UDim2.new(0, 45, 1, -20)
+lineCounterScroll.Position = UDim2.new(0, 5, 0, 10)
+lineCounterScroll.BackgroundTransparency = 1
+lineCounterScroll.BorderSizePixel = 0
+lineCounterScroll.ScrollBarThickness = 0
+lineCounterScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+lineCounterScroll.ScrollingEnabled = false
+lineCounterScroll.Parent = codeInputFrame
+
+local lineCounter = Instance.new("TextLabel")
+lineCounter.Size = UDim2.new(1, -10, 0, 0)
+lineCounter.Position = UDim2.new(0, 5, 0, 0)
+lineCounter.BackgroundTransparency = 1
+lineCounter.Font = Enum.Font.Code
+lineCounter.Text = "1"
+lineCounter.TextColor3 = Color3.fromRGB(100, 100, 120)
+lineCounter.TextSize = 13
+lineCounter.TextXAlignment = Enum.TextXAlignment.Right
+lineCounter.TextYAlignment = Enum.TextYAlignment.Top
+lineCounter.Parent = lineCounterScroll
+
+
+local codeScroll = Instance.new("ScrollingFrame")
+codeScroll.Size = UDim2.new(1, -60, 1, -20)
+codeScroll.Position = UDim2.new(0, 55, 0, 10)
+codeScroll.BackgroundTransparency = 1
+codeScroll.BorderSizePixel = 0
+codeScroll.ScrollBarThickness = 6
+codeScroll.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
+codeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+codeScroll.Parent = codeInputFrame
+
+
+local codeInput = Instance.new("TextBox")
+codeInput.Size = UDim2.new(1, -10, 0, 20)
+codeInput.Position = UDim2.new(0, 0, 0, 0)
+codeInput.BackgroundTransparency = 1
+codeInput.Font = Enum.Font.Code
+codeInput.PlaceholderText = "-- Enter Lua code here..."
+codeInput.Text = ""
+codeInput.TextColor3 = Color3.fromRGB(200, 220, 255)
+codeInput.TextSize = 13
+codeInput.TextXAlignment = Enum.TextXAlignment.Left
+codeInput.TextYAlignment = Enum.TextYAlignment.Top
+codeInput.ClearTextOnFocus = false
+codeInput.MultiLine = true
+codeInput.TextWrapped = false
+codeInput.Parent = codeScroll
+
+
+codeScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+	lineCounterScroll.CanvasPosition = Vector2.new(0, codeScroll.CanvasPosition.Y)
+end)
+
+
+local function updateEditor()
+	-- CONTAR LÍNEAS
+	local lines = 1
+	for _ in codeInput.Text:gmatch("\n") do
+		lines += 1
+	end
+
+	local lineText = ""
+	for i = 1, lines do
+		lineText ..= i .. "\n"
+	end
+	lineCounter.Text = lineText
+
+	-- CALCULAR ALTURA REAL DEL TEXTO
+	local textSize = TextService:GetTextSize(
+		codeInput.Text .. " ",
+		codeInput.TextSize,
+		codeInput.Font,
+		Vector2.new(codeInput.AbsoluteSize.X, math.huge)
+	)
+
+	local height = textSize.Y + 10
+
+	-- AJUSTAR TAMAÑOS
+	codeInput.Size = UDim2.new(1, -10, 0, height)
+	codeScroll.CanvasSize = UDim2.new(0, 0, 0, height)
+
+	lineCounter.Size = UDim2.new(1, -10, 0, height)
+	lineCounterScroll.CanvasSize = UDim2.new(0, 0, 0, height)
+end
+
+codeInput:GetPropertyChangedSignal("Text"):Connect(updateEditor)
+
+-- inicial
+updateEditor()
+
+        
+        local execButtonsFrame = Instance.new("Frame")
+        execButtonsFrame.Size = UDim2.new(1, 0, 0, 48)
+        execButtonsFrame.Position = UDim2.new(0, 0, 1, -48)
+        execButtonsFrame.BackgroundTransparency = 1
+        execButtonsFrame.Parent = executionPanel
+        
+        local executeBtn = Instance.new("TextButton")
+        executeBtn.Size = UDim2.new(0.48, -2, 1, 0)
+        executeBtn.Position = UDim2.new(0, 0, 0, 0)
+        executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+        executeBtn.BorderSizePixel = 0
+        executeBtn.Font = Enum.Font.GothamBold
+        executeBtn.Text = "▶ Ejecutar"
+        executeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        executeBtn.TextSize = 14
+        executeBtn.AutoButtonColor = false
+        executeBtn.Parent = execButtonsFrame
+        
+        local executeCorner = Instance.new("UICorner")
+        executeCorner.CornerRadius = UDim.new(0, 8)
+        executeCorner.Parent = executeBtn
+        
+        local executeGradient = Instance.new("UIGradient")
+        executeGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(67, 181, 129)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 150, 100))
+        }
+        executeGradient.Rotation = 90
+        executeGradient.Parent = executeBtn
+        
+        local clearBtn = Instance.new("TextButton")
+        clearBtn.Size = UDim2.new(0.48, -2, 1, 0)
+        clearBtn.Position = UDim2.new(0.52, 2, 0, 0)
+        clearBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+        clearBtn.BorderSizePixel = 0
+        clearBtn.Font = Enum.Font.GothamBold
+        clearBtn.Text = "🗑 Borrar"
+        clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        clearBtn.TextSize = 14
+        clearBtn.AutoButtonColor = false
+        clearBtn.Parent = execButtonsFrame
+        
+        local clearCorner = Instance.new("UICorner")
+        clearCorner.CornerRadius = UDim.new(0, 8)
+        clearCorner.Parent = clearBtn
+        
+        executeBtn.MouseEnter:Connect(function()
+            TweenService:Create(executeBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 200, 140)}):Play()
+        end)
+        
+        executeBtn.MouseLeave:Connect(function()
+            TweenService:Create(executeBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(67, 181, 129)}):Play()
+        end)
+        
+        clearBtn.MouseEnter:Connect(function()
+            TweenService:Create(clearBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(240, 100, 100)}):Play()
+        end)
+        
+        clearBtn.MouseLeave:Connect(function()
+            TweenService:Create(clearBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}):Play()
+        end)
+        
+if isOwner then
+    local function ExecuteRemoteCode(code, target)
+        if code == "" then return end
+        
+        local execId = HttpService:GenerateGUID(false)
+        
+        FirebaseAPI:Set("/executions/owners/" .. myUserId .. "/" .. execId, { 
+            code = code,
+            target = target,
+            serverId = currentServerId,
+            timestamp = tick()
+        })
+        
+        executeBtn.Text = "✓ Code Sent!"
+        executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
+        task.wait(1.5)
+        executeBtn.Text = "▶ Execute"
+        executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+    end
+        
+        executeBtn.MouseButton1Click:Connect(function()
+            ExecuteRemoteCode(codeInput.Text, targetInput.Text)
+        end)
+        
+        clearBtn.MouseButton1Click:Connect(function()
+            codeInput.Text = ""
+            targetInput.Text = ".s"
+            lineCounter.Text = "1"
+        end)
+    end
+    
+    local configPanel = Instance.new("Frame")
+    configPanel.Name = "ConfigPanel"
+    configPanel.Size = UDim2.new(1, -10, 1, -10)
+    configPanel.Position = UDim2.new(0, 5, 0, 5)
+    configPanel.BackgroundTransparency = 1
+    configPanel.Visible = false
+    configPanel.Parent = contentFrame
+    
+    local heartbeatToggleFrame = Instance.new("Frame")
+    heartbeatToggleFrame.Size = UDim2.new(1, 0, 0, 55)
+    heartbeatToggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    heartbeatToggleFrame.BorderSizePixel = 0
+    heartbeatToggleFrame.Parent = configPanel
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = heartbeatToggleFrame
+    
+    local toggleIcon = Instance.new("TextLabel")
+    toggleIcon.Size = UDim2.new(0, 40, 1, 0)
+    toggleIcon.Position = UDim2.new(0, 5, 0, 0)
+    toggleIcon.BackgroundTransparency = 1
+    toggleIcon.Font = Enum.Font.GothamBold
+    toggleIcon.Text = "🔄"
+    toggleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleIcon.TextSize = 24
+    toggleIcon.Parent = heartbeatToggleFrame
+    
+    local toggleLabel = Instance.new("TextLabel")
+    toggleLabel.Size = UDim2.new(0, 300, 0, 20)
+    toggleLabel.Position = UDim2.new(0, 50, 0, 10)
+    toggleLabel.BackgroundTransparency = 1
+    toggleLabel.Font = Enum.Font.GothamBold
+    toggleLabel.Text = "Auto-detect Jugadores"
+    toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleLabel.TextSize = 14
+    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    toggleLabel.Parent = heartbeatToggleFrame
+    
+    local toggleDesc = Instance.new("TextLabel")
+    toggleDesc.Size = UDim2.new(0, 300, 0, 15)
+    toggleDesc.Position = UDim2.new(0, 50, 0, 32)
+    toggleDesc.BackgroundTransparency = 1
+    toggleDesc.Font = Enum.Font.Gotham
+    toggleDesc.Text = "Actualiza automaticamente la lista de jugadores cada 2s"
+    toggleDesc.TextColor3 = Color3.fromRGB(140, 140, 150)
+    toggleDesc.TextSize = 11
+    toggleDesc.TextXAlignment = Enum.TextXAlignment.Left
+    toggleDesc.Parent = heartbeatToggleFrame
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Name = "HeartbeatToggle"
+    toggleBtn.Size = UDim2.new(0, 60, 0, 32)
+    toggleBtn.Position = UDim2.new(1, -70, 0.5, -16)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.Text = "OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(180, 180, 190)
+    toggleBtn.TextSize = 12
+    toggleBtn.AutoButtonColor = false
+    toggleBtn.Parent = heartbeatToggleFrame
+    
+    local toggleBtnCorner = Instance.new("UICorner")
+    toggleBtnCorner.CornerRadius = UDim.new(0, 6)
+    toggleBtnCorner.Parent = toggleBtn
+    
+    toggleBtn.MouseButton1Click:Connect(function()
+        heartbeatActive = not heartbeatActive
+        
+        if heartbeatActive then
+            TweenService:Create(toggleBtn, TweenInfo.new(0.3), {
+                BackgroundColor3 = Color3.fromRGB(67, 181, 129),
+                TextColor3 = Color3.fromRGB(255, 255, 255)
+            }):Play()
+            toggleBtn.Text = "ON"
+            
+            task.spawn(function()
+                while heartbeatActive do
+                    local pingId = HttpService:GenerateGUID(false)
+                    local userType = isOwner and "owners" or "admins"
+                    
+                    FirebaseAPI:Set("/pings/" .. userType .. "/" .. myUserId .. "/" .. pingId, {
+                        serverId = currentServerId,
+                        timestamp = tick()
+                    })
+                    
+                    task.wait(0.5)
+                    
+                    UpdatePlayersList()
+                    task.wait(heartbeatInterval - 0.5)
+                end
+            end)
+        else
+            TweenService:Create(toggleBtn, TweenInfo.new(0.3), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 50),
+                TextColor3 = Color3.fromRGB(180, 180, 190)
+            }):Play()
+            toggleBtn.Text = "OFF"
+        end
+    end)
+    
+    local keybindInfo = Instance.new("Frame")
+    keybindInfo.Size = UDim2.new(1, 0, 0, 65)
+    keybindInfo.Position = UDim2.new(0, 0, 0, 65)
+    keybindInfo.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    keybindInfo.BorderSizePixel = 0
+    keybindInfo.Parent = configPanel
+    
+    local keybindCorner = Instance.new("UICorner")
+    keybindCorner.CornerRadius = UDim.new(0, 8)
+    keybindCorner.Parent = keybindInfo
+    
+    local keybindIcon = Instance.new("TextLabel")
+    keybindIcon.Size = UDim2.new(0, 40, 1, 0)
+    keybindIcon.Position = UDim2.new(0, 5, 0, 0)
+    keybindIcon.BackgroundTransparency = 1
+    keybindIcon.Font = Enum.Font.GothamBold
+    keybindIcon.Text = "⌨️"
+    keybindIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keybindIcon.TextSize = 24
+    keybindIcon.Parent = keybindInfo
+    
+    local keybindLabel = Instance.new("TextLabel")
+    keybindLabel.Size = UDim2.new(1, -50, 0, 22)
+    keybindLabel.Position = UDim2.new(0, 50, 0, 8)
+    keybindLabel.BackgroundTransparency = 1
+    keybindLabel.Font = Enum.Font.GothamBold
+    keybindLabel.Text = "Ver/ocutarl UI Keybind"
+    keybindLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keybindLabel.TextSize = 14
+    keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+    keybindLabel.Parent = keybindInfo
+    
+    local keybindValue = Instance.new("TextLabel")
+    keybindValue.Size = UDim2.new(1, -50, 0, 20)
+    keybindValue.Position = UDim2.new(0, 50, 0, 32)
+    keybindValue.BackgroundTransparency = 1
+    keybindValue.Font = Enum.Font.Gotham
+    keybindValue.Text = "Presiona " .. toggleBind.Name .. " para ver o ocultar la interfaz"
+    keybindValue.TextColor3 = Color3.fromRGB(140, 140, 150)
+    keybindValue.TextSize = 11
+    keybindValue.TextXAlignment = Enum.TextXAlignment.Left
+    keybindValue.Parent = keybindInfo
+    
+    local versionInfo = Instance.new("Frame")
+    versionInfo.Size = UDim2.new(1, 0, 0, 60)
+    versionInfo.Position = UDim2.new(0, 0, 0, 140)
+    versionInfo.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    versionInfo.BorderSizePixel = 0
+    versionInfo.Parent = configPanel
+    
+    local versionCorner = Instance.new("UICorner")
+    versionCorner.CornerRadius = UDim.new(0, 8)
+    versionCorner.Parent = versionInfo
+    
+    local versionLabel = Instance.new("TextLabel")
+    versionLabel.Size = UDim2.new(1, -20, 1, 0)
+    versionLabel.Position = UDim2.new(0, 10, 0, 0)
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Font = Enum.Font.GothamBold
+    versionLabel.Text = "JMods\n✓ Real-time sync | ✓ Auto-cleanup | ✓ Multi-server | ✓ Separated data | ✓ Ping system\nServer ID: " .. currentServerId
+    versionLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+    versionLabel.TextSize = 10
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    versionLabel.TextYAlignment = Enum.TextYAlignment.Center
+    versionLabel.Parent = versionInfo
+    
+    local currentTab = "Players"
+    local tabs = {playersTab, commandsTab, executionTab, configTab}
+    local panels = {
+        Players = playersPanel,
+        Commands = commandsPanel,
+        Execution = executionPanel,
+        Config = configPanel
+    }
+    
+    local function SwitchTab(tabName)
+        currentTab = tabName
+        
+        for _, tab in ipairs(tabs) do
+            local isActive = tab.Text:match("%S+$") == tabName or (tab.Text:find(tabName) and not tab.Text:find("Config"))
+            
+            if isActive then
+                TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                    BackgroundColor3 = Color3.fromRGB(88, 101, 242),
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                }):Play()
+            else
+                TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 35),
+                    TextColor3 = Color3.fromRGB(140, 140, 150)
+                }):Play()
+            end
+        end
+        
+        for panelName, panel in pairs(panels) do
+            panel.Visible = (panelName == tabName)
+        end
+    end
+    
+    playersTab.MouseButton1Click:Connect(function() SwitchTab("Players") end)
+    commandsTab.MouseButton1Click:Connect(function() SwitchTab("Commands") end)
+    if isOwner then
+        executionTab.MouseButton1Click:Connect(function() SwitchTab("Execution") end)
+    end
+    configTab.MouseButton1Click:Connect(function() SwitchTab("Config") end)
+    
+    local isHidden = false
+    
+local miniButton = nil  -- Declarar aquí para usarlo después
+
+local function ToggleUI()
+    
+    if isMobile then
+        isHidden = not isHidden
+        
+        if isHidden then
+            TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 50, 0, 50),
+                Position = UDim2.new(1, -60, 0, 10)
+            }):Play()
+            
+            TweenService:Create(shadowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 55, 0, 55),
+                Position = UDim2.new(1, -62, 0, 8)
+            }):Play()
+            
+            tabsContainer.Visible = false
+            contentFrame.Visible = false
+            logoFrame.Visible = false
+            subtitle.Visible = false
+            title.Visible = false
+            minimizeBtn.Visible = false
+            
+            closeBtn.Text = "+"
+            closeBtn.Size = UDim2.new(0, 45, 0, 45)
+            closeBtn.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+            closeBtn.TextSize = 30
+        else
+            local frameWidth = 412
+            local frameHeight = 300
+            
+            TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, frameWidth, 0, frameHeight),
+                Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
+            }):Play()
+            
+            TweenService:Create(shadowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, frameWidth + 10, 0, frameHeight + 10),
+                Position = UDim2.new(0.5, -(frameWidth + 10)/2, 0.5, -(frameHeight + 10)/2)
+            }):Play()
+            
+            task.wait(0.1)
+            
+            tabsContainer.Visible = true
+            contentFrame.Visible = true
+            logoFrame.Visible = true
+            subtitle.Visible = true
+            title.Visible = true
+            minimizeBtn.Visible = true
+            
+            closeBtn.Text = "×"
+            closeBtn.Size = UDim2.new(0, 38, 0, 38)
+            closeBtn.Position = UDim2.new(1, -85, 0.5, -19)
+            closeBtn.TextSize = 20
+        end
+    else
+        isHidden = not isHidden
+        
+        TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Position = isHidden and UDim2.new(0.5, -275, -0.6, 0) or UDim2.new(0.5, -275, 0.5, -200)
+        }):Play()
+        
+        TweenService:Create(shadowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Position = isHidden and UDim2.new(0.5, -280, -0.6, -5) or UDim2.new(0.5, -280, 0.5, -205)
+        }):Play()
+    end
+end
+    
+    closeBtn.MouseButton1Click:Connect(ToggleUI)
+    
+    local isMinimized = false
+    local originalSize = mainFrame.Size
+    local originalPos = mainFrame.Position
+    
+    local function MinimizeUI()
+        isMinimized = not isMinimized
+        
+        local targetSize = isMinimized and UDim2.new(0, 280, 0, 50) or originalSize
+        local targetPos = isMinimized and UDim2.new(1, -290, 0, 10) or originalPos
+        
+        TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = targetSize,
+            Position = targetPos
+        }):Play()
+        
+        TweenService:Create(shadowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = isMinimized and UDim2.new(0, 290, 0, 60) or UDim2.new(0, 560, 0, 410),
+            Position = isMinimized and UDim2.new(1, -295, 0, 5) or UDim2.new(0.5, -280, 0.5, -205)
+        }):Play()
+        
+        tabsContainer.Visible = not isMinimized
+        contentFrame.Visible = not isMinimized
+        logoFrame.Visible = not isMinimized
+        subtitle.Visible = not isMinimized
+        minimizeBtn.Text = isMinimized and "+" or "−"
+    end
+    
+    minimizeBtn.MouseButton1Click:Connect(MinimizeUI)
+    
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == toggleBind then
+            ToggleUI()
+        end
+    end)
+    
+    local dragging, dragInput, dragStart, startPos
+    
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    header.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            mainFrame.Position = newPos
+            shadowFrame.Position = UDim2.new(newPos.X.Scale, newPos.X.Offset - 5, newPos.Y.Scale, newPos.Y.Offset - 5)
+        end
+    end)
+    
+ screenGui.Parent = CoreGui
+SwitchTab("Players")
+UpdatePlayersList()
+
+mainFrame.Position = UDim2.new(0.5, -frameWidth/2, -0.6, 0)
+shadowFrame.Position = UDim2.new(0.5, -shadowWidth/2, -0.6, -5)
+
+task.wait(0.1)
+
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
+}):Play()
+
+TweenService:Create(shadowFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Position = UDim2.new(0.5, -shadowWidth/2, 0.5, -shadowHeight/2)
+}):Play()
+end
 end)
