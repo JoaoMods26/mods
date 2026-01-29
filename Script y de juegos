@@ -159,6 +159,13 @@ local Button22 = TPTab:CreateButton({
    end,
 })
 
+local Button25 = TPTab:CreateButton({
+   Name = "Simple shaders",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/p0e1/1/refs/heads/main/SimpleShader.lua"))()
+   end,
+})
+
 local Button23 = TPTab:CreateButton({
    Name = "Subir FPS",
    Callback = function()
