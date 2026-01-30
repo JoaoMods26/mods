@@ -1140,6 +1140,7 @@ local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
  
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -1156,17 +1157,14 @@ local MobileMove = {
     Down = false,
 }
  
--- Variable para el stick de movimiento nativo
 local moveVector = Vector3.zero
  
--- Función para actualizar el personaje y sus componentes
 local function UpdateCharacter(newCharacter)
     Character = newCharacter
     Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
     RootPart = Character:FindFirstChild("HumanoidRootPart")
 end
  
--- Actualizar referencias cuando el personaje cambia
 LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     newCharacter:WaitForChild("HumanoidRootPart")
     newCharacter:WaitForChild("Humanoid")
@@ -1177,11 +1175,9 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     end
 end)
  
--- Capturar el movimiento del stick nativo de Roblox
 local function getMobileMovement()
     local moveDirection = Vector3.zero
  
-    -- Obtiene el MoveVector desde el ControlModule de Roblox
     pcall(function()
         local playerModule = LocalPlayer.PlayerScripts:WaitForChild("PlayerModule")
         local controls = require(playerModule:WaitForChild("ControlModule"))
@@ -1193,14 +1189,20 @@ local function getMobileMovement()
     return moveDirection
 end
  
--- Crear controles móviles (solo Up/Down)
 local function CreateMobileControls()
     if not UIS.TouchEnabled or MobileGui then return end
  
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local success = pcall(function()
+        MobileGui.Parent = CoreGui
+    end)
+    
+    if not success then
+        MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
  
     local ButtonSize = UDim2.new(0, 80, 0, 80)
  
@@ -1234,7 +1236,6 @@ local function CreateMobileControls()
         return Button
     end
  
-    -- Botones de subir y bajar (derecha de la pantalla)
     CreateButton("Up", UDim2.new(1, -100, 1, -200), "▲", 
         function() MobileMove.Up = true end, 
         function() MobileMove.Up = false end
@@ -1255,7 +1256,6 @@ local function DestroyMobileControls()
     end
 end
  
--- Toggle Fly
 function ToggleFly(state)
     if not RootPart or not Humanoid then
         return
@@ -1264,7 +1264,6 @@ function ToggleFly(state)
     FlyEnabled = state
  
     if FlyEnabled then
-        -- Activar controles móviles si es touch (solo Up/Down)
         if UIS.TouchEnabled then
             CreateMobileControls()
         end
@@ -1277,7 +1276,6 @@ function ToggleFly(state)
             local cameraCFrame = Workspace.CurrentCamera.CFrame
             local up = Vector3.new(0, 1, 0)
  
-            -- Para PC - Movimiento horizontal con WASD
             if not UIS.TouchEnabled then
                 local forward = cameraCFrame.LookVector
                 local right = cameraCFrame.RightVector
@@ -1287,19 +1285,16 @@ function ToggleFly(state)
                 if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDirection = MoveDirection - right end
                 if UIS:IsKeyDown(Enum.KeyCode.D) then MoveDirection = MoveDirection + right end
             else
-                -- Para Móvil - Usar el stick nativo de Roblox
                 local mobileMove = getMobileMovement()
                 if mobileMove.Magnitude > 0 then
                     local lookVector = cameraCFrame.LookVector
                     local rightVector = cameraCFrame.RightVector
  
-                    -- Convertir el input del stick a dirección mundial
                     local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
                     MoveDirection = MoveDirection + worldDirection
                 end
             end
  
-            -- Movimiento vertical (PC y Móvil)
             if UIS:IsKeyDown(Enum.KeyCode.Space) or MobileMove.Up then 
                 MoveDirection = MoveDirection + up 
             end
@@ -1307,7 +1302,6 @@ function ToggleFly(state)
                 MoveDirection = MoveDirection - up 
             end
  
-            -- Aplicar velocidad
             if MoveDirection.Magnitude == 0 then
                 RootPart.Velocity = Vector3.new(0, 0, 0)
             else
@@ -1323,12 +1317,10 @@ function ToggleFly(state)
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
         Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
  
-        -- Desactivar controles móviles si estaban activos
         DestroyMobileControls()
     end
 end
  
--- UI Rayfield
 FlyToggle = MainTab:CreateToggle({
     Name = "Volar Gravedad 0",
     CurrentValue = false,
@@ -1347,9 +1339,6 @@ FlySpeedSlider = MainTab:CreateSlider({
         FlySpeed = value
     end
 })
-
-
-
 
 
 
