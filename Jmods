@@ -386,12 +386,11 @@ Slider = MainTab:CreateSlider({
 
 
 
--- Servicios
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
--- Variables compartidas
 local player = Players.LocalPlayer
 local character, hrp, humanoid
 local currentSpeed = 16
@@ -402,29 +401,31 @@ local jumping = false
 local toggleActive = false
 local jumpKey = Enum.KeyCode.Space
 
--- Variable para el stick de movimiento nativo
 local moveVector = Vector3.zero
 
--- UI móvil (solo para salto)
 local touchGui
 local jumpButton
 
--- Conexiones que se activarán/desactivarán
 local inputBeganConnection
 local inputEndedConnection
 local inputChangedConnection
 local renderSteppedConnection
 
--- Función para crear solo el botón de salto
- function createJumpButton()
+function createJumpButton()
 	if jumpButton then jumpButton:Destroy() end
 
-	-- Crear el GUI solo si no existe
 	if not touchGui then
 		touchGui = Instance.new("ScreenGui")
 		touchGui.Name = "TouchControls"
 		touchGui.ResetOnSpawn = false
-		touchGui.Parent = player:WaitForChild("PlayerGui")
+		
+		local success = pcall(function()
+			touchGui.Parent = CoreGui
+		end)
+		
+		if not success then
+			touchGui.Parent = player:WaitForChild("PlayerGui")
+		end
 	end
 
 	jumpButton = Instance.new("TextButton")
@@ -451,8 +452,7 @@ local renderSteppedConnection
 	end)
 end
 
--- Función para limpiar el botón de salto
- function cleanupJumpButton()
+function cleanupJumpButton()
 	if jumpButton then
 		jumpButton:Destroy()
 		jumpButton = nil
@@ -463,9 +463,8 @@ end
 	end
 end
 
--- Función para conectar inputs (solo cuando se activa)
- function connectInputs()
-	if inputBeganConnection then return end -- Ya está conectado
+function connectInputs()
+	if inputBeganConnection then return end
 
 	inputBeganConnection = UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
@@ -496,8 +495,7 @@ end
 	end)
 end
 
--- Función para desconectar inputs (cuando se desactiva)
- function disconnectInputs()
+function disconnectInputs()
 	if inputBeganConnection then
 		inputBeganConnection:Disconnect()
 		inputBeganConnection = nil
@@ -510,12 +508,11 @@ end
 		inputChangedConnection:Disconnect()
 		inputChangedConnection = nil
 	end
-	keysPressed = {} -- Limpiar teclas presionadas
-	jumping = false -- Asegurar que no quede saltando
+	keysPressed = {}
+	jumping = false
 end
 
--- Función para obtener el movimiento móvil
- function getMobileMovement()
+function getMobileMovement()
 	local moveDirection = Vector3.zero
 
 	pcall(function()
@@ -529,9 +526,7 @@ end
 	return moveDirection
 end
 
--- Dirección de movimiento (PC + Móvil)
- function getDirection()
-	-- Si estamos en móvil y hay movimiento del stick nativo
+function getDirection()
 	if UserInputService.TouchEnabled then
 		local mobileMove = getMobileMovement()
 		if mobileMove.Magnitude > 0 then
@@ -546,7 +541,6 @@ end
 		end
 	end
 
-	-- Movimiento para PC (teclado)
 	local camCF = workspace.CurrentCamera.CFrame
 	local moveDir = Vector3.zero
 
@@ -559,9 +553,8 @@ end
 	return moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
 end
 
--- Función para conectar el loop de movimiento
- function connectRenderStepped()
-	if renderSteppedConnection then return end -- Ya está conectado
+function connectRenderStepped()
+	if renderSteppedConnection then return end
 
 	renderSteppedConnection = RunService.RenderStepped:Connect(function(dt)
 		if sliding and hrp and character then
@@ -571,23 +564,20 @@ end
 			end
 		end
 		
-		-- Salto suave continuo (como antes)
 		if jumping and toggleActive and hrp then
 			hrp.CFrame = hrp.CFrame + Vector3.new(0, currentJumpHeight, 0)
 		end
 	end)
 end
 
--- Función para desconectar el loop de movimiento
- function disconnectRenderStepped()
+function disconnectRenderStepped()
 	if renderSteppedConnection then
 		renderSteppedConnection:Disconnect()
 		renderSteppedConnection = nil
 	end
 end
 
--- Setup personaje
- function setupCharacter(char)
+function setupCharacter(char)
 	character = char
 	hrp = character:WaitForChild("HumanoidRootPart")
 	humanoid = character:WaitForChild("Humanoid")
@@ -603,12 +593,10 @@ end
 if player.Character then setupCharacter(player.Character) end
 player.CharacterAdded:Connect(setupCharacter)
 
--- Función para verificar si algún toggle está activo
 local function shouldBeActive()
 	return sliding or toggleActive
 end
 
--- UI con Rayfield
 MainTab:CreateToggle({
 	Name = "Modo deslizamiento",
 	CurrentValue = false,
@@ -617,11 +605,9 @@ MainTab:CreateToggle({
 		sliding = Value
 		
 		if shouldBeActive() then
-			-- ACTIVAR: Conectar todo si hay algún toggle activo
 			connectInputs()
 			connectRenderStepped()
 		else
-			-- DESACTIVAR: Desconectar solo si NINGÚN toggle está activo
 			disconnectInputs()
 			disconnectRenderStepped()
 		end
@@ -653,20 +639,16 @@ MainTab:CreateToggle({
 		
 		if not Value then
 			jumping = false
-			-- Limpiar botón cuando se desactiva
 			cleanupJumpButton()
 			
-			-- Desconectar solo si el modo deslizamiento también está desactivado
 			if not sliding then
 				disconnectInputs()
 				disconnectRenderStepped()
 			end
 		else
-			-- ACTIVAR: Conectar inputs y loop
 			connectInputs()
 			connectRenderStepped()
 			
-			-- Solo crear el botón de salto en móvil cuando se activa
 			if UserInputService.TouchEnabled then
 				createJumpButton()
 			end
