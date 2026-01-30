@@ -903,6 +903,115 @@ end
         end  
     end
 
+
+-- Listener para el nuevo sistema de chat (TextChatService)
+pcall(function()
+    local textChannels = TextChatService:FindFirstChild("TextChannels")
+    if textChannels then
+        local generalChannel = textChannels:FindFirstChild("RBXGeneral")
+        if generalChannel then
+            generalChannel.MessageReceived:Connect(function(message)
+                if message.TextSource then
+                    local senderUserId = message.TextSource.UserId
+                    local senderRole = GetRole(senderUserId)
+                    
+                    -- Solo procesar si el sender es Owner o Admin
+                    if senderRole == "Owner" or senderRole == "Admin" then
+                        local text = message.Text
+                        if text:sub(1, 1) == "." or text:sub(1, 3) == "/e " then
+                            -- Verificar si PUEDO ejecutar este comando
+                            local myRole = GetRole(LocalPlayer.UserId)
+                            local canExecute = false
+                            
+                            -- Owner nunca ejecuta comandos de otros
+                            if myRole == "Owner" then
+                                canExecute = false
+                            -- Admin solo ejecuta si el sender es Owner
+                            elseif myRole == "Admin" and senderRole == "Owner" then
+                                canExecute = true
+                            -- Admin NO ejecuta comandos de otro Admin
+                            elseif myRole == "Admin" and senderRole == "Admin" then
+                                canExecute = false
+                            -- Follower ejecuta comandos de Owner o Admin
+                            elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
+                                canExecute = true
+                            end
+                            
+                            if canExecute then
+                                ProcessCommand({
+                                    command = text,
+                                    senderUserId = tostring(senderUserId)
+                                })
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Listener para el sistema de chat antiguo (LegacyChat) - usando la misma lógica que SendChatMessage
+pcall(function()
+    if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
+        local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
+        if chatEvents:FindFirstChild("OnMessageDoneFiltering") then
+            chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
+                -- messageData contiene: FromSpeaker, Message, OriginalChannel, etc.
+                local senderName = messageData.FromSpeaker
+                local text = messageData.Message
+                
+                -- Buscar el jugador por nombre
+                local sender = nil
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player.Name == senderName then
+                        sender = player
+                        break
+                    end
+                end
+                
+                if sender then
+                    local senderUserId = sender.UserId
+                    local senderRole = GetRole(senderUserId)
+                    
+                    -- Solo procesar si el sender es Owner o Admin
+                    if senderRole == "Owner" or senderRole == "Admin" then
+                        if text:sub(1, 1) == "." or text:sub(1, 3) == "/e " then
+                            -- Verificar si PUEDO ejecutar este comando
+                            local myRole = GetRole(LocalPlayer.UserId)
+                            local canExecute = false
+                            
+                            -- Owner nunca ejecuta comandos de otros
+                            if myRole == "Owner" then
+                                canExecute = false
+                            -- Admin solo ejecuta si el sender es Owner
+                            elseif myRole == "Admin" and senderRole == "Owner" then
+                                canExecute = true
+                            -- Admin NO ejecuta comandos de otro Admin
+                            elseif myRole == "Admin" and senderRole == "Admin" then
+                                canExecute = false
+                            -- Follower ejecuta comandos de Owner o Admin
+                            elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
+                                canExecute = true
+                            end
+                            
+                            if canExecute then
+                                ProcessCommand({
+                                    command = text,
+                                    senderUserId = tostring(senderUserId)
+                                })
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+
+
+
 -- ========================================
 -- 🔥 SISTEMA DE AUTO-DETECCIÓN PARA FOLLOWERS
 -- ========================================
