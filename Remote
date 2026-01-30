@@ -172,7 +172,7 @@ task.spawn(function()
                                 if userId ~= "self" and type(data) == "table" then
                                     if data.timestamp and (cleanupTime - data.timestamp) > 180 then
                                         FirebaseAPI:Delete("/heartbeats/owners/" .. ownerIdStr .. "/" .. userId)
-                                        print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
+                                    --   - print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
                                     end
                                 end
                             end
@@ -188,7 +188,7 @@ task.spawn(function()
                                 if userId ~= "self" and type(data) == "table" then
                                     if data.timestamp and (cleanupTime - data.timestamp) > 180 then
                                         FirebaseAPI:Delete("/heartbeats/admins/" .. adminIdStr .. "/" .. userId)
-                                        print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
+                                      -- - print("🧹 [CLEANUP] Follower eliminado: " .. (data.name or userId))
                                     end
                                 end
                             end
