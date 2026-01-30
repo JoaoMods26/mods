@@ -1,15 +1,14 @@
--- // Fantasma
+-- Fantasma
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
--- // Variables de jugador
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local camera = workspace.CurrentCamera
 
--- // Variables de ghost
 local isGhostMode = false
 local ghostPart = nil
 local platform = nil
@@ -20,10 +19,6 @@ local originalTransparencies = {}
 
 -- // Movimiento móvil flags
 local moveFlags = {
-	W = false,
-	A = false,
-	S = false,
-	D = false,
 	Space = false,
 	LeftControl = false,
 }
@@ -35,6 +30,21 @@ local buttons = {}
 -- // Conexión del loop de movimiento (SE ACTIVA SOLO CUANDO SE USA)
 local heartbeatConnection = nil
 
+-- Función para obtener el movimiento del stick móvil nativo
+local function getMobileMovement()
+    local moveDirection = Vector3.zero
+ 
+    pcall(function()
+        local playerModule = player.PlayerScripts:WaitForChild("PlayerModule")
+        local controls = require(playerModule:WaitForChild("ControlModule"))
+        if controls then
+            moveDirection = controls:GetMoveVector()
+        end
+    end)
+ 
+    return moveDirection
+end
+
 -- // Función para crear la GUI móvil (SOLO cuando se activa ghost)
 function createMobileGui()
 	if screenGui then
@@ -45,27 +55,38 @@ function createMobileGui()
 
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "GhostMobileControls"
-	screenGui.Parent = player:WaitForChild("PlayerGui")
+	screenGui.Parent = CoreGui
 	screenGui.Enabled = false
 
-	local directions = {{"W", "↑"}, {"S", "↓"}, {"A", "←"}, {"D", "→"}, {"Space", "⎵"}, {"LeftControl", "C"}}
+	-- Solo botones de subir/bajar (el stick nativo maneja WASD)
+	local directions = {{"Space", "▲"}, {"LeftControl", "▼"}}
 
 	for i, dir in ipairs(directions) do
 		local button = Instance.new("TextButton")
-		button.Size = UDim2.new(0, 60, 0, 60)
-		button.Position = UDim2.new(0, 10 + (i-1)*65, 1, -70)
+		button.Size = UDim2.new(0, 80, 0, 80)
+		button.Position = UDim2.new(1, -100, 1, -100 - (i-1)*90)
 		button.Text = dir[2]
+		button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 		button.BackgroundTransparency = 0.3
 		button.TextScaled = true
+		button.Font = Enum.Font.GothamBold
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.AutoButtonColor = false
 		button.Name = dir[1]
 		button.Parent = screenGui
 		buttons[dir[1]] = button
 
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.2, 0)
+		corner.Parent = button
+
 		button.MouseButton1Down:Connect(function()
 			moveFlags[dir[1]] = true
+			button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 		end)
 		button.MouseButton1Up:Connect(function()
 			moveFlags[dir[1]] = false
+			button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 		end)
 	end
 end
@@ -76,6 +97,10 @@ end
 		screenGui:Destroy()
 		screenGui = nil
 		buttons = {}
+	end
+	-- Limpiar estados
+	for key in pairs(moveFlags) do
+		moveFlags[key] = false
 	end
 end
 
@@ -136,18 +161,34 @@ end
 	local speed = 60
 	local cameraCFrame = camera.CFrame
 
-	if UserInputService:IsKeyDown(Enum.KeyCode.W) or moveFlags.W then
-		moveDirection += cameraCFrame.LookVector * speed
+	-- Movimiento horizontal
+	if UserInputService.TouchEnabled then
+		-- Usar stick móvil nativo
+		local mobileMove = getMobileMovement()
+		if mobileMove.Magnitude > 0 then
+			local lookVector = cameraCFrame.LookVector
+			local rightVector = cameraCFrame.RightVector
+			
+			local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
+			moveDirection += worldDirection * speed
+		end
+	else
+		-- Controles de teclado PC
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveDirection += cameraCFrame.LookVector * speed
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveDirection -= cameraCFrame.LookVector * speed
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveDirection -= cameraCFrame.RightVector * speed
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveDirection += cameraCFrame.RightVector * speed
+		end
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.S) or moveFlags.S then
-		moveDirection -= cameraCFrame.LookVector * speed
-	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.A) or moveFlags.A then
-		moveDirection -= cameraCFrame.RightVector * speed
-	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.D) or moveFlags.D then
-		moveDirection += cameraCFrame.RightVector * speed
-	end
+
+	-- Subir/bajar (igual para móvil y PC)
 	if UserInputService:IsKeyDown(Enum.KeyCode.Space) or moveFlags.Space then
 		moveDirection += Vector3.new(0, speed, 0)
 	end
@@ -204,7 +245,6 @@ function restoreOriginalTransparencies()
 		end
 	end
 	
-	-- Mantener HumanoidRootPart invisible siempre
 	if humanoidRootPart then
 		humanoidRootPart.Transparency = 1
 	end
@@ -240,11 +280,9 @@ end
 
 		isGhostMode = false
 	else
-		-- ACTIVAR GHOST MODE
 		lastPosition = humanoidRootPart.CFrame
 		local teleportPosition = Vector3.new(math.random(-1000, 1000), 100, math.random(-1000, 1000))
 		
-		-- Guardar transparencias antes de modificar
 		saveOriginalTransparencies()
 		
 		createPlatform(teleportPosition)
@@ -268,7 +306,6 @@ end
 			end
 		end
 
-		-- Crear GUI solo si es móvil
 		if UserInputService.TouchEnabled then
 			createMobileGui()
 			if screenGui then
@@ -276,14 +313,12 @@ end
 			end
 		end
 
-		-- Conectar el loop de movimiento
 		connectHeartbeat()
 
 		isGhostMode = true
 	end
 end
 
--- // Manejo de respawn
 player.CharacterAdded:Connect(function(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
@@ -306,7 +341,6 @@ player.CharacterAdded:Connect(function(char)
 	end
 end)
 
--- // Toggle Rayfield
 MainTab:CreateToggle({
 	Name = "Fantasma",
 	CurrentValue = false,
@@ -319,6 +353,9 @@ MainTab:CreateToggle({
 		end
 	end,
 })
+
+
+
 
 
 
