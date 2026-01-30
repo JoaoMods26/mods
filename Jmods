@@ -1632,46 +1632,35 @@ Button = MainTab:CreateButton({
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
--- ====================================
--- DETECTAR SI ES MÓVIL
--- ====================================
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
--- ====================================
--- VARIABLES DE ESTADO
--- ====================================
 local autoClicking = false
 local toggleEnabled = false
 local clickDelay = 0.1
 local lastClickTime = 0
 local connection = nil
 
--- Variables para móvil
 local touchGui = nil
 local touchButton = nil
 local dragging = false
 local dragStart = nil
 local startPos = nil
 
--- ====================================
--- CREAR GUI TÁCTIL FLOTANTE (SOLO MÓVIL)
--- ====================================
 function createMobileTouchGui()
     if not isMobile then return end
-    if touchGui then return end -- Evitar duplicados
+    if touchGui then return end
     
-    -- Crear ScreenGui
     touchGui = Instance.new("ScreenGui")
     touchGui.Name = "AutoClickerTouchGui"
     touchGui.ResetOnSpawn = false
     touchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     touchGui.DisplayOrder = 999
     
-    -- Crear botón circular (área de clicks)
     touchButton = Instance.new("Frame")
     touchButton.Name = "TouchButton"
     touchButton.Size = UDim2.new(0, 100, 0, 100)
@@ -1682,12 +1671,10 @@ function createMobileTouchGui()
     touchButton.Active = true
     touchButton.Parent = touchGui
     
-    -- Hacer circular
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = touchButton
     
-    -- Borde de neón animado
     local stroke = Instance.new("UIStroke")
     stroke.Name = "NeonStroke"
     stroke.Color = Color3.fromRGB(0, 255, 255)
@@ -1695,7 +1682,6 @@ function createMobileTouchGui()
     stroke.Transparency = 0
     stroke.Parent = touchButton
     
-    -- Gradiente de fondo
     local gradient = Instance.new("UIGradient")
     gradient.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
@@ -1704,7 +1690,6 @@ function createMobileTouchGui()
     gradient.Rotation = 45
     gradient.Parent = touchButton
     
-    -- Ícono/Texto central
     local icon = Instance.new("TextLabel")
     icon.Name = "Icon"
     icon.Size = UDim2.new(1, 0, 0.7, 0)
@@ -1717,7 +1702,6 @@ function createMobileTouchGui()
     icon.TextTransparency = 0.2
     icon.Parent = touchButton
     
-    -- Texto "CLICK AQUÍ"
     local clickText = Instance.new("TextLabel")
     clickText.Name = "ClickText"
     clickText.Size = UDim2.new(1, 0, 0.3, 0)
@@ -1730,7 +1714,6 @@ function createMobileTouchGui()
     clickText.TextTransparency = 0.2
     clickText.Parent = touchButton
     
-    -- Contador de clicks
     local clickCounter = Instance.new("TextLabel")
     clickCounter.Name = "ClickCounter"
     clickCounter.Size = UDim2.new(0, 120, 0, 30)
@@ -1748,13 +1731,9 @@ function createMobileTouchGui()
     counterCorner.CornerRadius = UDim.new(0, 10)
     counterCorner.Parent = clickCounter
     
-    -- Variable para contar clicks
     local clickCount = 0
     touchButton:SetAttribute("ClickCount", clickCount)
     
-    -- ====================================
-    -- SISTEMA DE ARRASTRE
-    -- ====================================
     local dragButton = Instance.new("ImageButton")
     dragButton.Size = UDim2.new(1, 0, 1, 0)
     dragButton.BackgroundTransparency = 1
@@ -1786,13 +1765,9 @@ function createMobileTouchGui()
         end
     end)
     
-    -- ====================================
-    -- ANIMACIÓN DE PULSO CONTINUO
-    -- ====================================
     spawn(function()
         while touchButton and touchButton.Parent do
             if autoClicking then
-                -- Pulso de escala
                 for i = 1, 10 do
                     touchButton.Size = UDim2.new(0, 100 + i, 0, 100 + i)
                     stroke.Thickness = 4 + (i * 0.2)
@@ -1809,9 +1784,6 @@ function createMobileTouchGui()
         end
     end)
     
-    -- ====================================
-    -- ANIMACIÓN DE ROTACIÓN DEL GRADIENTE
-    -- ====================================
     spawn(function()
         while touchButton and touchButton.Parent do
             if autoClicking then
@@ -1825,13 +1797,15 @@ function createMobileTouchGui()
         end
     end)
     
-    -- Montar en PlayerGui
-    touchGui.Parent = player:WaitForChild("PlayerGui")
+    local success = pcall(function()
+        touchGui.Parent = CoreGui
+    end)
+    
+    if not success then
+        touchGui.Parent = player:WaitForChild("PlayerGui")
+    end
 end
 
--- ====================================
--- DESTRUIR GUI TÁCTIL
--- ====================================
 function destroyMobileTouchGui()
     if touchGui then
         touchGui:Destroy()
@@ -1840,9 +1814,6 @@ function destroyMobileTouchGui()
     end
 end
 
--- ====================================
--- EJECUTAR CLICK
--- ====================================
 function performClick()
     local currentTime = tick()
     
@@ -1853,13 +1824,11 @@ function performClick()
     lastClickTime = currentTime
     
     if isMobile and touchButton then
-        -- OBTENER POSICIÓN CENTRAL DEL BOTÓN TÁCTIL
         local buttonPos = touchButton.AbsolutePosition
         local buttonSize = touchButton.AbsoluteSize
         local centerX = buttonPos.X + (buttonSize.X / 2)
         local centerY = buttonPos.Y + (buttonSize.Y / 2)
         
-        -- Ejecutar click en esa posición
         pcall(function()
             local VIM = game:GetService("VirtualInputManager")
             VIM:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
@@ -1867,7 +1836,6 @@ function performClick()
             VIM:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
         end)
         
-        -- Actualizar contador
         local currentCount = touchButton:GetAttribute("ClickCount") or 0
         currentCount = currentCount + 1
         touchButton:SetAttribute("ClickCount", currentCount)
@@ -1877,7 +1845,6 @@ function performClick()
             counter.Text = "Clicks: " .. tostring(currentCount)
         end
         
-        -- Efecto visual de click (onda expansiva)
         spawn(function()
             local ripple = Instance.new("Frame")
             ripple.Size = UDim2.new(0, 20, 0, 20)
@@ -1892,7 +1859,6 @@ function performClick()
             rippleCorner.CornerRadius = UDim.new(1, 0)
             rippleCorner.Parent = ripple
             
-            -- Animación de expansión
             for i = 1, 10 do
                 ripple.Size = UDim2.new(0, 20 + (i * 10), 0, 20 + (i * 10))
                 ripple.Position = UDim2.new(0.5, -(10 + (i * 5)), 0.5, -(10 + (i * 5)))
@@ -1903,7 +1869,6 @@ function performClick()
             ripple:Destroy()
         end)
         
-        -- Flash del ícono
         spawn(function()
             local icon = touchButton:FindFirstChild("Icon")
             if icon then
@@ -1914,7 +1879,6 @@ function performClick()
         end)
         
     else
-        -- MÉTODO PARA PC (click donde está el mouse)
         pcall(function()
             mouse1click()
         end)
@@ -1941,9 +1905,6 @@ function performClick()
     end
 end
 
--- ====================================
--- INICIAR AUTO CLICKER
--- ====================================
 function startAutoClicker()
     if connection then
         connection:Disconnect()
@@ -1957,9 +1918,6 @@ function startAutoClicker()
     end)
 end
 
--- ====================================
--- DETENER AUTO CLICKER
--- ====================================
 function stopAutoClicker()
     if connection then
         connection:Disconnect()
@@ -1968,9 +1926,6 @@ function stopAutoClicker()
     autoClicking = false
 end
 
--- ====================================
--- LIMPIEZA AL MORIR/SALIR
--- ====================================
 player.CharacterRemoving:Connect(function()
     stopAutoClicker()
 end)
@@ -1982,13 +1937,6 @@ Players.PlayerRemoving:Connect(function(plr)
     end
 end)
 
--- ====================================
--- ====================================
--- CONTROLES DE LA INTERFAZ PRINCIPAL
--- ====================================
--- ====================================
-
--- 1. TOGGLE PRINCIPAL
 MainTab:CreateToggle({
     Name = "Auto Clicker",
     CurrentValue = false,
@@ -1998,13 +1946,11 @@ MainTab:CreateToggle({
         autoClicking = Value
         
         if Value then
-            -- ACTIVAR: Crear botón si es móvil e iniciar clicker
             if isMobile then
                 createMobileTouchGui()
             end
             startAutoClicker()
         else
-            -- DESACTIVAR: Destruir botón si es móvil y detener clicker
             if isMobile then
                 destroyMobileTouchGui()
             end
@@ -2013,7 +1959,6 @@ MainTab:CreateToggle({
     end,
 })
 
--- 2. KEYBIND (solo para PC)
 if not isMobile then
     MainTab:CreateKeybind({
         Name = "Tecla de Activacion",
@@ -2028,7 +1973,6 @@ if not isMobile then
     })
 end
 
--- 3. SLIDER DE VELOCIDAD
 MainTab:CreateSlider({
     Name = "Velocidad",
     Range = {0.01, 1},
@@ -2040,8 +1984,6 @@ MainTab:CreateSlider({
         clickDelay = Value
     end,
 })
-
-
 
 ----Camara libre---
 
