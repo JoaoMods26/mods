@@ -1993,6 +1993,7 @@ MainTab:CreateSlider({
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -2007,6 +2008,27 @@ local keysHeld = {}
 local lastTouchPosition = nil
 local guiFrames = nil
 local toggleActive = false  -- **AÑADIDO: estado del toggle**
+
+-- Variables para movimiento móvil nativo
+local MobileMove = {
+    Up = false,
+    Down = false,
+}
+
+-- Función para obtener el movimiento del stick móvil nativo
+local function getMobileMovement()
+    local moveDirection = Vector3.zero
+ 
+    pcall(function()
+        local playerModule = player.PlayerScripts:WaitForChild("PlayerModule")
+        local controls = require(playerModule:WaitForChild("ControlModule"))
+        if controls then
+            moveDirection = controls:GetMoveVector()
+        end
+    end)
+ 
+    return moveDirection
+end
 
 
 -- Manejar cuando muere el humanoid para desactivar freecam
@@ -2071,32 +2093,56 @@ end
 	guiFrames = Instance.new("ScreenGui")
 	guiFrames.Name = "FreecamMobileGui"
 	guiFrames.ResetOnSpawn = false
-	guiFrames.Parent = player:WaitForChild("PlayerGui")
+	guiFrames.Parent = CoreGui
 
-	 function CreateButton(name, pos, keycode)
+	 function CreateButton(name, pos, keycode, text)
 		local btn = Instance.new("TextButton")
 		btn.Name = name
 		btn.Size = UDim2.new(0, 60, 0, 60)
 		btn.Position = pos
 		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		btn.Text = name
+		btn.Text = text or name
 		btn.TextScaled = true
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.AutoButtonColor = false
 		btn.Parent = guiFrames
 
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.2, 0)
+		corner.Parent = btn
+
 		btn.MouseButton1Down:Connect(function()
-			keysHeld[keycode] = true
+			if keycode == "Up" then
+				MobileMove.Up = true
+			elseif keycode == "Down" then
+				MobileMove.Down = true
+			else
+				keysHeld[keycode] = true
+			end
+			btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 		end)
 		btn.MouseButton1Up:Connect(function()
-			keysHeld[keycode] = false
+			if keycode == "Up" then
+				MobileMove.Up = false
+			elseif keycode == "Down" then
+				MobileMove.Down = false
+			else
+				keysHeld[keycode] = false
+			end
+			btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 		end)
 	end
 
-	CreateButton("W", UDim2.new(0, 100, 1, -200), Enum.KeyCode.W)
-	CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
-	CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
-	CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
-	CreateButton("E", UDim2.new(1, -160, 1, -200), Enum.KeyCode.E)
-	CreateButton("Q", UDim2.new(1, -220, 1, -200), Enum.KeyCode.Q)
+	-- Botones de movimiento horizontal (ya no necesarios con stick nativo, pero los dejamos por compatibilidad)
+	-- CreateButton("W", UDim2.new(0, 100, 1, -200), Enum.KeyCode.W)
+	-- CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
+	-- CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
+	-- CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
+	
+	-- Solo botones de subir/bajar (E/Q)
+	CreateButton("Up", UDim2.new(1, -100, 1, -200), "Up", "▲")
+	CreateButton("Down", UDim2.new(1, -100, 1, -100), "Down", "▼")
 end
 
 function RemoveTouchGui()
@@ -2104,17 +2150,40 @@ function RemoveTouchGui()
 		guiFrames:Destroy()
 		guiFrames = nil
 	end
+	-- Limpiar estados de MobileMove
+	for key in pairs(MobileMove) do
+		MobileMove[key] = false
+	end
 end
 
 -- Calcular vector de movimiento
  function CalculateMoveVector()
 	local moveVec = Vector3.zero
-	if keysHeld[Enum.KeyCode.W] then moveVec += Vector3.new(0, 0, -1) end
-	if keysHeld[Enum.KeyCode.S] then moveVec += Vector3.new(0, 0, 1) end
-	if keysHeld[Enum.KeyCode.A] then moveVec += Vector3.new(-1, 0, 0) end
-	if keysHeld[Enum.KeyCode.D] then moveVec += Vector3.new(1, 0, 0) end
-	if keysHeld[Enum.KeyCode.E] then moveVec += Vector3.new(0, 1, 0) end
-	if keysHeld[Enum.KeyCode.Q] then moveVec += Vector3.new(0, -1, 0) end
+	
+	-- Si es dispositivo móvil, usar el stick nativo
+	if UserInputService.TouchEnabled then
+		local mobileMove = getMobileMovement()
+		if mobileMove.Magnitude > 0 then
+			-- Igual que en el script de vuelo: usar lookVector y rightVector de la cámara
+			local lookVector = camera.CFrame.LookVector
+			local rightVector = camera.CFrame.RightVector
+			
+			-- Combinar vectores correctamente
+			local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
+			moveVec += worldDirection
+		end
+	else
+		-- Controles de teclado (PC)
+		if keysHeld[Enum.KeyCode.W] then moveVec += Vector3.new(0, 0, -1) end
+		if keysHeld[Enum.KeyCode.S] then moveVec += Vector3.new(0, 0, 1) end
+		if keysHeld[Enum.KeyCode.A] then moveVec += Vector3.new(-1, 0, 0) end
+		if keysHeld[Enum.KeyCode.D] then moveVec += Vector3.new(1, 0, 0) end
+	end
+	
+	-- Subir/bajar funciona igual en ambas plataformas
+	if keysHeld[Enum.KeyCode.E] or MobileMove.Up then moveVec += Vector3.new(0, 1, 0) end
+	if keysHeld[Enum.KeyCode.Q] or MobileMove.Down then moveVec += Vector3.new(0, -1, 0) end
+	
 	return moveVec
 end
 
@@ -2156,7 +2225,13 @@ local renderConn = nil
 		local moveVec = CalculateMoveVector()
 
 		if moveVec.Magnitude > 0 then
-			moveVec = yawCF:VectorToWorldSpace(moveVec.Unit) * speed
+			-- En móvil, el vector ya viene en coordenadas del mundo
+			-- En PC, necesitamos transformarlo con yawCF
+			if not UserInputService.TouchEnabled then
+				moveVec = yawCF:VectorToWorldSpace(moveVec.Unit) * speed
+			else
+				moveVec = moveVec.Unit * speed
+			end
 			camPosition += moveVec * dt
 		end
 
@@ -2288,7 +2363,6 @@ MainTab:CreateSlider({
 		speed = Value
 	end,
 })
-
 
 
 
