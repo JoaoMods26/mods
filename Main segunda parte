@@ -365,11 +365,13 @@ MainTab:CreateToggle({
 
 
 -- SHIFTLOCK
+-- SHIFTLOCK
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
     UserInputService = game:GetService("UserInputService"),
-    TweenService = game:GetService("TweenService")
+    TweenService = game:GetService("TweenService"),
+    CoreGui = game:GetService("CoreGui")
 }
 
 local State = {
@@ -433,13 +435,11 @@ local UI = {}
 function UI.create()
     UI.destroy()
     
-    local playerGui = State.player:WaitForChild("PlayerGui")
-    
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "NewShiftlockUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = playerGui
+    screenGui.Parent = Services.CoreGui
     
     State.uiElements.screenGui = screenGui
     
@@ -465,6 +465,7 @@ function UI.createMobileButton(parent)
     button.TextScaled = true
     button.Font = Enum.Font.GothamBold
     button.ZIndex = 10
+    button.Active = true
     button.Parent = parent
     
     local corner = Instance.new("UICorner")
@@ -480,12 +481,22 @@ function UI.createMobileButton(parent)
     State.uiElements.button = button
     State.uiElements.stroke = stroke
     
-    button.Activated:Connect(function()
-        ShiftlockCore.toggle()
-    end)
+    -- Debounce para evitar doble activación
+    local debouncing = false
     
-    button.MouseButton1Click:Connect(function()
-        ShiftlockCore.toggle()
+    -- Usar solo Activated que funciona tanto en PC como móvil
+    button.Activated:Connect(function()
+        if debouncing then return end
+        debouncing = true
+        
+        if State.active then
+            ShiftlockCore.deactivate()
+        else
+            ShiftlockCore.activate()
+        end
+        
+        task.wait(0.2)
+        debouncing = false
     end)
 end
 
@@ -498,11 +509,12 @@ function UI.createCrosshair(parent)
     crosshair.Text = Config.crosshairSymbol
     crosshair.TextColor3 = Color3.fromRGB(255, 255, 255)
     crosshair.TextScaled = true
-    crosshair.TextStrokeTransparency = 0.5
+    crosshair.TextStrokeTransparency = 0.3
     crosshair.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     crosshair.Font = Enum.Font.Code
     crosshair.Visible = false
-    crosshair.ZIndex = 5
+    crosshair.ZIndex = 100
+    crosshair.Active = false
     crosshair.Parent = parent
     
     State.uiElements.crosshair = crosshair
@@ -527,10 +539,18 @@ function UI.updateButton(isActive)
             end
         end
         
+        -- Calcular el tamaño reducido correctamente
+        local smallSize = UDim2.new(
+            Config.buttonSize.X.Scale * 0.9,
+            Config.buttonSize.X.Offset * 0.9,
+            Config.buttonSize.Y.Scale * 0.9,
+            Config.buttonSize.Y.Offset * 0.9
+        )
+        
         local tween = Services.TweenService:Create(
             button,
             TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = Config.buttonSize * 0.9}
+            {Size = smallSize}
         )
         tween:Play()
         tween.Completed:Connect(function()
@@ -637,13 +657,23 @@ end
 ShiftlockCore = {}
 
 function ShiftlockCore.activate()
-    if State.active then return end
-    if not Utils.isValidForShiftlock() then return end
+    if State.active then 
+        return 
+    end
+    
+    -- En móvil, la validación es diferente porque no usamos el mouse
+    local isValid = Utils.isValidForShiftlock()
+    if not isValid and not Services.UserInputService.TouchEnabled then
+        return
+    end
     
     State.active = true
     
-    Services.UserInputService.MouseIconEnabled = false
-    Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    -- En PC ocultar cursor, en móvil no
+    if not Services.UserInputService.TouchEnabled then
+        Services.UserInputService.MouseIconEnabled = false
+        Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    end
     
     Rotation.start()
     
@@ -652,12 +682,17 @@ function ShiftlockCore.activate()
 end
 
 function ShiftlockCore.deactivate()
-    if not State.active then return end
+    if not State.active then 
+        return 
+    end
     
     State.active = false
     
-    Services.UserInputService.MouseIconEnabled = true
-    Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    -- Restaurar cursor solo si no es móvil
+    if not Services.UserInputService.TouchEnabled then
+        Services.UserInputService.MouseIconEnabled = true
+        Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
     
     Rotation.stop()
     
@@ -687,13 +722,22 @@ function ShiftlockCore.disable()
     
     State.enabled = false
     
+    -- Primero desactivar si está activo
     if State.active then
         ShiftlockCore.deactivate()
     end
     
+    -- Limpiar todas las conexiones
     Utils.cleanupConnections()
+    
+    -- Destruir UI
     UI.destroy()
+    
+    -- Limpiar input
     Input.cleanup()
+    
+    -- Forzar reset del estado activo por si acaso
+    State.active = false
 end
 
 State.player.CharacterAdded:Connect(function(newCharacter)
@@ -736,6 +780,7 @@ getgenv().NewShiftlock = {
 }
 
 getgenv().ToggleShiftlock = ToggleShiftlock
+
 
 
 
