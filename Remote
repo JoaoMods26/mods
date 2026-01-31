@@ -1503,19 +1503,22 @@ if isOwner or isAdmin then
         tabsContainer.BackgroundTransparency = 1
         tabsContainer.Parent = mainFrame
         
-        local function CreateTab(name, position, icon)
-            local btn = Instance.new("TextButton")
-            btn.Name = name.."Tab"
-            btn.Size = UDim2.new(0, 128, 1, 0)
-            btn.Position = UDim2.new(0, position, 0, 0)
-            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-            btn.BorderSizePixel = 0
-            btn.Font = Enum.Font.GothamSemibold
-            btn.Text = icon .. " " .. name
-            btn.TextColor3 = Color3.fromRGB(140, 140, 150)
-            btn.TextSize = 13
-            btn.AutoButtonColor = false
-            btn.Parent = tabsContainer
+local function CreateTab(name, position, icon)
+    local btn = Instance.new("TextButton")
+    btn.Name = name.."Tab"
+    -- Tabs más pequeños en móvil
+    local tabWidth = isMobile and 78 or 102
+    btn.Size = UDim2.new(0, tabWidth, 1, 0)
+    btn.Position = UDim2.new(0, position, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Text = icon .. " " .. name
+    btn.TextColor3 = Color3.fromRGB(140, 140, 150)
+    btn.TextSize = isMobile and 10 or 12  -- Texto más pequeño en móvil
+    btn.AutoButtonColor = false
+    btn.Parent = tabsContainer
+
             
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -1540,15 +1543,21 @@ if isOwner or isAdmin then
             return btn
         end
         
-        local playersTab = CreateTab("Jugadores", 0, "👥")
-        local commandsTab = CreateTab("Comandos", 133, "⚡")
-        local executionTab = CreateTab("Ejecutador", 266, "💻")
-        local configTab = CreateTab("Config", 399, "⚙️")
-        
-        if not isOwner then
-            executionTab.Visible = false
-            configTab.Position = UDim2.new(0, 266, 0, 0)
-        end
+-- Calcular posiciones dinámicamente
+local tabWidth = isMobile and 78 or 102
+local tabSpacing = 5
+
+local playersTab = CreateTab("Jugadores", 0, "👥")
+local commandsTab = CreateTab("Comandos", tabWidth + tabSpacing, "⚡")
+local serversTab = CreateTab("Servidores", (tabWidth + tabSpacing) * 2, "🌐")
+local executionTab = CreateTab("Ejecutador", (tabWidth + tabSpacing) * 3, "💻")
+local configTab = CreateTab("Config", (tabWidth + tabSpacing) * 4, "⚙️")
+
+if not isOwner then
+    executionTab.Visible = false
+    serversTab.Position = UDim2.new(0, (tabWidth + tabSpacing) * 2, 0, 0)
+    configTab.Position = UDim2.new(0, (tabWidth + tabSpacing) * 3, 0, 0)
+end
         
         local contentFrame = Instance.new("Frame")
         contentFrame.Size = UDim2.new(1, -20, 1, -118)
@@ -2607,45 +2616,259 @@ if isOwner then
     versionLabel.TextYAlignment = Enum.TextYAlignment.Center
     versionLabel.Parent = versionInfo
     
+
+
+
+-- TAB DE SERVIDORES
+
+local serversPanel = Instance.new("Frame")
+serversPanel.Name = "ServersPanel"
+serversPanel.Size = UDim2.new(1, -10, 1, -10)
+serversPanel.Position = UDim2.new(0, 5, 0, 5)
+serversPanel.BackgroundTransparency = 1
+serversPanel.Visible = false
+serversPanel.Parent = contentFrame
+
+local serverTitle = Instance.new("TextLabel")
+serverTitle.Size = UDim2.new(1, 0, 0, 30)
+serverTitle.BackgroundTransparency = 1
+serverTitle.Font = Enum.Font.GothamBold
+serverTitle.Text = "🌐 Teleport a otros servidores"
+serverTitle.TextColor3 = Color3.fromRGB(100, 180, 255)
+serverTitle.TextSize = 16
+serverTitle.TextXAlignment = Enum.TextXAlignment.Left
+serverTitle.Parent = serversPanel
+
+local serverSubtitle = Instance.new("TextLabel")
+serverSubtitle.Size = UDim2.new(1, 0, 0, 18)
+serverSubtitle.Position = UDim2.new(0, 0, 0, 28)
+serverSubtitle.BackgroundTransparency = 1
+serverSubtitle.Font = Enum.Font.Gotham
+serverSubtitle.Text = "Usa links de servidor para teletransportarte directamente"
+serverSubtitle.TextColor3 = Color3.fromRGB(150, 150, 160)
+serverSubtitle.TextSize = 11
+serverSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+serverSubtitle.Parent = serversPanel
+
+-- Input del link
+local linkInputFrame = Instance.new("Frame")
+linkInputFrame.Size = UDim2.new(1, 0, 0, 70)
+linkInputFrame.Position = UDim2.new(0, 0, 0, 58)
+linkInputFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+linkInputFrame.BorderSizePixel = 0
+linkInputFrame.Parent = serversPanel
+
+local linkCorner = Instance.new("UICorner")
+linkCorner.CornerRadius = UDim.new(0, 8)
+linkCorner.Parent = linkInputFrame
+
+local linkLabel = Instance.new("TextLabel")
+linkLabel.Size = UDim2.new(1, 0, 0, 20)
+linkLabel.Position = UDim2.new(0, 10, 0, 8)
+linkLabel.BackgroundTransparency = 1
+linkLabel.Font = Enum.Font.GothamBold
+linkLabel.Text = "Server Link:"
+linkLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+linkLabel.TextSize = 12
+linkLabel.TextXAlignment = Enum.TextXAlignment.Left
+linkLabel.Parent = linkInputFrame
+
+local linkInput = Instance.new("TextBox")
+linkInput.Size = UDim2.new(1, -20, 0, 32)
+linkInput.Position = UDim2.new(0, 10, 0, 32)
+linkInput.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+linkInput.BorderSizePixel = 0
+linkInput.Font = Enum.Font.Code
+linkInput.PlaceholderText = "roblox://experiences/start?placeId=XXX&gameInstanceId=XXX"
+linkInput.Text = ""
+linkInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+linkInput.TextSize = 11
+linkInput.TextXAlignment = Enum.TextXAlignment.Left
+linkInput.ClearTextOnFocus = false
+linkInput.Parent = linkInputFrame
+
+local linkInputCorner = Instance.new("UICorner")
+linkInputCorner.CornerRadius = UDim.new(0, 6)
+linkInputCorner.Parent = linkInput
+
+-- Botón de teleport
+local teleportBtn = Instance.new("TextButton")
+teleportBtn.Size = UDim2.new(1, 0, 0, 52)
+teleportBtn.Position = UDim2.new(0, 0, 0, 138)
+teleportBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+teleportBtn.BorderSizePixel = 0
+teleportBtn.Font = Enum.Font.GothamBold
+teleportBtn.Text = "🚀 Teleportarme"
+teleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportBtn.TextSize = 16
+teleportBtn.AutoButtonColor = false
+teleportBtn.Parent = serversPanel
+
+local teleportCorner = Instance.new("UICorner")
+teleportCorner.CornerRadius = UDim.new(0, 8)
+teleportCorner.Parent = teleportBtn
+
+local teleportGradient = Instance.new("UIGradient")
+teleportGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(88, 101, 242)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 70, 200))
+}
+teleportGradient.Rotation = 90
+teleportGradient.Parent = teleportBtn
+
+teleportBtn.MouseEnter:Connect(function()
+    TweenService:Create(teleportBtn, TweenInfo.new(0.2), {
+        Size = UDim2.new(1, 0, 0, 54),
+        BackgroundColor3 = Color3.fromRGB(100, 115, 255)
+    }):Play()
+end)
+
+teleportBtn.MouseLeave:Connect(function()
+    TweenService:Create(teleportBtn, TweenInfo.new(0.2), {
+        Size = UDim2.new(1, 0, 0, 52),
+        BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    }):Play()
+end)
+
+-- Información adicional
+local serverInfoFrame = Instance.new("Frame")
+serverInfoFrame.Size = UDim2.new(1, 0, 1, -200)
+serverInfoFrame.Position = UDim2.new(0, 0, 0, 200)
+serverInfoFrame.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+serverInfoFrame.BorderSizePixel = 0
+serverInfoFrame.Parent = serversPanel
+
+local serverInfoCorner = Instance.new("UICorner")
+serverInfoCorner.CornerRadius = UDim.new(0, 8)
+serverInfoCorner.Parent = serverInfoFrame
+
+local serverInfoLabel = Instance.new("TextLabel")
+serverInfoLabel.Size = UDim2.new(1, -20, 1, -20)
+serverInfoLabel.Position = UDim2.new(0, 10, 0, 10)
+serverInfoLabel.BackgroundTransparency = 1
+serverInfoLabel.Font = Enum.Font.Gotham
+serverInfoLabel.Text = [[💡 Cómo obtener el link del servidor:
+
+1️⃣ Método 1 - Desde el navegador:
+   • Entra al servidor destino desde el navegador
+   • Copia la URL completa que empieza con "roblox://experiences/start..."
+
+2️⃣ Método 2 - Desde la consola (F9):
+   • Presiona F9 para abrir la consola
+   • Ve a la pestaña "Server"
+   • Busca "game.JobId" y copia el valor
+   • Usa: roblox://experiences/start?placeId=PLACEID&gameInstanceId=JOBID
+
+3️⃣ Ejemplo de link válido:
+   roblox://experiences/start?placeId=4924922222&gameInstanceId=25ad10fd-...
+
+⚠️ Nota: El teleport puede tardar unos segundos en ejecutarse]]
+serverInfoLabel.TextColor3 = Color3.fromRGB(180, 200, 220)
+serverInfoLabel.TextSize = 10
+serverInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+serverInfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+serverInfoLabel.TextWrapped = true
+serverInfoLabel.Parent = serverInfoFrame
+
+-- Función para teleportarse
+local TeleportService = game:GetService("TeleportService")
+
+local function TeleportToServer(link)
+    if link == "" or not link:match("roblox://") then
+        teleportBtn.Text = "❌ Link inválido"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+        task.wait(1.5)
+        teleportBtn.Text = "🚀 Teleportarme"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        return
+    end
+    
+    -- Extraer placeId y gameInstanceId del link
+    local placeId = link:match("placeId=(%d+)")
+    local gameInstanceId = link:match("gameInstanceId=([%w%-]+)")
+    
+    if not placeId or not gameInstanceId then
+        teleportBtn.Text = "❌ Link mal formado"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+        task.wait(1.5)
+        teleportBtn.Text = "🚀 Teleportarme"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        return
+    end
+    
+    teleportBtn.Text = "⏳ Teleportando..."
+    teleportBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 100)
+    
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(
+            tonumber(placeId),
+            gameInstanceId,
+            LocalPlayer
+        )
+    end)
+    
+    task.wait(2)
+    teleportBtn.Text = "🚀 Teleportarme"
+    teleportBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+end
+
+teleportBtn.MouseButton1Click:Connect(function()
+    TeleportToServer(linkInput.Text)
+end)
+
+-- También permitir teleport con Enter
+linkInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        TeleportToServer(linkInput.Text)
+    end
+end)
+
+
+
+
     local currentTab = "Players"
     local tabs = {playersTab, commandsTab, executionTab, configTab}
     local panels = {
         Players = playersPanel,
         Commands = commandsPanel,
+        Servers = serversPanel, 
         Execution = executionPanel,
         Config = configPanel
     }
     
-    local function SwitchTab(tabName)
-        currentTab = tabName
+local function SwitchTab(tabName)
+    currentTab = tabName
+    
+    for _, tab in ipairs(tabs) do
+        -- Obtener el nombre del tab desde el texto (después del emoji y espacio)
+        local tabText = tab.Text:match("%s(.+)") or tab.Text
+        local isActive = tabText == tabName
         
-        for _, tab in ipairs(tabs) do
-            local isActive = tab.Text:match("%S+$") == tabName or (tab.Text:find(tabName) and not tab.Text:find("Config"))
-            
-            if isActive then
-                TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                    BackgroundColor3 = Color3.fromRGB(88, 101, 242),
-                    TextColor3 = Color3.fromRGB(255, 255, 255)
-                }):Play()
-            else
-                TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 35),
-                    TextColor3 = Color3.fromRGB(140, 140, 150)
-                }):Play()
-            end
-        end
-        
-        for panelName, panel in pairs(panels) do
-            panel.Visible = (panelName == tabName)
+        if isActive then
+            TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                BackgroundColor3 = Color3.fromRGB(88, 101, 242),
+                TextColor3 = Color3.fromRGB(255, 255, 255)
+            }):Play()
+        else
+            TweenService:Create(tab, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                BackgroundColor3 = Color3.fromRGB(25, 25, 35),
+                TextColor3 = Color3.fromRGB(140, 140, 150)
+            }):Play()
         end
     end
     
-    playersTab.MouseButton1Click:Connect(function() SwitchTab("Players") end)
-    commandsTab.MouseButton1Click:Connect(function() SwitchTab("Commands") end)
-    if isOwner then
-        executionTab.MouseButton1Click:Connect(function() SwitchTab("Execution") end)
+    for panelName, panel in pairs(panels) do
+        panel.Visible = (panelName == tabName)
     end
-    configTab.MouseButton1Click:Connect(function() SwitchTab("Config") end)
+end
+    
+playersTab.MouseButton1Click:Connect(function() SwitchTab("Players") end)
+commandsTab.MouseButton1Click:Connect(function() SwitchTab("Commands") end)
+serversTab.MouseButton1Click:Connect(function() SwitchTab("Servers") end)  -- ← AGREGAR ESTA LÍNEA
+if isOwner then
+    executionTab.MouseButton1Click:Connect(function() SwitchTab("Execution") end)
+end
+configTab.MouseButton1Click:Connect(function() SwitchTab("Config") end)
     
     local isHidden = false
     
