@@ -632,279 +632,284 @@ end
         end)
     end
 
-    local function SendChatMessage(message)
-        pcall(function()
-            local textChannel = TextChatService:FindFirstChild("TextChannels")
-            if textChannel then
-                local generalChannel = textChannel:FindFirstChild("RBXGeneral")
-                if generalChannel then
-                    generalChannel:SendAsync(message, LocalPlayer)
+---comandos en el chat
+
+local function SendChatMessage(message)
+    local messageSent = false
+    
+    task.wait(0.5)
+    
+    pcall(function()
+        local textChannels = TextChatService:FindFirstChild("TextChannels")
+        if textChannels and not messageSent then
+            local generalChannel = textChannels:FindFirstChild("RBXGeneral")
+            if generalChannel then
+                generalChannel:SendAsync(message)
+                messageSent = true
+                return
+            end
+        end
+    end)
+    
+    if messageSent then return end
+    
+    pcall(function()
+        if not messageSent then
+            local defaultChat = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            if defaultChat then
+                local sayRequest = defaultChat:FindFirstChild("SayMessageRequest")
+                if sayRequest then
+                    sayRequest:FireServer(message, "All")
+                    messageSent = true
                     return
                 end
             end
-        end)
+        end
+    end)
+end
 
-        pcall(function()
-            if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
-                local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
-                if chatEvents:FindFirstChild("SayMessageRequest") then
-                    chatEvents.SayMessageRequest:FireServer(message, "All")
-                    return
-                end
-            end
-        end)
+function ProcessCommand(cmdData)
+    local message = cmdData.command
+    local senderUserId = cmdData.senderUserId
+    
+    if message:sub(1,3) == "/e " then message = message:sub(4) end
 
-        pcall(function()
-            StarterGui:SetCore("ChatMakeSystemMessage", {
-                Text = message,
-                Color = Color3.fromRGB(255, 255, 0),
-                Font = Enum.Font.GothamBold,
-                FontSize = Enum.FontSize.Size18
-            })
-        end)
+    local parts = {}
+    for word in message:gmatch("%S+") do table.insert(parts, word) end
+    
+    local prefijo = parts[1] or ""
+    local cmd = prefijo:lower()
+    local victimaInput = parts[2] and parts[2]:lower() or nil
+    local destinoOMensaje = parts[3] or nil
+
+    local function CanExecuteCommand()
+        local senderRole = GetRole(tonumber(senderUserId))
+        local myRole = GetRole(LocalPlayer.UserId)
+        
+        if myRole == "Owner" then
+            return false
+        end
+        
+        if myRole == "Admin" and senderRole == "Admin" then
+            return false
+        end
+        
+        if myRole == "Admin" and senderRole == "Owner" then
+            return true
+        end
+        
+        if myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
+            return true
+        end
+        
+        return false
     end
     
-    function ProcessCommand(cmdData)
-        local message = cmdData.command
-        local senderUserId = cmdData.senderUserId
-        
-        if message:sub(1,3) == "/e " then message = message:sub(4) end
-
-        local parts = {}
-        for word in message:gmatch("%S+") do table.insert(parts, word) end
-        
-        local prefijo = parts[1] or ""
-        local cmd = prefijo:lower()
-        local victimaInput = parts[2] and parts[2]:lower() or nil
-        local destinoOMensaje = parts[3] or nil
-
-        local function CanExecuteCommand()
-            local senderRole = GetRole(tonumber(senderUserId))
-            local myRole = GetRole(LocalPlayer.UserId)
-            
-            if myRole == "Owner" then
-                return false
-            end
-            
-            if myRole == "Admin" and senderRole == "Admin" then
-                return false
-            end
-            
-            if myRole == "Admin" and senderRole == "Owner" then
-                return true
-            end
-            
-            if myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
-                return true
-            end
-            
-            return false
-        end
-        
-        if not CanExecuteCommand() then return end
-
-        local function BuscarJugador(nombreInput)
-            if not nombreInput or #nombreInput < 3 then return nil end
-            
-            nombreInput = nombreInput:lower()
-            
-            for _, player in ipairs(Players:GetPlayers()) do
-                local username = player.Name:lower()
-                local displayname = player.DisplayName:lower()
-                
-                if username == nombreInput or displayname == nombreInput then
-                    return player
-                end
-                
-                if username:sub(1, #nombreInput) == nombreInput then
-                    return player
-                end
-                
-                if displayname:sub(1, #nombreInput) == nombreInput then
-                    return player
-                end
-            end
-            
-            return nil
-        end
-
-        local function MeAfecta()
-            if not victimaInput then return true end
-            if #victimaInput < 3 then return false end
-            
-            local myUsername = LocalPlayer.Name:lower()
-            local myDisplayName = LocalPlayer.DisplayName:lower()
-            
-            if myUsername == victimaInput or myDisplayName == victimaInput then 
-                return true 
-            end
-            
-            if myUsername:sub(1, #victimaInput) == victimaInput then 
-                return true 
-            end
-            
-            if myDisplayName:sub(1, #victimaInput) == victimaInput then 
-                return true 
-            end
-            
-            return false
-        end
-
-        if cmd == ".t" then 
-            if MeAfecta() then
-                if destinoOMensaje then
-                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
-                    if targetPlayer then
-                        TeleportToPlayer(tostring(targetPlayer.UserId))
-                    end
-                else
-                    TeleportToPlayer(senderUserId)
-                end
-            end
-            
-        elseif cmd == ".u" then
-            if MeAfecta() then
-                if destinoOMensaje then
-                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
-                    if targetPlayer then
-                        StartOrbit(tostring(targetPlayer.UserId))
-                    end
-                else
-                    StartOrbit(senderUserId)
-                end
-            end
-            
-        elseif cmd == ".uu" then 
-            if MeAfecta() then StopOrbit() end
-            
-        elseif cmd == ".w" then
-            if MeAfecta() then
-                if destinoOMensaje then
-                    local targetPlayer = BuscarJugador(destinoOMensaje:lower())
-                    if targetPlayer then
-                        WalkToPlayer(tostring(targetPlayer.UserId))
-                    end
-                else
-                    WalkToPlayer(senderUserId)
-                end
-            end
-            
-        elseif cmd == ".ww" then 
-            if MeAfecta() then StopWalking() end
-            
-        elseif cmd == ".m" then
-            if MeAfecta() then
-                local mensajeFinal = ""
-                if destinoOMensaje then
-                    for i = 3, #parts do
-                        mensajeFinal = mensajeFinal .. parts[i]
-                        if i < #parts then mensajeFinal = mensajeFinal .. " " end
-                    end
-                    SendChatMessage(mensajeFinal)
-                end
-            end
-            
-        elseif cmd == ".q" then
-            if MeAfecta() then FreezeAll() end
-            
-        elseif cmd == ".qq" then
-            if MeAfecta() then UnfreezeAll() end
-            
-        elseif cmd == ".b" then
-            if MeAfecta() then DoRandomDance(LocalPlayer) end
-            
-        elseif cmd == ".bb" then
-            if MeAfecta() then StopAllDancesOn(LocalPlayer) end
-            
-        elseif cmd == ".p" then
-            if MeAfecta() then StartEmoteSync(senderUserId) end
-            
-        elseif cmd == ".pp" then
-            if MeAfecta() then StopEmoteSync() end
-            
-        elseif cmd == ".r" then 
-            if MeAfecta() then
-                if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
-            end
-            
-        elseif cmd == ".s" then 
-            if MeAfecta() then
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then hum.Sit = true end
-                end
-            end
-            
-        elseif cmd == ".k" then 
-            if MeAfecta() then
-                LocalPlayer:Kick("Expulsado por el owner/admin")
-            end
-            
-        elseif cmd == ".sc" then 
-            if MeAfecta() then
-                local SoundService = game:GetService("SoundService")
-                local SCREAM_DURATION = 3
-                local SOUND_ID = "rbxassetid://113159710536201"
-                local IMAGES = {
-                    "rbxassetid://93669941436109",
-                    "rbxassetid://135567909583165",
-                    "rbxassetid://18394342398",
-                    "rbxassetid://8804558033",
-                    "rbxassetid://17708331218"
-                }
-                
-                local guiParent
-                pcall(function()
-                    if gethui then
-                        guiParent = gethui()
-                    else
-                        guiParent = CoreGui
-                    end
-                end)
-                if not guiParent then guiParent = CoreGui end
-                
-                if guiParent:FindFirstChild("ScreamerGui") then
-                    guiParent.ScreamerGui:Destroy()
-                end
-                
-                local gui = Instance.new("ScreenGui")
-                gui.Name = "ScreamerGui"
-                gui.IgnoreGuiInset = true
-                gui.ResetOnSpawn = false
-                gui.Parent = guiParent
-                
-                local image = Instance.new("ImageLabel")
-                image.BackgroundTransparency = 1
-                image.Size = UDim2.fromScale(1, 1)
-                image.Position = UDim2.fromScale(0.5, 0.5)
-                image.AnchorPoint = Vector2.new(0.5, 0.5)
-                image.ScaleType = Enum.ScaleType.Stretch
-                image.Image = IMAGES[math.random(#IMAGES)]
-                image.Parent = gui
-                
-                local sound = Instance.new("Sound")
-                sound.SoundId = SOUND_ID
-                sound.Volume = 10
-                sound.Looped = false
-                sound.Parent = SoundService
-                sound:Play()
-                
-                task.delay(SCREAM_DURATION, function()
-                    if sound then
-                        sound:Stop()
-                        sound:Destroy()
-                    end
-                    if gui then
-                        gui:Destroy()
-                    end
-                end)
-            end
-        end  
+    if not CanExecuteCommand() then 
+        return 
     end
 
+    local function BuscarJugador(nombreInput)
+        if not nombreInput or #nombreInput < 3 then 
+            return nil 
+        end
+        
+        nombreInput = nombreInput:lower()
+        
+        for _, player in ipairs(Players:GetPlayers()) do
+            local username = player.Name:lower()
+            local displayname = player.DisplayName:lower()
+            
+            if username == nombreInput or displayname == nombreInput then
+                return player
+            end
+            
+            if username:sub(1, #nombreInput) == nombreInput then
+                return player
+            end
+            
+            if displayname:sub(1, #nombreInput) == nombreInput then
+                return player
+            end
+        end
+        
+        return nil
+    end
 
--- Listener para el nuevo sistema de chat (TextChatService)
+    local function MeAfecta()
+        if not victimaInput then 
+            return true 
+        end
+        if #victimaInput < 3 then 
+            return false 
+        end
+        
+        local myUsername = LocalPlayer.Name:lower()
+        local myDisplayName = LocalPlayer.DisplayName:lower()
+        
+        local afecta = myUsername == victimaInput or myDisplayName == victimaInput or
+                      myUsername:sub(1, #victimaInput) == victimaInput or
+                      myDisplayName:sub(1, #victimaInput) == victimaInput
+        
+        return afecta
+    end
+
+    if cmd == ".t" then 
+        if MeAfecta() then
+            if destinoOMensaje then
+                local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                if targetPlayer then
+                    TeleportToPlayer(tostring(targetPlayer.UserId))
+                end
+            else
+                TeleportToPlayer(senderUserId)
+            end
+        end
+        
+    elseif cmd == ".u" then
+        if MeAfecta() then
+            if destinoOMensaje then
+                local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                if targetPlayer then
+                    StartOrbit(tostring(targetPlayer.UserId))
+                end
+            else
+                StartOrbit(senderUserId)
+            end
+        end
+        
+    elseif cmd == ".uu" then 
+        if MeAfecta() then StopOrbit() end
+        
+    elseif cmd == ".w" then
+        if MeAfecta() then
+            if destinoOMensaje then
+                local targetPlayer = BuscarJugador(destinoOMensaje:lower())
+                if targetPlayer then
+                    WalkToPlayer(tostring(targetPlayer.UserId))
+                end
+            else
+                WalkToPlayer(senderUserId)
+            end
+        end
+        
+    elseif cmd == ".ww" then 
+        if MeAfecta() then StopWalking() end
+        
+    elseif cmd == ".m" then
+        if MeAfecta() then
+            local mensajeFinal = ""
+            if destinoOMensaje then
+                for i = 3, #parts do
+                    mensajeFinal = mensajeFinal .. parts[i]
+                    if i < #parts then mensajeFinal = mensajeFinal .. " " end
+                end
+                
+                task.spawn(function()
+                    SendChatMessage(mensajeFinal)
+                end)
+            end
+        end
+        
+    elseif cmd == ".q" then
+        if MeAfecta() then FreezeAll() end
+        
+    elseif cmd == ".qq" then
+        if MeAfecta() then UnfreezeAll() end
+        
+    elseif cmd == ".b" then
+        if MeAfecta() then DoRandomDance(LocalPlayer) end
+        
+    elseif cmd == ".bb" then
+        if MeAfecta() then StopAllDancesOn(LocalPlayer) end
+        
+    elseif cmd == ".p" then
+        if MeAfecta() then StartEmoteSync(senderUserId) end
+        
+    elseif cmd == ".pp" then
+        if MeAfecta() then StopEmoteSync() end
+        
+    elseif cmd == ".r" then 
+        if MeAfecta() then
+            if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
+        end
+        
+    elseif cmd == ".s" then 
+        if MeAfecta() then
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Sit = true end
+            end
+        end
+        
+    elseif cmd == ".k" then 
+        if MeAfecta() then
+            LocalPlayer:Kick("Expulsado por el owner/admin")
+        end
+        
+    elseif cmd == ".sc" then 
+        if MeAfecta() then
+            local SoundService = game:GetService("SoundService")
+            local SCREAM_DURATION = 3
+            local SOUND_ID = "rbxassetid://113159710536201"
+            local IMAGES = {
+                "rbxassetid://93669941436109",
+                "rbxassetid://135567909583165",
+                "rbxassetid://18394342398",
+                "rbxassetid://8804558033",
+                "rbxassetid://17708331218"
+            }
+            
+            local guiParent
+            pcall(function()
+                if gethui then
+                    guiParent = gethui()
+                else
+                    guiParent = CoreGui
+                end
+            end)
+            if not guiParent then guiParent = CoreGui end
+            
+            if guiParent:FindFirstChild("ScreamerGui") then
+                guiParent.ScreamerGui:Destroy()
+            end
+            
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "ScreamerGui"
+            gui.IgnoreGuiInset = true
+            gui.ResetOnSpawn = false
+            gui.Parent = guiParent
+            
+            local image = Instance.new("ImageLabel")
+            image.BackgroundTransparency = 1
+            image.Size = UDim2.fromScale(1, 1)
+            image.Position = UDim2.fromScale(0.5, 0.5)
+            image.AnchorPoint = Vector2.new(0.5, 0.5)
+            image.ScaleType = Enum.ScaleType.Stretch
+            image.Image = IMAGES[math.random(#IMAGES)]
+            image.Parent = gui
+            
+            local sound = Instance.new("Sound")
+            sound.SoundId = SOUND_ID
+            sound.Volume = 10
+            sound.Looped = false
+            sound.Parent = SoundService
+            sound:Play()
+            
+            task.delay(SCREAM_DURATION, function()
+                if sound then
+                    sound:Stop()
+                    sound:Destroy()
+                end
+                if gui then
+                    gui:Destroy()
+                end
+            end)
+        end
+    end
+end
+
 pcall(function()
     local textChannels = TextChatService:FindFirstChild("TextChannels")
     if textChannels then
@@ -913,33 +918,42 @@ pcall(function()
             generalChannel.MessageReceived:Connect(function(message)
                 if message.TextSource then
                     local senderUserId = message.TextSource.UserId
+                    local text = message.Text
+                    
+                    text = text:gsub("<[^>]+>", "")
+                    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+                    
                     local senderRole = GetRole(senderUserId)
                     
-                    -- Solo procesar si el sender es Owner o Admin
                     if senderRole == "Owner" or senderRole == "Admin" then
-                        local text = message.Text
-                        if text:sub(1, 1) == "." or text:sub(1, 3) == "/e " then
-                            -- Verificar si PUEDO ejecutar este comando
+                        local isCommand = false
+                        local cleanCommand = text
+                        
+                        if text:sub(1, 3):lower() == "/e " then
+                            cleanCommand = text:sub(4):gsub("^%s+", "")
+                        end
+                        
+                        if cleanCommand:sub(1, 1) == "." then
+                            isCommand = true
+                        end
+                        
+                        if isCommand then
                             local myRole = GetRole(LocalPlayer.UserId)
                             local canExecute = false
                             
-                            -- Owner nunca ejecuta comandos de otros
                             if myRole == "Owner" then
                                 canExecute = false
-                            -- Admin solo ejecuta si el sender es Owner
                             elseif myRole == "Admin" and senderRole == "Owner" then
                                 canExecute = true
-                            -- Admin NO ejecuta comandos de otro Admin
                             elseif myRole == "Admin" and senderRole == "Admin" then
                                 canExecute = false
-                            -- Follower ejecuta comandos de Owner o Admin
                             elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
                                 canExecute = true
                             end
                             
                             if canExecute then
                                 ProcessCommand({
-                                    command = text,
+                                    command = cleanCommand,
                                     senderUserId = tostring(senderUserId)
                                 })
                             end
@@ -951,17 +965,17 @@ pcall(function()
     end
 end)
 
--- Listener para el sistema de chat antiguo (LegacyChat) - usando la misma lógica que SendChatMessage
 pcall(function()
     if ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
         local chatEvents = ReplicatedStorage.DefaultChatSystemChatEvents
         if chatEvents:FindFirstChild("OnMessageDoneFiltering") then
             chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
-                -- messageData contiene: FromSpeaker, Message, OriginalChannel, etc.
                 local senderName = messageData.FromSpeaker
                 local text = messageData.Message
                 
-                -- Buscar el jugador por nombre
+                text = text:gsub("<[^>]+>", "")
+                text = text:gsub("^%s+", ""):gsub("%s+$", "")
+                
                 local sender = nil
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player.Name == senderName then
@@ -974,30 +988,35 @@ pcall(function()
                     local senderUserId = sender.UserId
                     local senderRole = GetRole(senderUserId)
                     
-                    -- Solo procesar si el sender es Owner o Admin
                     if senderRole == "Owner" or senderRole == "Admin" then
-                        if text:sub(1, 1) == "." or text:sub(1, 3) == "/e " then
-                            -- Verificar si PUEDO ejecutar este comando
+                        local isCommand = false
+                        local cleanCommand = text
+                        
+                        if text:sub(1, 3):lower() == "/e " then
+                            cleanCommand = text:sub(4):gsub("^%s+", "")
+                        end
+                        
+                        if cleanCommand:sub(1, 1) == "." then
+                            isCommand = true
+                        end
+                        
+                        if isCommand then
                             local myRole = GetRole(LocalPlayer.UserId)
                             local canExecute = false
                             
-                            -- Owner nunca ejecuta comandos de otros
                             if myRole == "Owner" then
                                 canExecute = false
-                            -- Admin solo ejecuta si el sender es Owner
                             elseif myRole == "Admin" and senderRole == "Owner" then
                                 canExecute = true
-                            -- Admin NO ejecuta comandos de otro Admin
                             elseif myRole == "Admin" and senderRole == "Admin" then
                                 canExecute = false
-                            -- Follower ejecuta comandos de Owner o Admin
                             elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then
                                 canExecute = true
                             end
                             
                             if canExecute then
                                 ProcessCommand({
-                                    command = text,
+                                    command = cleanCommand,
                                     senderUserId = tostring(senderUserId)
                                 })
                             end
@@ -1010,11 +1029,7 @@ pcall(function()
 end)
 
 
-
-
--- ========================================
--- 🔥 SISTEMA DE AUTO-DETECCIÓN PARA FOLLOWERS
--- ========================================
+ --- SISTEMA DE AUTO-DETECCIÓN PARA FOLLOWERS
 if not isOwner and not isAdmin then
     -- 🚀 AUTO-HEARTBEAT: Envía automáticamente presencia a Owners y Admins
     task.spawn(function()
