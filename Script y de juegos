@@ -97,7 +97,7 @@ local Button4 = TPTab:CreateButton({
 local Button3 = TPTab:CreateButton({
    Name = "Dex (Pc)",
    Callback = function()
-       loadstring(game:HttpGet("https://raw.githubusercontent.com/zzerexx/Dex/refs/heads/master/main.lua"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
    end,
 })
 
