@@ -1682,45 +1682,108 @@ MainTab:CreateToggle({
 
 
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local camera = workspace.CurrentCamera
 
+-- Reconectar si respawns
+player.CharacterAdded:Connect(function(newChar)
+	character = newChar
+	humanoid = character:WaitForChild("Humanoid")
+end)
+
 local AntiAfkEnabled = false
-local AntiAfkThread
+local AntiAfkThread = nil
 
+-- Función que simula un input completo (presión + liberación)
+local function SimulateInput()
+	-- Crear objeto de input falso que simula presión de tecla
+	local inputObject = Instance.new("BindableEvent")
+
+	-- Usar ContextActionService para registrar y desregistrar una acción
+	-- Esto genera un ciclo input completo que Roblox reconoce
+	local actionId = "AAF_" .. tostring(math.random(100000))
+
+	ContextActionService:BindToAction(
+		actionId,
+		{ Enum.KeyCode.L }, -- Usar una tecla que generalmente no se usa en juegos
+		false,
+		function(actionName, actionState, inputObject)
+			-- No hacer nada, solo existe para generar el evento
+			return Enum.ContextActionResult.Sink -- "Absorber" el input para que no haga otra cosa
+		end
+	)
+
+	-- Esperar un frame para que se registre
+	task.wait(0)
+
+	-- Desregistrar inmediatamente
+	ContextActionService:UnbindAction(actionId)
+	inputObject:Destroy()
+end
+
+-- Función que resetea el idle time de múltiples formas
+local function ResetIdleTime()
+	-- Método 1: Asignar directamente (funciona en muchos casos)
+	player.IdleTime = 0
+
+	-- Método 2: Usar Chat para generar actividad interna
+	-- Escribir un mensaje vacío al chat no envía nada pero genera actividad
+	local chat = player:FindFirstChild("ChatService") 
+		or game:GetService("ChatService")
+	-- No enviar nada real, solo activar el servicio
+end
+
+-- Función que hace un movimiento físico sutil
+local function PhysicsMovement()
+	if humanoid and humanoid.Health > 0 then
+		-- Salto sutil cada vez
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+
+	-- Rotar cámara un poco
+	if camera then
+		camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(0.5), 0)
+	end
+end
+
+-- Loop principal
+local function RunAntiAfk()
+	while AntiAfkEnabled do
+		-- Ejecutar las 3 capas de anti-afk
+		ResetIdleTime()      -- Resetea contador interno
+		SimulateInput()      -- Genera evento de input real
+		PhysicsMovement()    -- Movimiento físico visible
+
+		-- Cada 20 segundos (bien antes del límite de detección)
+		task.wait(20)
+	end
+end
+
+-- Toggle
 MainTab:CreateToggle({
-    Name = "Anti-AFK OP",
-    CurrentValue = false,
-    Flag = "AntiAfkToggle",
-    Callback = function(Value)
-        AntiAfkEnabled = Value
+	Name = "Anti-AFK OP",
+	CurrentValue = false,
+	Flag = "AntiAfkToggle",
+	Callback = function(Value)
+		AntiAfkEnabled = Value
 
-        if AntiAfkEnabled then
-            AntiAfkThread = task.spawn(function()
-                while AntiAfkEnabled do
-                    -- Simular salto
-                    if humanoid and humanoid.Health > 0 then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-
-                    -- Simular rotación de cámara
-                    local camCF = camera.CFrame
-                    local rotation = CFrame.Angles(0, math.rad(1), 0) -- gira un poco a la derecha
-                    camera.CFrame = camCF * rotation
-
-                    task.wait(60) -- cada 60 segundos
-                end
-            end)
-        else
-            if AntiAfkThread then
-                task.cancel(AntiAfkThread)
-                AntiAfkThread = nil
-            end
-        end
-    end,
+		if AntiAfkEnabled then
+			AntiAfkThread = task.spawn(RunAntiAfk)
+		else
+			if AntiAfkThread then
+				task.cancel(AntiAfkThread)
+				AntiAfkThread = nil
+			end
+		end
+	end,
 })
+
 
 
 
