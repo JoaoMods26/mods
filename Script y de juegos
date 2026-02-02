@@ -45,7 +45,7 @@ local Button2 = TPTab:CreateButton({
 local Button9 = TPTab:CreateButton({
    Name = "Fly universal(Volar)",
    Callback = function()
-       loadstring(game:HttpGet("https://pastebin.com/raw/dzrGmBbw"))()
+       loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Dh-ios-fly-9769"))()
    end,
 })
 
