@@ -28,12 +28,6 @@ loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-AnimSpoofer
    end,
 })
 
-local Button24 = TPTab:CreateButton({
-   Name = "Chat Espía(JChat SpyMods)",
-   Callback = function()
-       loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Jchat-SpyMods-48758"))()
-   end,
-})
 
 local Button2 = TPTab:CreateButton({
    Name = "Infinite Yield",
@@ -149,6 +143,13 @@ local Button8 = TPTab:CreateButton({
    Name = "Remote Spy (Octo spy)",
    Callback = function()
        loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Octo-Spy/refs/heads/main/Main.lua", true))()
+   end,
+})
+
+local Button24 = TPTab:CreateButton({
+   Name = "Cobalt Remote spy",
+   Callback = function()
+       loadstring(game:HttpGet("https://github.com/notpoiu/cobalt/releases/latest/download/Cobalt.luau"))()
    end,
 })
 
