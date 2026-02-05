@@ -13,7 +13,7 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
     
     local FIREBASE_URL = "https://admxd-d6c49-default-rtdb.firebaseio.com"
-    local ownerIds = {4591285210, 9133722122}
+    local ownerIds = {4591285210, 9133722122, 9235243450}
     local adminIds = {8929351324, 9132360437}
     
     local detectedFollowers = {}
