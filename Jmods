@@ -4346,6 +4346,25 @@ TelekinesisTab:CreateButton({
 
 
 
+VoiceTab = Window:CreateTab("Voice Chat")
+
+local cargado = false
+
+VoiceTab:CreateButton({
+    Name = "Cargar AntiBan",
+    Callback = function()
+        if cargado then return end
+        cargado = true
+        
+        getgenv().VoiceTab = VoiceTab
+        getgenv().Rayfield = Rayfield
+        
+        -- Cargar script
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/asda/refs/heads/main/VC"))()
+
+    end
+})
+
 
 
 
