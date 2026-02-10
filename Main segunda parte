@@ -1681,98 +1681,138 @@ MainTab:CreateToggle({
 
 
 
+-- ANTI-AFK
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local camera = workspace.CurrentCamera
 
--- Reconectar si respawns
-player.CharacterAdded:Connect(function(newChar)
-	character = newChar
-	humanoid = character:WaitForChild("Humanoid")
-end)
+local character, humanoid, hrp
+
+local function bindCharacter(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	hrp = char:WaitForChild("HumanoidRootPart")
+end
+
+-- Conectar personaje inicial y futuras respawns
+bindCharacter(player.Character or player.CharacterAdded:Wait())
+player.CharacterAdded:Connect(bindCharacter)
 
 local AntiAfkEnabled = false
 local AntiAfkThread = nil
+local mode = "Walk" -- "Walk" o "Jump"
+local interval = 20 -- Intervalo en segundos (20s es óptimo)
+local lastAction = 0
 
--- Función que simula un input completo (presión + liberación)
+
+-- CAPA 1: Simular Input Real usando ContextActionService
 local function SimulateInput()
-	-- Crear objeto de input falso que simula presión de tecla
-	local inputObject = Instance.new("BindableEvent")
-
-	-- Usar ContextActionService para registrar y desregistrar una acción
-	-- Esto genera un ciclo input completo que Roblox reconoce
-	local actionId = "AAF_" .. tostring(math.random(100000))
-
-	ContextActionService:BindToAction(
+	local actionId = "AAF_" .. tostring(math.random(100000, 999999))
+	
+	-- Lista de teclas alternativas para no ser tan obvio
+	local keys = {
+		Enum.KeyCode.L,
+		Enum.KeyCode.K,
+		Enum.KeyCode.Semicolon,
+		Enum.KeyCode.Quote
+	}
+	
+	local randomKey = keys[math.random(1, #keys)]
+	
+	ContextActionService:BindAction(
 		actionId,
-		{ Enum.KeyCode.L }, -- Usar una tecla que generalmente no se usa en juegos
-		false,
 		function(actionName, actionState, inputObject)
-			-- No hacer nada, solo existe para generar el evento
-			return Enum.ContextActionResult.Sink -- "Absorber" el input para que no haga otra cosa
-		end
+			return Enum.ContextActionResult.Sink
+		end,
+		false,
+		randomKey
 	)
-
-	-- Esperar un frame para que se registre
+	
 	task.wait(0)
-
-	-- Desregistrar inmediatamente
 	ContextActionService:UnbindAction(actionId)
-	inputObject:Destroy()
 end
 
--- Función que resetea el idle time de múltiples formas
+-- CAPA 2: Resetear IdleTime + Activar ChatService
 local function ResetIdleTime()
-	-- Método 1: Asignar directamente (funciona en muchos casos)
+	-- Resetear directamente el contador de inactividad
 	player.IdleTime = 0
-
-	-- Método 2: Usar Chat para generar actividad interna
-	-- Escribir un mensaje vacío al chat no envía nada pero genera actividad
-	local chat = player:FindFirstChild("ChatService") 
-		or game:GetService("ChatService")
-	-- No enviar nada real, solo activar el servicio
+	
+	-- Acceder al ChatService para generar actividad interna
+	pcall(function()
+		local chat = player:FindFirstChild("ChatService") or game:GetService("ChatService")
+		-- Solo acceder, no hacer nada más
+	end)
 end
 
--- Función que hace un movimiento físico sutil
+-- CAPA 3: Movimiento Físico Real (el más importante)
 local function PhysicsMovement()
-	if humanoid and humanoid.Health > 0 then
-		-- Salto sutil cada vez
+	if not humanoid or not hrp then return end
+	if humanoid.Health <= 0 then return end
+	
+	if mode == "Walk" then
+		-- MoveTo con offset aleatorio (como el script funcional)
+		humanoid.WalkSpeed = 16
+		local offsetX = math.random(-5, 5) + math.random() -- Más natural
+		local offsetZ = math.random(-5, 5) + math.random()
+		local targetPos = hrp.Position + Vector3.new(offsetX, 0, offsetZ)
+		
+		humanoid:MoveTo(targetPos)
+		
+	elseif mode == "Jump" then
+		-- Salto simple pero efectivo
 		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 	end
-
-	-- Rotar cámara un poco
-	if camera then
-		camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(0.5), 0)
+	
+	-- Rotación de cámara sutil
+	if workspace.CurrentCamera then
+		local randomRotation = math.rad(math.random(-2, 2))
+		workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.Angles(0, randomRotation, 0)
 	end
 end
 
--- Loop principal
+-- CAPA 4: Movimiento de Mouse Virtual (extra)
+local function SimulateMouseMovement()
+	pcall(function()
+		-- Crear un pequeño delta de mouse movement
+		local connection
+		connection = RunService.RenderStepped:Connect(function()
+			connection:Disconnect()
+		end)
+	end)
+end
+
 local function RunAntiAfk()
 	while AntiAfkEnabled do
-		-- Ejecutar las 3 capas de anti-afk
-		ResetIdleTime()      -- Resetea contador interno
-		SimulateInput()      -- Genera evento de input real
-		PhysicsMovement()    -- Movimiento físico visible
-
-		-- Cada 20 segundos (bien antes del límite de detección)
-		task.wait(20)
+		-- Intervalo aleatorio para evitar patrones (15-25 segundos)
+		local randomInterval = interval + math.random(-5, 5)
+		
+		task.wait(randomInterval)
+		
+		if not AntiAfkEnabled then break end
+		
+		-- Ejecutar las 4 capas en orden
+		pcall(function()
+			ResetIdleTime()        -- Capa 2: Reseteo directo
+			SimulateInput()        -- Capa 1: Input fantasma
+			PhysicsMovement()      -- Capa 3: Movimiento real (LA MÁS IMPORTANTE)
+			SimulateMouseMovement() -- Capa 4: Mouse virtual
+		end)
+		
+		lastAction = os.clock()
 	end
 end
 
--- Toggle
 MainTab:CreateToggle({
-	Name = "Anti-AFK OP",
+	Name = "Anti-AFK Ultimate",
 	CurrentValue = false,
-	Flag = "AntiAfkToggle",
+	Flag = "AntiAfkUltimateToggle",
 	Callback = function(Value)
 		AntiAfkEnabled = Value
-
+		
 		if AntiAfkEnabled then
 			AntiAfkThread = task.spawn(RunAntiAfk)
 		else
