@@ -506,8 +506,19 @@ boton= Juegostab:CreateButton({
 
 
 boton= Juegostab:CreateButton({
+   Name = "Death Ball(JBaddiesMods)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/baddie'))()
+   end,
+})
+
+
+boton= Juegostab:CreateButton({
    Name = "Death Ball(JDeathBallMods)",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Death%20ball'))()
    end,
 })
+
+
+https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/baddie
