@@ -1683,14 +1683,20 @@ MainTab:CreateToggle({
 
 -- ANTI-AFK
 
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-
 local character, humanoid, hrp
+
+
+local AntiAfkEnabled = false
+local AntiAfkThread = nil
+local mode = "Walk"
+local interval = 20
 
 local function bindCharacter(char)
 	character = char
@@ -1698,124 +1704,103 @@ local function bindCharacter(char)
 	hrp = char:WaitForChild("HumanoidRootPart")
 end
 
--- Conectar personaje inicial y futuras respawns
-bindCharacter(player.Character or player.CharacterAdded:Wait())
-player.CharacterAdded:Connect(bindCharacter)
+-- Solo vincular personaje cuando ya existe
+if player.Character then
+	bindCharacter(player.Character)
+end
+player.CharacterAdded:Connect(function(char)
+	task.wait(0.5)
+	bindCharacter(char)
+end)
 
-local AntiAfkEnabled = false
-local AntiAfkThread = nil
-local mode = "Walk" -- "Walk" o "Jump"
-local interval = 20 -- Intervalo en segundos (20s es óptimo)
-local lastAction = 0
 
-
--- CAPA 1: Simular Input Real usando ContextActionService
 local function SimulateInput()
+	if not AntiAfkEnabled then return end
+
 	local actionId = "AAF_" .. tostring(math.random(100000, 999999))
-	
-	-- Lista de teclas alternativas para no ser tan obvio
 	local keys = {
 		Enum.KeyCode.L,
 		Enum.KeyCode.K,
 		Enum.KeyCode.Semicolon,
-		Enum.KeyCode.Quote
+		Enum.KeyCode.Quote,
 	}
-	
 	local randomKey = keys[math.random(1, #keys)]
-	
+
 	ContextActionService:BindAction(
 		actionId,
-		function(actionName, actionState, inputObject)
+		function(_, _, _)
 			return Enum.ContextActionResult.Sink
 		end,
 		false,
 		randomKey
 	)
-	
 	task.wait(0)
 	ContextActionService:UnbindAction(actionId)
 end
 
--- CAPA 2: Resetear IdleTime + Activar ChatService
+
 local function ResetIdleTime()
-	-- Resetear directamente el contador de inactividad
-	player.IdleTime = 0
-	
-	-- Acceder al ChatService para generar actividad interna
+	if not AntiAfkEnabled then return end
 	pcall(function()
-		local chat = player:FindFirstChild("ChatService") or game:GetService("ChatService")
-		-- Solo acceder, no hacer nada más
+		player.IdleTime = 0
 	end)
 end
 
--- CAPA 3: Movimiento Físico Real (el más importante)
+
 local function PhysicsMovement()
+	if not AntiAfkEnabled then return end
 	if not humanoid or not hrp then return end
 	if humanoid.Health <= 0 then return end
-	
+
 	if mode == "Walk" then
-		-- MoveTo con offset aleatorio (como el script funcional)
-		humanoid.WalkSpeed = 16
-		local offsetX = math.random(-5, 5) + math.random() -- Más natural
-		local offsetZ = math.random(-5, 5) + math.random()
+		-- Movimiento pequeño aleatorio, NO modifica WalkSpeed
+		local offsetX = math.random(-3, 3) + math.random()
+		local offsetZ = math.random(-3, 3) + math.random()
 		local targetPos = hrp.Position + Vector3.new(offsetX, 0, offsetZ)
-		
 		humanoid:MoveTo(targetPos)
-		
+
 	elseif mode == "Jump" then
-		-- Salto simple pero efectivo
 		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 	end
-	
-	-- Rotación de cámara sutil
+
+	-- Rotación de cámara mínima
 	if workspace.CurrentCamera then
-		local randomRotation = math.rad(math.random(-2, 2))
-		workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.Angles(0, randomRotation, 0)
+		local rot = math.rad(math.random(-1, 1))
+		workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.Angles(0, rot, 0)
 	end
 end
 
--- CAPA 4: Movimiento de Mouse Virtual (extra)
-local function SimulateMouseMovement()
-	pcall(function()
-		-- Crear un pequeño delta de mouse movement
-		local connection
-		connection = RunService.RenderStepped:Connect(function()
-			connection:Disconnect()
-		end)
-	end)
-end
 
 local function RunAntiAfk()
 	while AntiAfkEnabled do
-		-- Intervalo aleatorio para evitar patrones (15-25 segundos)
 		local randomInterval = interval + math.random(-5, 5)
-		
 		task.wait(randomInterval)
-		
+
 		if not AntiAfkEnabled then break end
-		
-		-- Ejecutar las 4 capas en orden
+
 		pcall(function()
-			ResetIdleTime()        -- Capa 2: Reseteo directo
-			SimulateInput()        -- Capa 1: Input fantasma
-			PhysicsMovement()      -- Capa 3: Movimiento real (LA MÁS IMPORTANTE)
-			SimulateMouseMovement() -- Capa 4: Mouse virtual
+			ResetIdleTime()
+			SimulateInput()
+			PhysicsMovement()
 		end)
-		
-		lastAction = os.clock()
 	end
 end
 
+
 MainTab:CreateToggle({
-	Name = "Anti-AFK Ultimate",
-	CurrentValue = false,
+	Name = "Anti-AFK ",
+	CurrentValue = false,         -- SIEMPRE inicia en false
 	Flag = "AntiAfkUltimateToggle",
 	Callback = function(Value)
 		AntiAfkEnabled = Value
-		
-		if AntiAfkEnabled then
-			AntiAfkThread = task.spawn(RunAntiAfk)
+
+		if Value then
+			-- Arrancar solo si no hay thread activo
+			if not AntiAfkThread then
+				AntiAfkThread = task.spawn(RunAntiAfk)
+			end
 		else
+			-- Parar el thread limpiamente
 			if AntiAfkThread then
 				task.cancel(AntiAfkThread)
 				AntiAfkThread = nil
