@@ -514,6 +514,14 @@ boton= Juegostab:CreateButton({
 
 
 boton= Juegostab:CreateButton({
+   Name = "Midnight Chasers(JMidnightMods)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Midnight%20Chasers'))()
+   end,
+})
+
+
+boton= Juegostab:CreateButton({
    Name = "Survive Overnight in a Mega Store(JSurviveMegaMods)",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Noche%20en%20una%20Mega%20Tienda'))()
