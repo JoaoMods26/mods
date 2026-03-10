@@ -88,6 +88,8 @@ local Button4 = TPTab:CreateButton({
    end,
 })
 
+
+
 local Button3 = TPTab:CreateButton({
    Name = "Dex (Pc)",
    Callback = function()
@@ -211,6 +213,12 @@ local Button19 = TPTab:CreateButton({
    end,
 })
 
+local Button20 = TPTab:CreateButton({
+   Name = "JRemotesMods",
+   Callback = function()    
+loadstring(game:HttpGet("https://pastebin.com/raw/2KhtNvg7"))()
+   end,
+})
 
 
 
