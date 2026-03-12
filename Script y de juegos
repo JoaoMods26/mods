@@ -545,3 +545,12 @@ boton= Juegostab:CreateButton({
 })
 
 
+boton= Juegostab:CreateButton({
+   Name = "AVatar Creator(JAvatarMods)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Avartarcrea'))()
+   end,
+})
+
+
+
