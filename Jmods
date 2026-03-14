@@ -903,56 +903,51 @@ end
 ---Spin
 
 local spinActive = false
-local spinSpeed = 10 -- Velocidad predeterminada del giro
+local spinSpeed = 10
 local spinAngle = 0
-
-local function toggleSpin()
-    spinActive = not spinActive
-    if spinActive then
-        Rayfield:Notify({
-            Title = "Spin Activado",
-            Content = "El giro ha comenzado.",
-            Duration = 3,
-            Image = 4483362458
-        })
-    else
-        Rayfield:Notify({
-            Title = "Spin Desactivado",
-            Content = "El giro ha sido detenido.",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-end
+local spinConnection = nil
 
 local spinToggle = MainTab:CreateToggle({
     Name = "Spin",
-    Callback = function()
-        toggleSpin()
+    CurrentValue = false,
+    Flag = "SpinToggle",
+    Callback = function(Value)
+        spinActive = Value
+
+        if Value then
+            if spinConnection then
+                spinConnection:Disconnect()
+            end
+            spinConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+                if spinActive then
+                    local character = game.Players.LocalPlayer.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        spinAngle = spinAngle + spinSpeed * dt
+                        character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+                    end
+                end
+            end)
+        else
+            if spinConnection then
+                spinConnection:Disconnect()
+                spinConnection = nil
+            end
+            spinAngle = 0
+        end
     end
 })
 
--- Slider para ajustar la velocidad del Spin
 MainTab:CreateSlider({
     Name = "Velocidad de Spin",
     Range = {1, 50},
     Increment = 1,
     Suffix = "vel",
     CurrentValue = spinSpeed,
+    Flag = "SpinSpeedSlider",
     Callback = function(value)
         spinSpeed = value
     end
 })
-
-game:GetService("RunService").Heartbeat:Connect(function(dt)
-    if spinActive then
-        local character = game.Players.LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            spinAngle = spinAngle + spinSpeed * dt
-            character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
-        end
-    end
-end)
 
 
 
