@@ -2147,7 +2147,6 @@ function ApplyOptimizations()
 end
 
 -- Guardar configuraciones originales al inicio
-SaveOriginalSettings()
 
 
 
@@ -2158,9 +2157,9 @@ MainTab:CreateToggle({
     Callback = function(state)
         fpsBoosterActive = state
         
-        if state then
-            -- Activar optimizaciones
-            ApplyOptimizations()
+if state then
+    SaveOriginalSettings()
+    ApplyOptimizations()
             
             -- Conectar evento para nuevas instancias
             if descendantConnection then
