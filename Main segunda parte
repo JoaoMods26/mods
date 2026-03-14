@@ -591,11 +591,11 @@ function Rotation.start()
         Rotation.update()
     end)
     
-    State.connections.autoRotateKeeper = Services.RunService.Heartbeat:Connect(function()
-        if State.humanoid and State.humanoid.AutoRotate then
-            State.humanoid.AutoRotate = false
-        end
-    end)
+State.connections.autoRotateKeeper = State.humanoid:GetPropertyChangedSignal("AutoRotate"):Connect(function()
+    if State.active and State.humanoid.AutoRotate then
+        State.humanoid.AutoRotate = false
+    end
+end)
     
     return true
 end
