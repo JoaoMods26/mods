@@ -827,8 +827,8 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     newCharacter:WaitForChild("Humanoid")
     UpdateCharacter(newCharacter)
     if FlyEnabled then
-        ToggleFly(false)
-        ToggleFly(true)
+        ToggleFlyVehicle(false)
+        ToggleFlyVehicle(true)
     end
 end)
 
@@ -917,7 +917,7 @@ function DestroyMobileControls()
     end
 end
 
-function ToggleFly(state)
+function ToggleFlyVehicle(state)
     if not RootPart or not Humanoid then
         return
     end
@@ -1104,12 +1104,12 @@ FlyToggle = MainTab:CreateToggle({
     Name = "Volar en Vehiculos",
     CurrentValue = false,
     Callback = function(state)
-        ToggleFly(state)
+        ToggleFlyVehicle(state)
     end
 })
 
 FlySpeedSlider = MainTab:CreateSlider({
-    Name = "Velociddad Volar en Vehiculos",
+    Name = "Velocidad Volar en Vehiculos",
     Range = {0, 1000},
     Increment = 5,
     Suffix = " Velocidad",
@@ -1118,6 +1118,7 @@ FlySpeedSlider = MainTab:CreateSlider({
         FlySpeed = value
     end
 })
+
 
 
 
