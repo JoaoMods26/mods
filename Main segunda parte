@@ -1127,13 +1127,14 @@ FlySpeedSlider = MainTab:CreateSlider({
 
 
 -- Caminar en el aire
+-- Caminar en el aire
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local isWalkingInAir = false
 local floorPart = nil
-local heartbeatConnection = nil
+local airWalkHeartbeat = nil
 
 -- Detectar si está tocando suelo REAL (no nuestra plataforma)
  function isTouchingRealGround()
@@ -1200,10 +1201,10 @@ function destroyFloor()
 end
 
 -- Limpiar la conexión
-function disconnectHeartbeat()
-    if heartbeatConnection then
-        heartbeatConnection:Disconnect()
-        heartbeatConnection = nil
+local function disconnectAirWalkHeartbeat()
+    if airWalkHeartbeat then
+        airWalkHeartbeat:Disconnect()
+        airWalkHeartbeat = nil
     end
 end
 
@@ -1217,11 +1218,11 @@ MainTab:CreateToggle({
         if isWalkingInAir then
             -- Activar caminar en el aire
             createFloor()
-            disconnectHeartbeat()
+           disconnectAirWalkHeartbeat()
             
-            heartbeatConnection = RunService.Heartbeat:Connect(function()
-                if not isWalkingInAir then
-                    disconnectHeartbeat()
+airWalkHeartbeat = RunService.Heartbeat:Connect(function()
+    if not isWalkingInAir then
+        disconnectAirWalkHeartbeat()
                     destroyFloor()
                     return
                 end
@@ -1257,7 +1258,7 @@ MainTab:CreateToggle({
             
         else
             -- Desactivar caminar en el aire
-            disconnectHeartbeat()
+disconnectAirWalkHeartbeat()
             destroyFloor()
         end
     end,
@@ -1269,7 +1270,7 @@ player.CharacterAdded:Connect(function(newChar)
     
     if isWalkingInAir then
         destroyFloor()
-        disconnectHeartbeat()
+disconnectAirWalkHeartbeat()
         task.wait(0.2)
         createFloor()
     end
@@ -1278,10 +1279,16 @@ end)
 -- Limpiar al salir del juego
 game:GetService("Players").PlayerRemoving:Connect(function(playerWhoLeft)
     if playerWhoLeft == player then
-        disconnectHeartbeat()
+disconnectAirWalkHeartbeat()
         destroyFloor()
     end
 end)
+
+
+
+
+
+
 
 
 
