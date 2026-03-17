@@ -125,160 +125,177 @@ LoadSavedTheme()
 ------
 
 
--- [[ Notificación + WHID Check - Jmods Universal ]] --
+-- [[ notificaciones Jmods Universal ]] --
 
 
 
 task.delay(0.3, function()
     local success, err = pcall(function()
-        local HttpService = game:GetService("HttpService")
-        local CoreGui = game:GetService("CoreGui")
-        local player = game.Players.LocalPlayer
-        local placeName = "Juego desconocido"
-        local ejecutador = "Desconocido"
-        local jobId = game.JobId
-        local userId = player.UserId
-        local whid = tostring(userId) .. "-" .. string.sub(jobId, 1, 8)
 
-        -- Lista de WHIDs bloqueados directamente en el script (añade los que necesites)
-        local blockedWHIDs = {
-            --["12345678-abcdef12"] = true,
-            --["otroWHID"] = true,
+
+        local WEBHOOK = "https://discord.com/api/webhooks/1477418987397710080/QXScwAa142GujFKdHtkqKWylCOzSg-8gcbbf8m_gyc5nZmRDa8FvIsZhII9Fl5WqEQ7f"
+
+        -- HWIDs bloqueados — pega aquí lo que te llega en Discord
+        local blockedHWIDs = {
+            ---["uwu"] = false,
         }
 
-        if blockedWHIDs[whid] then
-            warn("WHID bloqueado: " .. whid)
-            local hiddenUI = CoreGui:FindFirstChild("HiddenUI")
-            if hiddenUI then
-                hiddenUI:Destroy()
+
+        local HttpService = game:GetService("HttpService")
+        local CoreGui     = game:GetService("CoreGui")
+        local player      = game.Players.LocalPlayer
+        local jobId       = game.JobId
+
+        local function getHWID()
+            if gethwid then return tostring(gethwid()) end
+            if getdeviceid then return tostring(getdeviceid()) end
+            if identifyexecutor then
+                local name, ver = identifyexecutor()
+                return "exec_" .. tostring(name) .. "_" .. tostring(ver or "0")
+            end
+            return "unknown_" .. tostring(player.UserId)
+        end
+
+        local hwid = getHWID()
+
+        if blockedHWIDs[hwid] then
+            -- Destruir cualquier UI de JmodsLib en CoreGui
+            for _, obj in ipairs(CoreGui:GetChildren()) do
+                if obj:IsA("ScreenGui") or obj:IsA("Frame") then
+                    pcall(function() obj:Destroy() end)
+                end
             end
             return
         end
 
-        local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
-        local webLink = "https://www.roblox.com/games/" .. game.PlaceId
+        local placeName  = "Desconocido"
+        local ejecutador = "Desconocido"
 
         pcall(function()
             placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
         end)
 
         pcall(function()
-            ejecutador = identifyexecutor and identifyexecutor() or (getexecutorname and getexecutorname()) or "Otro"
+            if identifyexecutor then
+                local name, ver = identifyexecutor()
+                ejecutador = tostring(name) .. " v" .. tostring(ver or "?")
+            elseif getexecutorname then
+                ejecutador = tostring(getexecutorname())
+            end
         end)
 
-        -- Mapeo de códigos de país a nombres completos
+        local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
+        local webLink  = "https://www.roblox.com/games/" .. game.PlaceId
+
+
         local countryNames = {
-            AF = "Afganistán", AL = "Albania", DZ = "Argelia", AD = "Andorra", AO = "Angola",
-            AR = "Argentina", AM = "Armenia", AU = "Australia", AT = "Austria", AZ = "Azerbaiyán",
-            BS = "Bahamas", BD = "Bangladés", BE = "Bélgica", BO = "Bolivia", BR = "Brasil",
-            BG = "Bulgaria", CA = "Canadá", CL = "Chile", CN = "China", CO = "Colombia",
-            CR = "Costa Rica", HR = "Croacia", CU = "Cuba", CZ = "Chequia", DK = "Dinamarca",
-            DO = "República Dominicana", EC = "Ecuador", EG = "Egipto", SV = "El Salvador",
-            EE = "Estonia", FI = "Finlandia", FR = "Francia", GE = "Georgia", DE = "Alemania",
-            GR = "Grecia", GT = "Guatemala", HN = "Honduras", HU = "Hungría", IS = "Islandia",
-            IN = "India", ID = "Indonesia", IR = "Irán", IE = "Irlanda", IL = "Israel",
-            IT = "Italia", JP = "Japón", KZ = "Kazajistán", KR = "Corea del Sur", MX = "México",
-            MD = "Moldavia", MA = "Marruecos", NL = "Países Bajos", NZ = "Nueva Zelanda",
-            NI = "Nicaragua", NG = "Nigeria", NO = "Noruega", PA = "Panamá", PY = "Paraguay",
-            PE = "Perú", PH = "Filipinas", PL = "Polonia", PT = "Portugal", RO = "Rumanía",
-            RU = "Rusia", SA = "Arabia Saudita", RS = "Serbia", SG = "Singapur", SK = "Eslovaquia",
-            SI = "Eslovenia", ZA = "Sudáfrica", ES = "España", SE = "Suecia", CH = "Suiza",
-            TH = "Tailandia", TR = "Turquía", UA = "Ucrania", AE = "Emiratos Árabes Unidos",
-            GB = "Reino Unido", US = "Estados Unidos", UY = "Uruguay", VE = "Venezuela", VN = "Vietnam"
+            AF="Afganistán",AL="Albania",DZ="Argelia",AR="Argentina",AM="Armenia",
+            AU="Australia",AT="Austria",AZ="Azerbaiyán",BD="Bangladés",BE="Bélgica",
+            BO="Bolivia",BR="Brasil",BG="Bulgaria",CA="Canadá",CL="Chile",
+            CN="China",CO="Colombia",CR="Costa Rica",HR="Croacia",CU="Cuba",
+            CZ="Chequia",DK="Dinamarca",DO="Rep. Dominicana",EC="Ecuador",
+            EG="Egipto",SV="El Salvador",EE="Estonia",FI="Finlandia",FR="Francia",
+            GE="Georgia",DE="Alemania",GR="Grecia",GT="Guatemala",HN="Honduras",
+            HU="Hungría",IS="Islandia",IN="India",ID="Indonesia",IR="Irán",
+            IE="Irlanda",IL="Israel",IT="Italia",JP="Japón",KZ="Kazajistán",
+            KR="Corea del Sur",MX="México",MD="Moldavia",MA="Marruecos",
+            NL="Países Bajos",NZ="Nueva Zelanda",NI="Nicaragua",NG="Nigeria",
+            NO="Noruega",PA="Panamá",PY="Paraguay",PE="Perú",PH="Filipinas",
+            PL="Polonia",PT="Portugal",RO="Rumanía",RU="Rusia",SA="Arabia Saudita",
+            RS="Serbia",SG="Singapur",SK="Eslovaquia",SI="Eslovenia",ZA="Sudáfrica",
+            ES="España",SE="Suecia",CH="Suiza",TH="Tailandia",TR="Turquía",
+            UA="Ucrania",AE="Emiratos Árabes",GB="Reino Unido",US="Estados Unidos",
+            UY="Uruguay",VE="Venezuela",VN="Vietnam"
         }
 
         local country = "Desconocido"
-        local region = "Desconocido"
+        local region  = "Desconocido"
+        local ip      = "Desconocido"
 
-        local ipinfoReq = (syn and syn.request) or (http_request) or (request) or (http and http.request)
-        if ipinfoReq then
-            local ok, geoResponse = pcall(function()
-                return ipinfoReq({
-                    Url = "https://ipinfo.io/json",
-                    Method = "GET"
-                })
+        local req = (syn and syn.request) or http_request or request or (http and http.request)
+
+        if req then
+            local ok, geoRes = pcall(function()
+                return req({ Url = "https://ipinfo.io/json", Method = "GET" })
             end)
-
-            if ok and geoResponse and geoResponse.StatusCode == 200 then
-                local geoData
-                local decodeOk, decodeErr = pcall(function()
-                    geoData = HttpService:JSONDecode(geoResponse.Body)
-                end)
-                if decodeOk and geoData then
-                    local countryCode = geoData.country or "Desconocido"
-                    country = countryNames[countryCode] and (countryNames[countryCode] .. " - " .. countryCode) or countryCode
-                    region = geoData.region or "Desconocido"
+            if ok and geoRes and geoRes.StatusCode == 200 then
+                local dok, geoData = pcall(HttpService.JSONDecode, HttpService, geoRes.Body)
+                if dok and geoData then
+                    local code = geoData.country or "??"
+                    country = countryNames[code] and (countryNames[code] .. " (" .. code .. ")") or code
+                    region  = geoData.region or "Desconocido"
+                    ip      = geoData.ip or "Desconocido"
                 end
             end
         end
 
-        local folderName = "Jmods_NotifyFlag"
-        if not CoreGui:FindFirstChild(folderName) then
-            local flag = Instance.new("Folder")
-            flag.Name = folderName
-            flag.Parent = CoreGui
+        local flagName = "Jmods_NotifyFlag"
+        if CoreGui:FindFirstChild(flagName) then return end
 
-            local embedData = {
-                title = "✅ Jmods Universal",
-                color = tonumber("FFC0CB", 16),
-                thumbnail = {
-                    url = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. game.PlaceId .. "&width=420&height=420&format=png"
+        local flag = Instance.new("Folder")
+        flag.Name   = flagName
+        flag.Parent = CoreGui
+
+        local embed = {
+            title = "Jmods Universal",
+            color = 0xFFC0CB,
+            thumbnail = {
+                url = "https://www.roblox.com/asset-thumbnail/image?assetId="
+                    .. game.PlaceId .. "&width=420&height=420&format=png"
+            },
+            fields = {
+                {
+                    name  = "👤 Usuario",
+                    value = "**" .. player.Name .. "** (@" .. player.DisplayName .. ")"
+                          .. "\n🆔 UserId: `" .. player.UserId .. "`",
+                    inline = false
                 },
-                footer = {
-                    text = "Jmods Universal",
-                    icon_url = ""
+                {
+                    name  = "🔑 HWID",
+                    value = "```" .. hwid .. "```",
+                    inline = false
                 },
-                fields = { {
-                    name = "📌 Información",
-                    value = "👤 Usuario: " .. player.Name .. " @" .. player.DisplayName .. "" ..
-                            "\n🎮 Juego: " .. placeName ..
-                            "\n🧠 Ejecutador: " .. ejecutador ..
-                            "\n🆔 WHID: `" .. whid .. "`" ..
-                            "\n||🌍 País: " .. country .. "||" ..
-                            "\n||🏙️ Región: " .. region .. "||" ..
-                            "\n🕒 Hora: " .. os.date("%Y-%m-%d %H:%M:%S") ..
-                            "\n🌐 [Ver juego en la web](" .. webLink .. ")" ..
-                            "\n🔗 Unirse al servidor:\n```" .. joinLink .. "```",
+                {
+                    name  = "🎮 Juego",
+                    value = placeName
+                          .. "\n🌐 [Ver en web](" .. webLink .. ")"
+                          .. "\n🔗 Unirse:\n```" .. joinLink .. "```",
+                    inline = false
+                },
+                {
+                    name  = "🧠 Ejecutador",
+                    value = ejecutador,
                     inline = true
-                }},
-                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-            }
+                },
+                {
+                    name  = "🌍 Ubicación",
+                    value = "||País: " .. country .. "\nRegión: " .. region .. "\nIP: " .. ip .. "||",
+                    inline = true
+                },
+                {
+                    name  = "🕒 Hora",
+                    value = os.date("%Y-%m-%d %H:%M:%S"),
+                    inline = false
+                }
+            },
+            footer    = { text = "Jmods Universal • Whitelist System" },
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+        }
 
-            local jsonData = HttpService:JSONEncode({embeds = {embedData}})
+        if not req then return end
 
-            local link = "https://discord.com/api/webhooks/1477418987397710080/QXScwAa142GujFKdHtkqKWylCOzSg-8gcbbf8m_gyc5nZmRDa8FvIsZhII9Fl5WqEQ7f"
+        pcall(function()
+            req({
+                Url     = WEBHOOK,
+                Method  = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body    = HttpService:JSONEncode({ embeds = { embed } })
+            })
+        end)
 
-            local req = (syn and syn.request) or (http_request) or (request) or (http and http.request)
-            if req then
-                local ok2, resp = pcall(function()
-                    return req({
-                        Url = link,
-                        Method = "POST",
-                        Headers = {
-                            ["Content-Type"] = "application/json"
-                        },
-                        Body = jsonData
-                    })
-                end)
-                if not ok2 then
-                 --   warn("Error al enviar webhook (pcall):", resp)
-                else
-                    if resp and (resp.StatusCode == 204 or resp.StatusCode == 200) then
-                     --   warn("Webhook enviado correctamente:", resp.StatusCode)
-                    else
-                     --   warn("Respuesta webhook inesperada:", resp and resp.StatusCode or "nil")
-                    end
-                end
-            else
-             --   warn("El ejecutador no soporta requests; webhook no enviado.")
-            end
-        end
     end)
-
-    if not success then
-        -- silencioso
-    end
 end)
+
 
 
 
