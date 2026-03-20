@@ -808,6 +808,12 @@ local myUserId = tostring(LocalPlayer.UserId)
     --   · Si no hay nadie → solo re-chequea cada 30s (casi sin requests)
     --   · Owner puede forzar detección poniendo un flag en /presence/trigger
     -- ========================================
+      task.spawn(function()
+        local w = 0
+        while not myVerified and w < 10 do
+            task.wait(0.5); w = w + 0.5
+        end
+
     if not isOwner and not isAdmin then
 
         -- Estado compartido entre los loops del follower
@@ -1563,6 +1569,7 @@ local function SendHeartbeat()
 bringBtn.MouseButton1Click:Connect(function()
                     if bringButtonLocked then return end
                     bringButtonLocked = true
+                    supaRequest("send_trigger", { server_id = currentServerId })
                     supaRequest("send_bring", {
                         sender_id      = myUserId,
                         server_id      = currentServerId,
@@ -2585,4 +2592,5 @@ if isOwner then
         task.delay(1, UpdatePlayersList)
     -- cierra: if isOwner then (del ExecuteRemoteCode)
     end) -- cierra el task.spawn de la UI
+end)
 end)
