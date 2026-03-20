@@ -501,13 +501,13 @@ local myUserId = tostring(LocalPlayer.UserId)
         -- Para .m all mensaje → el mensaje empieza en parts[3]
         -- Para .t all joao / .u all joao → destino es parts[3]
 
-        local function CanExecuteCommand()
-            local senderRole = GetRole(tonumber(senderUserId))
-            local myRole = GetRole(LocalPlayer.UserId)
-            if myRole == "Owner" then return false end
-            if myRole == "Admin" and senderRole == "Admin" then return false end
-            if myRole == "Admin" and senderRole == "Owner" then return true end
-            if myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then return true end
+local function CanExecuteCommand()
+            local senderIsOwnerF = IsOwner(tonumber(senderUserId))
+            local senderIsAdminF = IsAdmin(tonumber(senderUserId))
+            if isOwner then return false end
+            if isAdmin and senderIsOwnerF then return true end
+            if isAdmin and senderIsAdminF then return false end
+            if (not isOwner and not isAdmin) and (senderIsOwnerF or senderIsAdminF) then return true end
             return false
         end
 
