@@ -736,20 +736,21 @@ local myUserId = tostring(LocalPlayer.UserId)
                         local senderUserId = message.TextSource.UserId
                         local text = message.Text
                         text = text:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", "")
-                        local senderRole = GetRole(senderUserId)
-                        if senderRole == "Owner" or senderRole == "Admin" then
+                      local senderIsOwner = IsOwner(senderUserId)
+local senderIsAdmin = IsAdmin(senderUserId)
+if senderIsOwner or senderIsAdmin then
                             local cleanCommand = text
                             if text:sub(1, 3):lower() == "/e " then
                                 cleanCommand = text:sub(4):gsub("^%s+", "")
                             end
                             if cleanCommand:sub(1, 1) == "." then
-                                local myRole = GetRole(LocalPlayer.UserId)
-                                local canExecute = false
-                                if myRole == "Owner" then canExecute = false
-                                elseif myRole == "Admin" and senderRole == "Owner" then canExecute = true
-                                elseif myRole == "Admin" and senderRole == "Admin" then canExecute = false
-                                elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then canExecute = true
+                              local canExecute = false
+                                if isOwner then canExecute = false
+                                elseif isAdmin and senderIsOwner then canExecute = true
+                                elseif isAdmin and senderIsAdmin then canExecute = false
+                                elseif (not isOwner and not isAdmin) and (senderIsOwner or senderIsAdmin) then canExecute = true
                                 end
+
                                 if canExecute then
                                     ProcessCommand({ command = cleanCommand, senderUserId = tostring(senderUserId) })
                                 end
@@ -775,19 +776,19 @@ local myUserId = tostring(LocalPlayer.UserId)
                     end
                     if sender then
                         local senderUserId = sender.UserId
-                        local senderRole = GetRole(senderUserId)
-                        if senderRole == "Owner" or senderRole == "Admin" then
+local senderIsOwner = IsOwner(senderUserId)
+                        local senderIsAdmin = IsAdmin(senderUserId)
+                        if senderIsOwner or senderIsAdmin then
                             local cleanCommand = text
                             if text:sub(1, 3):lower() == "/e " then
                                 cleanCommand = text:sub(4):gsub("^%s+", "")
                             end
                             if cleanCommand:sub(1, 1) == "." then
-                                local myRole = GetRole(LocalPlayer.UserId)
-                                local canExecute = false
-                                if myRole == "Owner" then canExecute = false
-                                elseif myRole == "Admin" and senderRole == "Owner" then canExecute = true
-                                elseif myRole == "Admin" and senderRole == "Admin" then canExecute = false
-                                elseif myRole == "Follower" and (senderRole == "Owner" or senderRole == "Admin") then canExecute = true
+                             local canExecute = false
+                                if isOwner then canExecute = false
+                                elseif isAdmin and senderIsOwner then canExecute = true
+                                elseif isAdmin and senderIsAdmin then canExecute = false
+                                elseif (not isOwner and not isAdmin) and (senderIsOwner or senderIsAdmin) then canExecute = true
                                 end
                                 if canExecute then
                                     ProcessCommand({ command = cleanCommand, senderUserId = tostring(senderUserId) })
