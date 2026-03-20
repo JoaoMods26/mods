@@ -131,7 +131,8 @@ local myUserId = tostring(LocalPlayer.UserId)
         isAdmin = (myRole == "admin")
 
         -- Llenar ownerIds y adminIds desde Supabase
-        local rolesResult = supaRequest("get_all_roles", {})
+task.wait(1)
+        local rolesResult = supaRequest("get_all_roles", {dummy = true})
         if rolesResult and rolesResult.users then
             for _, u in ipairs(rolesResult.users) do
                 if u.role == "owner" then
