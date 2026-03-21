@@ -12,8 +12,172 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
 
 
-local SUPABASE_API = "https://jmods-whitelist-api-j7i2.vercel.app"
-local API_TOKEN    = "jmods2024secreto"
+local SUPA_URL = "https://isrlwjiivnnikphhoxlo.supabase.co"
+local SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzcmx3amlpdm5uaWtwaGhveGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4Nzc5NDEsImV4cCI6MjA4OTQ1Mzk0MX0.4jpit7sdf6hvDzKx47e2-PIomI3UVBQPB4Z6aHmUujE"
+
+local function supaREST(method, table, params, body)
+    local url = SUPA_URL .. "/rest/v1/" .. table
+    if params and params ~= "" then url = url .. "?" .. params end
+    local headers = {
+        ["Content-Type"] = "application/json",
+        ["apikey"] = SUPA_KEY,
+        ["Authorization"] = "Bearer " .. SUPA_KEY,
+        ["Prefer"] = "return=representation"
+    }
+    local ok, result = pcall(function()
+        return request({ Url = url, Method = method, Headers = headers,
+            Body = body and HttpService:JSONEncode(body) or nil })
+    end)
+    if ok and result and result.Body and result.Body ~= "" and result.Body ~= "null" then
+        local dok, decoded = pcall(function() return HttpService:JSONDecode(result.Body) end)
+        if dok then return decoded end
+    end
+    return nil
+end
+
+local function getISO()
+    return os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+end
+
+local function supaRequest(action, body)
+    local myName = LocalPlayer and LocalPlayer.Name or "unknown"
+    local myPlace = game and game.PlaceId or 0
+
+    if action == "heartbeat" then
+        supaREST("POST", "jmods_heartbeats", nil, {
+            user_id = tonumber(body.user_id), username = body.username,
+            role = body.role, server_id = body.server_id,
+            place_id = tonumber(body.place_id) or 0, last_seen = getISO()
+        })
+        return { success = true }
+
+    elseif action == "get_heartbeats" then
+        local cutoff = os.time() - 30
+        local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
+        local data = supaREST("GET", "jmods_heartbeats",
+            "server_id=eq." .. body.server_id .. "&last_seen=gte." .. cutoffISO .. "&select=*")
+        return { players = data or {} }
+
+    elseif action == "send_trigger" then
+        supaREST("POST", "jmods_triggers", nil, { server_id = body.server_id })
+        return { success = true }
+
+    elseif action == "get_trigger" then
+        local cutoff = os.time() - 20
+        local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
+        local data = supaREST("GET", "jmods_triggers",
+            "server_id=eq." .. body.server_id .. "&created_at=gte." .. cutoffISO .. "&select=id&limit=1")
+        return { active = data and #data > 0 }
+
+    elseif action == "send_command" then
+        supaREST("POST", "jmods_commands", nil, {
+            sender_id = tonumber(body.sender_id), sender_role = body.sender_role,
+            server_id = body.server_id, command = body.command,
+            target = body.target or nil, executed = false
+        })
+        return { success = true }
+
+    elseif action == "get_commands" then
+        local cutoff = os.time() - 20
+        local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
+        local data = supaREST("GET", "jmods_commands",
+            "server_id=eq." .. body.server_id .. "&executed=eq.false&created_at=gte." .. cutoffISO .. "&select=*&order=created_at.asc")
+        if not data or #data == 0 then return { commands = {} } end
+        -- Validar senders contra jmods_users
+        local validData = supaREST("GET", "jmods_users",
+            "role=in.(owner,admin)&active=eq.true&select=user_id,role")
+        local validIds = {}
+        if validData then
+            for _, u in ipairs(validData) do validIds[tonumber(u.user_id)] = true end
+        end
+        local filtered = {}
+        for _, cmd in ipairs(data) do
+            if validIds[tonumber(cmd.sender_id)] then
+                table.insert(filtered, cmd)
+            end
+        end
+        return { commands = filtered }
+
+    elseif action == "ack_commands" then
+        if body.ids and #body.ids > 0 then
+            local ids = table.concat(body.ids, ",")
+            supaREST("PATCH", "jmods_commands", "id=in.(" .. ids .. ")", { executed = true })
+        end
+        return { success = true }
+
+    elseif action == "send_execution" then
+        supaREST("POST", "jmods_executions", nil, {
+            sender_id = tonumber(body.sender_id), server_id = body.server_id,
+            target = body.target, code = body.code, executed = false
+        })
+        return { success = true }
+
+    elseif action == "get_executions" then
+        local cutoff = os.time() - 20
+        local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
+        local data = supaREST("GET", "jmods_executions",
+            "executed=eq.false&created_at=gte." .. cutoffISO .. "&select=*")
+        local filtered = {}
+        if data then
+            for _, e in ipairs(data) do
+                if e.target == ".all" or
+                   (e.target == ".s" and e.server_id == body.server_id) or
+                   e.target == (body.username or myName) then
+                    table.insert(filtered, e)
+                end
+            end
+        end
+        return { executions = filtered }
+
+    elseif action == "ack_executions" then
+        if body.ids and #body.ids > 0 then
+            local ids = table.concat(body.ids, ",")
+            supaREST("PATCH", "jmods_executions", "id=in.(" .. ids .. ")", { executed = true })
+        end
+        return { success = true }
+
+    elseif action == "send_bring" then
+        supaREST("POST", "jmods_brings", nil, {
+            sender_id = tonumber(body.sender_id), server_id = body.server_id,
+            target_user_id = tonumber(body.target_user_id), executed = false
+        })
+        return { success = true }
+
+    elseif action == "get_brings" then
+        local cutoff = os.time() - 20
+        local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
+        local data = supaREST("GET", "jmods_brings",
+            "server_id=eq." .. body.server_id ..
+            "&target_user_id=eq." .. tostring(body.user_id) ..
+            "&executed=eq.false&created_at=gte." .. cutoffISO .. "&select=*")
+        return { brings = data or {} }
+
+    elseif action == "ack_brings" then
+        if body.ids and #body.ids > 0 then
+            local ids = table.concat(body.ids, ",")
+            supaREST("PATCH", "jmods_brings", "id=in.(" .. ids .. ")", { executed = true })
+        end
+        return { success = true }
+
+    elseif action == "verify_user" then
+        local data = supaREST("GET", "jmods_users",
+            "user_id=eq." .. tostring(body.user_id) .. "&active=eq.true&select=*&limit=1")
+        if not data or #data == 0 then return { verified = false } end
+        local u = data[1]
+        if u.hwid ~= body.hwid then return { verified = false, reason = "HWID no coincide" } end
+        if u.expires ~= 0 and os.time() > u.expires then
+            supaREST("PATCH", "jmods_users", "id=eq." .. u.id, { active = false })
+            return { verified = false, reason = "Expirado" }
+        end
+        return { verified = true, role = u.role, username = u.username }
+
+    elseif action == "get_all_roles" then
+        local data = supaREST("GET", "jmods_users", "active=eq.true&select=user_id,role")
+        return { users = data or {} }
+    end
+
+    return nil
+end
 
     local ownerIds  = {}
     local adminIds  = {}
