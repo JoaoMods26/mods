@@ -184,25 +184,6 @@ end
     local myRole    = "follower"
     local myVerified = false
 
-    local function supaRequest(action, body)
-        body.action = action
-        local ok, result = pcall(function()
-            return request({
-                Url    = SUPABASE_API .. "/api/jmods_rt",
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                    ["x-api-token"]  = API_TOKEN
-                },
-                Body = HttpService:JSONEncode(body)
-            })
-        end)
-        if ok and result and result.Body and result.Body ~= "" then
-            local dok, decoded = pcall(function() return HttpService:JSONDecode(result.Body) end)
-            if dok then return decoded end
-        end
-        return nil
-    end
 
 
     local detectedFollowers = {}
