@@ -243,7 +243,20 @@ local myUserId = tostring(LocalPlayer.UserId)
    -- ✅ Verificar usuario al inicio desde Supabase y llenar roles
     task.spawn(function()
         task.wait(1)
-        -- Obtener HWID real del dispositivo
+
+        -- Cargar owners/admins primero, siempre, para que el chat funcione
+        local rolesResult = supaRequest("get_all_roles", {dummy = true})
+        if rolesResult and rolesResult.users then
+            for _, u in ipairs(rolesResult.users) do
+                if u.role == "owner" then
+                    table.insert(ownerIds, tonumber(u.user_id))
+                elseif u.role == "admin" then
+                    table.insert(adminIds, tonumber(u.user_id))
+                end
+            end
+        end
+
+        -- Verificar si este jugador tiene rol owner/admin
         local hwidValue = ""
         pcall(function()
             if gethwid then
@@ -258,37 +271,41 @@ local myUserId = tostring(LocalPlayer.UserId)
             end
         end)
 
-
         local verifyResult = supaRequest("verify_user", {
             user_id = myUserId,
             hwid    = hwidValue
         })
 
-
-        if not verifyResult or not verifyResult.verified then
-            return -- no autorizado, el script se detiene silenciosamente
+        if verifyResult and verifyResult.verified then
+            myRole    = verifyResult.role or "follower"
+            isOwner   = (myRole == "owner")
+            isAdmin   = (myRole == "admin")
+        else
+            myRole  = "follower"
+            isOwner = false
+            isAdmin = false
         end
 
-        myRole     = verifyResult.role or "follower"
         myVerified = true
 
-        isOwner = (myRole == "owner")
-        isAdmin = (myRole == "admin")
-
-        -- Llenar ownerIds y adminIds desde Supabase
-task.wait(1)
-        local rolesResult = supaRequest("get_all_roles", {dummy = true})
-        if rolesResult and rolesResult.users then
-            for _, u in ipairs(rolesResult.users) do
-                if u.role == "owner" then
-                    table.insert(ownerIds, tonumber(u.user_id))
-                elseif u.role == "admin" then
-                    table.insert(adminIds, tonumber(u.user_id))
+        -- ✅ Arrancar heartbeat de owner/admin AQUI, ya con roles correctos
+        if isOwner or isAdmin then
+            task.spawn(function()
+                while true do
+                    task.wait(5)
+                    pcall(function()
+                        supaRequest("heartbeat", {
+                            user_id   = myUserId,
+                            username  = LocalPlayer.Name,
+                            role      = myRole,
+                            server_id = currentServerId,
+                            place_id  = game.PlaceId
+                        })
+                    end)
                 end
-            end
+            end)
         end
     end)
-
     -- ✅ Self-heartbeat para owners/admins via Supabase
     if isOwner or isAdmin then
         task.spawn(function()
