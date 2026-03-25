@@ -164,7 +164,19 @@ local function supaRequest(action, body)
             "user_id=eq." .. tostring(body.user_id) .. "&active=eq.true&select=*&limit=1")
         if not data or #data == 0 then return { verified = false } end
         local u = data[1]
-        if u.hwid ~= body.hwid then return { verified = false, reason = "HWID no coincide" } end
+      local hwidMatch = false
+        if u.hwids and type(u.hwids) == "table" then
+            for _, h in ipairs(u.hwids) do
+                if h == body.hwid then
+                    hwidMatch = true
+                    break
+                end
+            end
+        end
+        if not hwidMatch and u.hwid then
+            hwidMatch = (u.hwid == body.hwid)
+        end
+        if not hwidMatch then return { verified = false, reason = "HWID no coincide" } end
         if u.expires ~= 0 and os.time() > u.expires then
             supaREST("PATCH", "jmods_users", "id=eq." .. u.id, { active = false })
             return { verified = false, reason = "Expirado" }
