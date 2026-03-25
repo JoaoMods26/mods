@@ -1064,7 +1064,7 @@ local function SendHeartbeat()
                     })
                     if trigger and trigger.active then
                         pollingFast = true
-                        fastUntil = tick() + 45
+                        fastUntil = tick() + 30
                     else
                         pollingFast = false  -- ← esto es lo nuevo, apaga el fast polling si no hay trigger
                     end
