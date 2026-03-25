@@ -1070,12 +1070,11 @@ local function SendHeartbeat()
         local pollingFast = false
         local fastUntil = 0
 
-        -- Loop de trigger: siempre activo, polling cada 3s
--- Loop de trigger: siempre activo, polling cada 3s
+        -- Loop de trigger: siempre activo, polling cada 8s
         task.spawn(function()
             task.wait(8)
             while true do
-                task.wait(8)   -- ← este cámbialo a 8
+                task.wait(8)
                 pcall(function()
                     local trigger = supaRequest("get_trigger", {
                         server_id = currentServerId
@@ -1083,6 +1082,8 @@ local function SendHeartbeat()
                     if trigger and trigger.active then
                         pollingFast = true
                         fastUntil = tick() + 45
+                    else
+                        pollingFast = false  -- ← esto es lo nuevo, apaga el fast polling si no hay trigger
                     end
                 end)
             end
