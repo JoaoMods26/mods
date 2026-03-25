@@ -318,24 +318,7 @@ local myUserId = tostring(LocalPlayer.UserId)
             end)
         end
     end)
-    -- ✅ Self-heartbeat para owners/admins via Supabase
-    if isOwner or isAdmin then
-        task.spawn(function()
-            task.wait(3)
-            while true do
-                task.wait(5)
-                pcall(function()
-                    supaRequest("heartbeat", {
-                        user_id   = myUserId,
-                        username  = LocalPlayer.Name,
-                        role      = myRole,
-                        server_id = currentServerId,
-                        place_id  = game.PlaceId
-                    })
-                end)
-            end
-        end)
-    end
+
 
     local function GetPlayerByUserId(userId)
         return Players:GetPlayerByUserId(tonumber(userId))
