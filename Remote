@@ -1071,10 +1071,11 @@ local function SendHeartbeat()
         local fastUntil = 0
 
         -- Loop de trigger: siempre activo, polling cada 3s
+-- Loop de trigger: siempre activo, polling cada 3s
         task.spawn(function()
-            task.wait(3)
+            task.wait(8)
             while true do
-                task.wait(3)
+                task.wait(8)   -- ← este cámbialo a 8
                 pcall(function()
                     local trigger = supaRequest("get_trigger", {
                         server_id = currentServerId
@@ -1090,9 +1091,9 @@ local function SendHeartbeat()
         -- Loop activo: corre cuando hay trigger activo
         task.spawn(function()
             while true do
-                task.wait(0.5)
-                if not pollingFast then
-                    task.wait(0.5)
+task.wait(2)
+if not pollingFast then
+    task.wait(2)
                     continue
                 end
                 if tick() > fastUntil then
@@ -1100,7 +1101,10 @@ local function SendHeartbeat()
                     task.wait(1)
                     continue
                 end
-
+                -- HEARTBEAT cuando hay trigger activo (para aparecer en el scan del owner)
+                if (tick() - followerState.lastHeartbeat) >= 5 then
+                    SendHeartbeat()
+                end
                 -- BRINGS
                 pcall(function()
                     local brings = supaRequest("get_brings", {
@@ -1798,30 +1802,35 @@ bringBtn.MouseButton1Click:Connect(function()
         end
 
 detectBtn.MouseButton1Click:Connect(function()
-            detectBtn.Text = "📡 Enviando señal..."
-            pcall(function()
-                supaRequest("heartbeat", {
-                    user_id   = myUserId,
-                    username  = LocalPlayer.Name,
-                    role      = myRole,
-                    server_id = currentServerId,
-                    place_id  = game.PlaceId
-                })
-            end)
-            detectBtn.Text = "⏳ Esperando respuestas..."
-            task.wait(3)
-            UpdatePlayersList()
-            task.wait(1)
-            local count = 0
-            for _, child in ipairs(playersList:GetChildren()) do
-                if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
-                    count = count + 1
-                end
-            end
-            detectBtn.Text = "✓ " .. count .. " Jugadores Detectados!"
-            task.wait(1.5)
-            detectBtn.Text = "🔍 Actualizar Lista"
-        end)
+    detectBtn.Text = "📡 Enviando señal..."
+    -- Primero el trigger para despertar followers
+    pcall(function() supaRequest("send_trigger", { server_id = currentServerId }) end)
+    task.wait(0.1)
+    pcall(function() supaRequest("send_trigger", { server_id = currentServerId }) end)
+    -- Luego el heartbeat del owner (para que followers confirmen que hay owner online)
+    pcall(function()
+        supaRequest("heartbeat", {
+            user_id   = myUserId,
+            username  = LocalPlayer.Name,
+            role      = myRole,
+            server_id = currentServerId,
+            place_id  = game.PlaceId
+        })
+    end)
+    detectBtn.Text = "⏳ Esperando respuestas..."
+    task.wait(6) -- subido de 3 a 6 para que el follower tenga tiempo de responder
+    UpdatePlayersList()
+    task.wait(1)
+    local count = 0
+    for _, child in ipairs(playersList:GetChildren()) do
+        if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
+            count = count + 1
+        end
+    end
+    detectBtn.Text = "✓ " .. count .. " Jugadores Detectados!"
+    task.wait(1.5)
+    detectBtn.Text = "🔍 Actualizar Lista"
+end)
 
         -- PANEL COMANDOS
         local commandsPanel = Instance.new("Frame")
