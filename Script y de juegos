@@ -19,6 +19,12 @@ loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-JAnimacione
    end,
 })
 
+local Button24 = TPTab:CreateButton({
+   Name = "JshadersMods(Shaders)",
+   Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/shaders"))()       
+   end,
+})
 
 
 local Button24 = TPTab:CreateButton({
