@@ -1,0 +1,215 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local antiFlingEnabled = false
+local characterConnections = {}
+local playerAddedConn
+local collisionLoop
+local velocityLoop
+local savedCollisionStates = {}
+
+local MAX_VELOCITY = 17
+local MAX_ANGULAR = 15
+local MAX_POSITION_DELTA = 4 -- studs por frame máximo antes de resetear posición
+
+local cachedParts = {}
+local lastRootCFrame = nil  -- ✅ guardamos posición anterior cada frame
+
+local function buildCache(character)
+    local parts = {}
+    for _, item in pairs(character:GetDescendants()) do
+        if item:IsA("BasePart") then
+            parts[#parts + 1] = item
+        end
+    end
+    cachedParts[character] = parts
+end
+
+local function StartVelocityProtection()
+    if velocityLoop then return end
+
+    velocityLoop = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        -- ✅ Detectar movimiento de posición anormal (spin/teleport fling)
+        if lastRootCFrame then
+            local delta = (root.CFrame.Position - lastRootCFrame.Position).Magnitude
+            if delta > MAX_POSITION_DELTA then
+                -- Resetear a la posición anterior
+                root.CFrame = lastRootCFrame
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+            end
+        end
+
+        -- Clamp velocidad lineal y angular en todas las partes
+        for _, part in pairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                local vel = part.AssemblyLinearVelocity
+                if vel.Magnitude > MAX_VELOCITY then
+                    part.AssemblyLinearVelocity = vel.Unit * MAX_VELOCITY
+                end
+
+                local angVel = part.AssemblyAngularVelocity
+                if angVel.Magnitude > MAX_ANGULAR then
+                    part.AssemblyAngularVelocity = angVel.Unit * MAX_ANGULAR
+                end
+            end
+        end
+
+        -- ✅ Guardar posición actual para el próximo frame
+        -- Solo si el personaje está vivo y en el suelo/movimiento normal
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health > 0 then
+            lastRootCFrame = root.CFrame
+        end
+    end)
+end
+
+local function StopVelocityProtection()
+    if velocityLoop then
+        velocityLoop:Disconnect()
+        velocityLoop = nil
+    end
+    lastRootCFrame = nil
+end
+
+local function addConn(player, conn)
+    if not characterConnections[player] then
+        characterConnections[player] = {}
+    end
+    table.insert(characterConnections[player], conn)
+end
+
+local function SetNoCollision(character)
+    local parts = cachedParts[character]
+    if not parts then return end
+
+    for _, item in pairs(parts) do
+        if item and item.Parent then
+            if savedCollisionStates[item] == nil then
+                savedCollisionStates[item] = item.CanCollide
+            end
+            item.CanCollide = false
+        end
+    end
+end
+
+local function OnCharacterAdded(player, character)
+    if not antiFlingEnabled or player == LocalPlayer then return end
+
+    buildCache(character)
+    SetNoCollision(character)
+
+    local conn = character.DescendantAdded:Connect(function(desc)
+        if desc:IsA("BasePart") then
+            if savedCollisionStates[desc] == nil then
+                savedCollisionStates[desc] = desc.CanCollide
+            end
+            desc.CanCollide = false
+
+            if cachedParts[character] then
+                table.insert(cachedParts[character], desc)
+            end
+        end
+    end)
+
+    local removeConn = character.AncestryChanged:Connect(function()
+        if not character.Parent then
+            cachedParts[character] = nil
+        end
+    end)
+
+    addConn(player, conn)
+    addConn(player, removeConn)
+end
+
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+
+    if player.Character then
+        OnCharacterAdded(player, player.Character)
+    end
+
+    local conn = player.CharacterAdded:Connect(function(char)
+        OnCharacterAdded(player, char)
+    end)
+
+    addConn(player, conn)
+end
+
+local function EnableAntiFling()
+    if collisionLoop then return end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        setupPlayer(player)
+    end
+
+    playerAddedConn = Players.PlayerAdded:Connect(function(player)
+        setupPlayer(player)
+    end)
+
+    local timer = 0
+    collisionLoop = RunService.Stepped:Connect(function(_, dt)
+        timer += dt
+        if timer >= 0.25 then
+            timer = 0
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    SetNoCollision(player.Character)
+                end
+            end
+        end
+    end)
+
+    StartVelocityProtection()
+end
+
+local function DisableAntiFling()
+    for _, conns in pairs(characterConnections) do
+        for _, conn in pairs(conns) do
+            conn:Disconnect()
+        end
+    end
+    characterConnections = {}
+
+    if playerAddedConn then
+        playerAddedConn:Disconnect()
+        playerAddedConn = nil
+    end
+
+    if collisionLoop then
+        collisionLoop:Disconnect()
+        collisionLoop = nil
+    end
+
+    StopVelocityProtection()
+    cachedParts = {}
+
+    task.defer(function()
+        for part, originalValue in pairs(savedCollisionStates) do
+            if part and part.Parent then
+                part.CanCollide = originalValue
+            end
+        end
+        savedCollisionStates = {}
+    end)
+end
+
+ProteTab:CreateToggle({
+    Name = "Anti-Fling",
+    CurrentValue = false,
+    Callback = function(state)
+        antiFlingEnabled = state
+        if state then
+            EnableAntiFling()
+        else
+            DisableAntiFling()
+        end
+    end,
+})
