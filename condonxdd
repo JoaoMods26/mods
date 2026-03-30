@@ -11,10 +11,9 @@ local savedCollisionStates = {}
 
 local MAX_VELOCITY = 17
 local MAX_ANGULAR = 15
-local MAX_POSITION_DELTA = 4 -- studs por frame máximo antes de resetear posición
-
+local MAX_POSITION_DELTA = 4
 local cachedParts = {}
-local lastRootCFrame = nil  -- ✅ guardamos posición anterior cada frame
+local lastRootCFrame = nil 
 
 local function buildCache(character)
     local parts = {}
@@ -36,7 +35,6 @@ local function StartVelocityProtection()
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
-        -- ✅ Detectar movimiento de posición anormal (spin/teleport fling)
         if lastRootCFrame then
             local delta = (root.CFrame.Position - lastRootCFrame.Position).Magnitude
             if delta > MAX_POSITION_DELTA then
@@ -47,7 +45,6 @@ local function StartVelocityProtection()
             end
         end
 
-        -- Clamp velocidad lineal y angular en todas las partes
         for _, part in pairs(char:GetChildren()) do
             if part:IsA("BasePart") then
                 local vel = part.AssemblyLinearVelocity
@@ -62,8 +59,6 @@ local function StartVelocityProtection()
             end
         end
 
-        -- ✅ Guardar posición actual para el próximo frame
-        -- Solo si el personaje está vivo y en el suelo/movimiento normal
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         if humanoid and humanoid.Health > 0 then
             lastRootCFrame = root.CFrame
