@@ -42,8 +42,8 @@ CreditosTab:CreateParagraph({
 CreditosTab:CreateSection("Colaboradores")
 
 CreditosTab:CreateParagraph({
-    Title = "INFINITYHACK",
-    Content = "Jefe de los enanos albinos 🧑‍🦲"
+    Title = "Pepito",
+    Content = "Soy hetero 🔥"
 })
 
 
