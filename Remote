@@ -26,6 +26,9 @@ task.spawn(function()
     local isAdmin    = false
 local myUserId        = tostring(LocalPlayer.UserId)
 local currentServerId = game.JobId
+   
+   local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
+
     -- ========================================
     -- ✅ FIREBASE REQUEST (GET / PUT / DELETE / PATCH)
     -- ========================================
@@ -196,7 +199,6 @@ end)
     local lastCleanupTime = 0
     local cleanupInterval = 300 -- ✅ OPTIMIZADO: cada 5 min en lugar de 30s
 
-    local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
 
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
@@ -263,14 +265,20 @@ end)
     -- ========================================
     -- ✅ SISTEMA ADMINS (via Firebase, solo server actual)
     -- ========================================
-    if isAdmin and not isOwner then
+task.spawn(function()
+        local waited = 0
+        while not myVerified and waited < 15 do
+            task.wait(0.5)
+            waited = waited + 0.5
+        end
+        if not (isAdmin and not isOwner) then return end
 
         -- Comandos del owner → solo del server actual
         task.spawn(function()
-            local waited = 0
-            while not myVerified and waited < 15 do
+            local waited2 = 0
+            while not myVerified and waited2 < 15 do
                 task.wait(0.5)
-                waited = waited + 0.5
+                waited2 = waited2 + 0.5
             end
             while true do
                 task.wait(1)
@@ -340,7 +348,7 @@ end)
             end
         end)
 
-    end -- cierra: if isAdmin and not isOwner
+    end) -- cierra: if isAdmin and not isOwner
 
     local function GetPlayerByUserId(userId)
         return Players:GetPlayerByUserId(tonumber(userId))
@@ -1032,14 +1040,11 @@ local function SendHeartbeat()
 
 
         -- ✅ -- ✅ LOOP PRINCIPAL DEL FOLLOWER
-        task.spawn(function()
+task.spawn(function()
             task.wait(2)
+            SendHeartbeat() -- ✅ siempre al inicio, sin condición
             followerState.ownerOnline = CheckOwnerOnline()
             followerState.lastOnlineCheck = tick()
-
-            if followerState.ownerOnline then
-                SendHeartbeat()
-            end
 
             while true do
                 local now = tick()
