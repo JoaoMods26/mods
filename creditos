@@ -38,13 +38,14 @@ CreditosTab:CreateParagraph({
     Content = "No asi esta bien"
 })
 
+CreditosTab:CreateParagraph({
+    Title = "NullModder",
+    Content = "El creador mas perron de scripts!"
+})
+
 -- Colaboradores
 CreditosTab:CreateSection("Colaboradores")
 
-CreditosTab:CreateParagraph({
-    Title = "Pepito",
-    Content = "Soy hetero 🔥"
-})
 
 
 
