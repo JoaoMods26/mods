@@ -1,1184 +1,355 @@
-----JUGADORES---
-JugadoresTab = Window:CreateTab("Jugadores")
-JugadoresTab:CreateSection("Acciones")
+local fg = false
+local forceStop = false
+local loopFlingTargets = {}
+local kaOn = false
 
+local spdVal = 16
+local jmpVal = 50
 
--- Variables globales necesarias
-local selectedPlayer = nil
-local aimlockEnabled = false
-local aimlockConnection
-local orbitConnection
-local sitConnection
-local followConnection
-local isSitting = false
-local orbitSpeed = 20
-local orbitDistance = 10
-local followOffsetZ = 5
-local orbitEnabled = false
-local followEnabled = false
-local doggyEnabled = false
-local doggyConnection
-local doggyAnimId = 13694096724
-local doggyAnimTime = 2.6
-local doggySpeed = 1 -- Velocidad fija para el movimiento doggy
-local doggyDirection = 1
-local doggyCurrentDistance = 2.7
-local doggyTargetDistance = 4
+function safeDC(cn)
+    if cn then pcall(function() cn:Disconnect() end) end
+    return nil
+end
 
--- Variables globales necesarias
-local pataEnabled = false
-local pataConnection
-local pataAnimId = 18526288497
-local pataAnimTime = 2.44
-local pataSpeed = 1 -- Velocidad fija para el movimiento pata
-local pataDirection = 1
-local pataCurrentDistance = 3
-local pataTargetDistance = 4
+function safeChar()
+    local c = game.Players.LocalPlayer.Character
+    if not c or not c.Parent then return nil, nil, nil end
+    return c, c:FindFirstChild("HumanoidRootPart"), c:FindFirstChildOfClass("Humanoid")
+end
 
--- Variables globales necesarias
-local cariEnabled = false
-local cariConnection
-local cariAnimId = 15679624464
-local cariAnimTime = 2.6
-local cariSpeed = 5-- Velocidad fija para el movimiento cari
-local cariDirection = 1
-local cariCurrentDistance = 2.7
-local cariTargetDistance = 4
+function predictPosition(targetRoot, lookahead)
+    lookahead = lookahead or 0.18
+    local vel = targetRoot.AssemblyLinearVelocity
+    return targetRoot.Position + vel * lookahead
+end
 
--- Variables globales necesarias
-local wataEnabled = false
-local wataConnection
-local wataAnimId = 12992262118
-local wataAnimTime = 5.6
-local wataSpeed = 5 -- Velocidad fija para el movimiento Wata
-local wataDirection = 1
-local wataCurrentDistance = 2
-local wataTargetDistance = 3
-local savedCollisions = {}
+function safeReturnTo(h, hu, originCF, omh, ohh)
+    if not h or not h.Parent then return end
 
--- Función para controlar la colisión
-local function SetNoCollision(char, state)
-    if state then
-        -- Guardar estado original
-        savedCollisions[char] = {}
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                savedCollisions[char][part] = part.CanCollide
-                part.CanCollide = false
-            end
-        end
-    else
-        -- Restaurar el estado original
-        if savedCollisions[char] then
-            for part, original in pairs(savedCollisions[char]) do
-                if part and part:IsA("BasePart") then
-                    part.CanCollide = original
-                end
-            end
-            savedCollisions[char] = nil
-        end
+    h.Anchored = true
+    h.AssemblyLinearVelocity = Vector3.zero
+    h.AssemblyAngularVelocity = Vector3.zero
+    h.CFrame = originCF
+
+    task.wait(0.05)
+
+    h.CFrame = originCF
+    h.AssemblyLinearVelocity = Vector3.zero
+    h.AssemblyAngularVelocity = Vector3.zero
+
+    task.wait(0.05)
+
+    h.Anchored = false
+
+    if hu and hu.Parent then
+        hu.MaxHealth = omh
+        hu.Health = omh
+        hu.WalkSpeed = spdVal
+        hu.UseJumpPower = true
+        hu.JumpPower = jmpVal
+        hu.HipHeight = ohh
+        hu.PlatformStand = false
+        hu.AutoRotate = true
+        pcall(function() hu:ChangeState(Enum.HumanoidStateType.GettingUp) end)
     end
 end
 
--- Función para ejecutar el Wata
-local function PlayWata(target)
-    if not target or not target.Character then return end
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local root = char:WaitForChild("HumanoidRootPart")
-    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
-    if not humanoid or not root or not targetRoot then return end
-
-    -- Animación Wata
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://" .. wataAnimId
-    local track = humanoid:LoadAnimation(anim)
-    track:Play()
-    track.TimePosition = wataAnimTime
-    track:AdjustSpeed(0)
-
-    humanoid.AutoRotate = false
-    humanoid.WalkSpeed = 0
-    humanoid.JumpPower = 0
-    SetNoCollision(char, true)
-
-    -- Ciclo de movimiento hacia adelante y atrás
-    wataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-        if not targetRoot.Parent then return end
-
-        -- Ajustar distancia
-        wataCurrentDistance = wataCurrentDistance + (wataSpeed * wataDirection * game:GetService("RunService").Heartbeat:Wait())
-
-        -- Cambiar dirección si se alcanza la distancia máxima o mínima
-        if wataCurrentDistance >= wataTargetDistance then
-            wataDirection = -1
-        elseif wataCurrentDistance <= 1.2 then
-            wataDirection = 1
-        end
-
-        -- Posicionar al jugador enfrente del objetivo y mirando hacia él
-        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * wataCurrentDistance + Vector3.new(0, 0.23, 0)
-        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
-    end)
-end
-
--- Función para detener el Wata
-local function StopWata()
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChild("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-
-    if wataConnection then
-        wataConnection:Disconnect()
-        wataConnection = nil
+function fling(t)
+    if fg or forceStop then return end
+    if not t then
+        Rayfield:Notify({Title = "Error", Content = "No hay jugador seleccionado!", Duration = 2, Image = 4483362458})
+        return
+    end
+    local tc = t.Character
+    if not tc or not tc.Parent then
+        Rayfield:Notify({Title = "Error", Content = "El jugador no tiene personaje!", Duration = 2, Image = 4483362458})
+        return
     end
 
-    if humanoid then
-        humanoid.AutoRotate = true
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        for _, track in humanoid:GetPlayingAnimationTracks() do
-            if tostring(track.Animation.AnimationId):find(tostring(wataAnimId)) then
-                track:Stop()
-            end
-        end
-    end
-
-    if char then
-        SetNoCollision(char, false)
-    end
-end
-
-
--- Función para controlar la colisión
-local function SetNoCollision(char, state)
-    if state then
-        -- Guardar estado original
-        savedCollisions[char] = {}
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                savedCollisions[char][part] = part.CanCollide
-                part.CanCollide = false
-            end
-        end
-    else
-        -- Restaurar el estado original
-        if savedCollisions[char] then
-            for part, original in pairs(savedCollisions[char]) do
-                if part and part:IsA("BasePart") then
-                    part.CanCollide = original
-                end
-            end
-            savedCollisions[char] = nil
-        end
-    end
-end
-
--- Función para ejecutar el Cari
-local function PlayCari(target)
-    if not target or not target.Character then return end
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local root = char:WaitForChild("HumanoidRootPart")
-    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
-    if not humanoid or not root or not targetRoot then return end
-
-    -- Animación Cari
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://" .. cariAnimId
-    local track = humanoid:LoadAnimation(anim)
-    track:Play()
-    track.TimePosition = cariAnimTime
-    track:AdjustSpeed(0)
-
-    humanoid.AutoRotate = false
-    humanoid.WalkSpeed = 0
-    humanoid.JumpPower = 0
-    SetNoCollision(char, true)
-
-    -- Ciclo de movimiento hacia adelante y atrás
-    cariConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-        if not targetRoot.Parent then return end
-
-        -- Ajustar distancia
-        cariCurrentDistance = cariCurrentDistance + (cariSpeed * cariDirection * game:GetService("RunService").Heartbeat:Wait())
-
-        -- Cambiar dirección si se alcanza la distancia máxima o mínima
-        if cariCurrentDistance >= cariTargetDistance then
-            cariDirection = -1
-        elseif cariCurrentDistance <= 1.2 then
-            cariDirection = 1
-        end
-
-        -- Posicionar al jugador detrás del objetivo y mirando hacia él
-        local offsetPosition = targetRoot.Position - targetRoot.CFrame.LookVector * cariCurrentDistance + Vector3.new(0, 0.23, 0)
-        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
-    end)
-end
-
--- Función para detener el Cari
-local function StopCari()
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChild("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-
-    if cariConnection then
-        cariConnection:Disconnect()
-        cariConnection = nil
-    end
-
-    if humanoid then
-        humanoid.AutoRotate = true
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        for _, track in humanoid:GetPlayingAnimationTracks() do
-            if tostring(track.Animation.AnimationId):find(tostring(cariAnimId)) then
-                track:Stop()
-            end
-        end
-    end
-
-    if char then
-        SetNoCollision(char, false)
-    end
-end
-
-
--- Función para encontrar jugador por nombre parcial o DisplayName
-local function findPlayerByPartialName(name)
-    name = name:lower()
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        local usernameMatch = player.Name:lower():sub(1, #name) == name
-        local displaynameMatch = player.DisplayName:lower():sub(1, #name) == name
-        if usernameMatch or displaynameMatch then
-            return player
-        end
-    end
-end
-
-
-
--- Función para controlar la colisión
- function SetNoCollision(char, state)
-    if state then
-        -- Guardar estado original
-        savedCollisions[char] = {}
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                savedCollisions[char][part] = part.CanCollide
-                part.CanCollide = false
-            end
-        end
-    else
-        -- Restaurar el estado original
-        if savedCollisions[char] then
-            for part, original in pairs(savedCollisions[char]) do
-                if part and part:IsA("BasePart") then
-                    part.CanCollide = original
-                end
-            end
-            savedCollisions[char] = nil
-        end
-    end
-end
-
--- Función para ejecutar el Pata
- function PlayPata(target)
-    if not target or not target.Character then return end
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local root = char:WaitForChild("HumanoidRootPart")
-    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
-    if not humanoid or not root or not targetRoot then return end
-
-    -- Animación Pata
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://" .. pataAnimId
-    local track = humanoid:LoadAnimation(anim)
-    track:Play()
-    track.TimePosition = pataAnimTime
-    track:AdjustSpeed(0)
-
-    humanoid.AutoRotate = false
-    humanoid.WalkSpeed = 0
-    humanoid.JumpPower = 0
-    SetNoCollision(char, true)
-
-    -- Ciclo de movimiento hacia adelante y atrás
-    pataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-        if not targetRoot.Parent then return end
-
-        -- Ajustar distancia
-        pataCurrentDistance = pataCurrentDistance + (pataSpeed * pataDirection * game:GetService("RunService").Heartbeat:Wait())
-
-        -- Cambiar dirección si se alcanza la distancia máxima o mínima
-        if pataCurrentDistance >= pataTargetDistance then
-            pataDirection = -1
-        elseif pataCurrentDistance <= 2.7 then
-            pataDirection = 1
-        end
-
-        -- Posicionar al jugador
-        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * pataCurrentDistance + Vector3.new(0, 0.23, 0)
-        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
-    end)
-end
-
--- Función para detener el Pata
- function StopPata()
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChild("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-
-    if pataConnection then
-        pataConnection:Disconnect()
-        pataConnection = nil
-    end
-
-    if humanoid then
-        humanoid.AutoRotate = true
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        for _, track in humanoid:GetPlayingAnimationTracks() do
-            if tostring(track.Animation.AnimationId):find(tostring(pataAnimId)) then
-                track:Stop()
-            end
-        end
-    end
-
-    if char then
-        SetNoCollision(char, false)
-    end
-end
-
-
--- Función para controlar la colisión
- function SetNoCollision(char, state)
-    if state then
-        -- Guardar estado original
-        savedCollisions[char] = {}
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                savedCollisions[char][part] = part.CanCollide
-                part.CanCollide = false
-            end
-        end
-    else
-        -- Restaurar el estado original
-        if savedCollisions[char] then
-            for part, original in pairs(savedCollisions[char]) do
-                if part and part:IsA("BasePart") then
-                    part.CanCollide = original
-                end
-            end
-            savedCollisions[char] = nil
-        end
-    end
-end
--- Función para ejecutar el Doggy
- function PlayDoggy(target)
-    if not target or not target.Character then return end
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local root = char:WaitForChild("HumanoidRootPart")
-    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
-    if not humanoid or not root or not targetRoot then return end
-
-    -- Animación Doggy
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://" .. doggyAnimId
-    local track = humanoid:LoadAnimation(anim)
-    track:Play()
-    track.TimePosition = doggyAnimTime
-    track:AdjustSpeed(0)
-
-    humanoid.AutoRotate = false
-    humanoid.WalkSpeed = 0
-    humanoid.JumpPower = 0
-    SetNoCollision(char, true)
-
-    -- Ciclo de movimiento hacia adelante y atrás
-    doggyConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-        if not targetRoot.Parent then return end
-
-        -- Ajustar distancia
-        doggyCurrentDistance = doggyCurrentDistance + (doggySpeed * doggyDirection * game:GetService("RunService").Heartbeat:Wait())
-
-        -- Cambiar dirección si se alcanza la distancia máxima o mínima
-        if doggyCurrentDistance >= doggyTargetDistance then
-            doggyDirection = -1
-        elseif doggyCurrentDistance <= 2.7 then
-            doggyDirection = 1
-        end
-
-        -- Posicionar al jugador
-        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * doggyCurrentDistance + Vector3.new(0, 0.23, 0)
-        root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
-    end)
-end
-
--- Función para detener el Doggy
- function StopDoggy()
-    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChild("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-
-    if doggyConnection then
-        doggyConnection:Disconnect()
-        doggyConnection = nil
-    end
-
-    if humanoid then
-        humanoid.AutoRotate = true
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        for _, track in humanoid:GetPlayingAnimationTracks() do
-            if tostring(track.Animation.AnimationId):find(tostring(doggyAnimId)) then
-                track:Stop()
-            end
-        end
-    end
-
-    if char then
-        SetNoCollision(char, false)
-    end
-end
-
--- Input de nombre de jugador
-JugadoresTab:CreateInput({
-    Name = "Nombre del Jugador",
-    PlaceholderText = "Ej. juan, maria...",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local player = findPlayerByPartialName(text)
-        if player then
-            selectedPlayer = player
-            Rayfield:Notify({
-                Title = "Jugador Seleccionado",
-                Content = player.Name .. " ha sido seleccionado.",
-                Duration = 3,
-                Image = 4483362458
-            })
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "No se encontró el jugador.",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end
-})
-
------Boton crear herramienta-------
-local selectorTool = nil
-local isToolActive = false
-
--- Función para crear la herramienta de selección
-local function CreateSelectorTool()
-    -- Eliminar herramienta existente si existe
-    if selectorTool then
-        selectorTool:Destroy()
-        selectorTool = nil
-    end
-    
-    -- Crear nueva herramienta
-    selectorTool = Instance.new("Tool")
-    selectorTool.Name = "Selector de Jugadores"
-    selectorTool.RequiresHandle = false
-    
-    -- Crear el handle (opcional, para visualización)
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(0.2, 0.2, 1)
-    handle.Material = Enum.Material.Neon
-    handle.BrickColor = BrickColor.new("Bright blue")
-    handle.CanCollide = false
-    handle.Parent = selectorTool
-    
-    -- Función cuando se hace clic con la herramienta
-    selectorTool.Activated:Connect(function()
-        local player = game.Players.LocalPlayer
-        local mouse = player:GetMouse()
-        
-        -- Verificar si el mouse está apuntando a un jugador
-        if mouse.Target and mouse.Target.Parent then
-            local targetCharacter = mouse.Target.Parent
-            local targetPlayer = nil
-            
-            -- Buscar si el objeto clickeado pertenece a un jugador
-            for _, plr in ipairs(game.Players:GetPlayers()) do
-                if plr.Character == targetCharacter then
-                    targetPlayer = plr
-                    break
-                end
-            end
-            
-            -- Si encontramos un jugador, actualizarlo
-            if targetPlayer and targetPlayer ~= player then
-                selectedPlayer = targetPlayer
-                
-                -- Notificación de éxito
-                Rayfield:Notify({
-                    Title = "Jugador Seleccionado",
-                    Content = targetPlayer.DisplayName .. " (" .. targetPlayer.Name .. ") ha sido seleccionado.",
-                    Duration = 3,
-                    Image = 4483362458
-                })
-                
-                -- Opcional: Desequipar la herramienta automáticamente
-                selectorTool.Parent = player.Backpack
-            else
-                -- Notificación si no es un jugador válido
-                Rayfield:Notify({
-                    Title = "Error",
-                    Content = "No has clickeado en un jugador válido.",
-                    Duration = 2,
-                    Image = 4483362458
-                })
-            end
-        end
-    end)
-    
-    -- Cuando se equipa la herramienta
-    selectorTool.Equipped:Connect(function()
-        Rayfield:Notify({
-            Title = "Herramienta Equipada",
-            Content = "Haz click en cualquier jugador para seleccionarlo.",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end)
-    
-    -- Cuando se desequipa la herramienta
-    selectorTool.Unequipped:Connect(function()
-        Rayfield:Notify({
-            Title = "Herramienta Guardada",
-            Content = "Selector de jugadores guardado en el inventario.",
-            Duration = 2,
-            Image = 4483362458
-        })
-    end)
-    
-    return selectorTool
-end
-
--- Botón para crear/dar la herramienta de selección
-JugadoresTab:CreateButton({
-    Name = "Herramienta Selector",
-    Callback = function()
-        local player = game.Players.LocalPlayer
-        
-        -- Crear la herramienta
-        local tool = CreateSelectorTool()
-        
-        -- Darle la herramienta al jugador
-        tool.Parent = player.Backpack
-        
-        Rayfield:Notify({
-            Title = "Herramienta Creada",
-            Content = "Revisa tu inventario y equipa el 'Selector de Jugadores'.",
-            Duration = 4,
-            Image = 4483362458
-        })
-    end
-})
-
-
-local espectando = false
-local cameraSubjectBackup
-
-JugadoresTab:CreateToggle({
-    Name = "Espectar",
-    CurrentValue = false,
-    Callback = function(Value)
-        local camera = workspace.CurrentCamera
-        local localPlayer = game.Players.LocalPlayer
-
-        if Value then
-            if selectedPlayer and selectedPlayer.Character then
-                cameraSubjectBackup = camera.CameraSubject
-                camera.CameraSubject = selectedPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-                espectando = true
-            end
-        else
-            if localPlayer and localPlayer.Character then
-                camera.CameraSubject = localPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-                espectando = false
-
-            end
-        end
-    end
-})
-
-
-
-
-
--- Teleportarse
-JugadoresTab:CreateButton({
-    Name = "Teleportarse",
-    Callback = function()
-        if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = selectedPlayer.Character.HumanoidRootPart.Position
-            game.Players.LocalPlayer.Character:MoveTo(targetPos)
-        end
-    end
-})
-
-
-
--- Función para guardar y restaurar colisiones
- function SaveCollisions(char)
-    savedCollisions[char] = {}
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            savedCollisions[char][part] = part.CanCollide
-        end
-    end
-end
-
- function RestoreCollisions(char)
-    if savedCollisions[char] then
-        for part, original in pairs(savedCollisions[char]) do
-            if part and part:IsA("BasePart") then
-                part.CanCollide = original
-            end
-        end
-        savedCollisions[char] = nil
-    end
-end
-
--- Sliders para órbita (ya existentes)
-JugadoresTab:CreateSlider({
-    Name = "Velocidad de Órbita",
-    Range = {1, 200},
-    Increment = 1,
-    Suffix = "vel",
-    CurrentValue = orbitSpeed,
-    Callback = function(value)
-        orbitSpeed = value
-    end
-})
-
-JugadoresTab:CreateSlider({
-    Name = "Distancia de Órbita",
-    Range = {1, 40},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = orbitDistance,
-    Callback = function(value)
-        orbitDistance = value
-    end
-})
-
--- Toggle para activar/desactivar órbita (ya existente)
-JugadoresTab:CreateToggle({
-    Name = "Órbita (girar alrededor del jugador)",
-    CurrentValue = false,
-    Callback = function(value)
-        orbitEnabled = value
-        if orbitConnection then
-            orbitConnection:Disconnect()
-            orbitConnection = nil
-        end
-
-        if orbitEnabled and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local targetHRP = selectedPlayer.Character.HumanoidRootPart
-            local localChar = game.Players.LocalPlayer.Character
-            local angle = 0
-
-            -- Guardar colisiones antes de activar la órbita
-            SaveCollisions(localChar)
-            
-            orbitConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-                if localChar and localChar:FindFirstChild("HumanoidRootPart") then
-                    angle = angle + orbitSpeed * dt
-                    local offset = Vector3.new(math.cos(angle) * orbitDistance, 0, math.sin(angle) * orbitDistance)
-                    local newPos = targetHRP.Position + offset
-                    local hrp = localChar.HumanoidRootPart
-                    hrp.CFrame = CFrame.new(newPos, targetHRP.Position)
-                end
-            end)
-
-            -- Desactivar colisiones para la órbita
-            for _, part in pairs(localChar:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
+    fg = true
+    Rayfield:Notify({Title = "Fling", Content = "Flinging " .. t.DisplayName, Duration = 2, Image = 4483362458})
+
+    task.spawn(function()
+        local ok = pcall(function()
+            local c, h, hu = safeChar()
+            if not h or not hu then fg = false return end
+
+            local originCF = h.CFrame
+            local omh = hu.MaxHealth
+            local ohh = hu.HipHeight
+
+            local targetStartPos = nil
+            local th0 = t.Character and (t.Character:FindFirstChild("HumanoidRootPart") or t.Character:FindFirstChild("Torso"))
+            if th0 then targetStartPos = th0.Position end
+
+            local pp, pts = {}, {}
+
+            for _, v in c:GetDescendants() do
+                if v:IsA("BasePart") then
+                    table.insert(pts, v)
+                    pp[v] = {v.CustomPhysicalProperties, v.Massless, v.CanCollide}
+                    v.CustomPhysicalProperties = PhysicalProperties.new(9999, 0, 0, 0, 0)
+                    v.Massless = false
+                elseif v:IsA("BodyMover") or v:IsA("BodyVelocity") or v:IsA("BodyGyro") or
+                       v:IsA("BodyPosition") or v:IsA("BodyForce") or v:IsA("LinearVelocity") or
+                       v:IsA("AngularVelocity") or v:IsA("AlignPosition") or v:IsA("VectorForce") then
+                    pcall(v.Destroy, v)
                 end
             end
 
-
-        elseif not orbitEnabled then
-            local localChar = game.Players.LocalPlayer.Character
-            if localChar and localChar:FindFirstChild("HumanoidRootPart") then
-                local safePos = localChar.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
-                localChar.HumanoidRootPart.CFrame = CFrame.new(safePos)
-
-                -- Restaurar las colisiones originales
-                RestoreCollisions(localChar)
-            end
-
-
-        end
-    end
-})
-
-
-
-
-
-
-
-local sitToggle = false
-local isSitting = false
-local originalStats = {}
-
-local function clearAlign(localChar)
-    if not localChar then return end
-    local root = localChar:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    for _, v in ipairs(root:GetChildren()) do
-        if v:IsA("AlignPosition") or v:IsA("AlignOrientation") or v:IsA("Attachment") then
-            v:Destroy()
-        end
-    end
-end
-
-JugadoresTab:CreateToggle({
-    Name = "Sentarse en la cabeza",
-    Default = false,
-    Callback = function(state)
-        local player = game.Players.LocalPlayer
-        if not player then return end
-        local localChar = player.Character
-        if not localChar then return end
-
-        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-        local root = localChar:FindFirstChild("HumanoidRootPart")
-
-        if not humanoid or not root then return end
-        sitToggle = state
-
-        -- ACTIVAR
-        if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
-            local head = selectedPlayer.Character.Head
-            if not head then return end
-
-            -- guardar stats originales
-            originalStats = {
-                WalkSpeed = humanoid.WalkSpeed,
-                JumpPower = humanoid.JumpPower,
-                JumpHeight = humanoid.JumpHeight
+            local deadStates = {
+                Enum.HumanoidStateType.Dead, Enum.HumanoidStateType.FallingDown,
+                Enum.HumanoidStateType.Ragdoll, Enum.HumanoidStateType.Physics
             }
+            for _, s in ipairs(deadStates) do pcall(function() hu:SetStateEnabled(s, false) end) end
 
-            clearAlign(localChar)
-
-            -- TP inmediato arriba de la cabeza
-            root.CFrame = head.CFrame * CFrame.new(0, 1, 0)
-
-            -- Bloquear totalmente
-            humanoid.Sit = true
-            humanoid.WalkSpeed = 0
-            humanoid.JumpPower = 0
-            humanoid.JumpHeight = 0
-            humanoid:ChangeState(Enum.HumanoidStateType.Seated)
-
-            -- Desactivar salto/caída
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-
-            -- Crear attachments
-            local rootAttachment = Instance.new("Attachment", root)
-            local headAttachment = Instance.new("Attachment", head)
-            headAttachment.Position = Vector3.new(0, 1, 0)
-
-            local alignPos = Instance.new("AlignPosition")
-            alignPos.Attachment0 = rootAttachment
-            alignPos.Attachment1 = headAttachment
-            alignPos.RigidityEnabled = true
-            alignPos.Responsiveness = math.huge
-            alignPos.MaxForce = math.huge
-            alignPos.Parent = root
-
-            local alignOri = Instance.new("AlignOrientation")
-            alignOri.Attachment0 = rootAttachment
-            alignOri.Attachment1 = headAttachment
-            alignOri.RigidityEnabled = true
-            alignOri.Responsiveness = math.huge
-            alignOri.MaxTorque = math.huge
-            alignOri.Parent = root
-
-            isSitting = true
-
-        -- DESACTIVAR
-elseif not sitToggle then
-    if localChar and localChar.Parent then
-        clearAlign(localChar)
-
-        if humanoid and humanoid.Parent then
-            -- restaurar stats originales si existen
-            if originalStats.WalkSpeed then
-                humanoid.WalkSpeed = originalStats.WalkSpeed
-                humanoid.JumpPower = originalStats.JumpPower
-                humanoid.JumpHeight = originalStats.JumpHeight
-            else
-                humanoid.WalkSpeed = 16
-                humanoid.JumpPower = 50
-                humanoid.JumpHeight = 7.2
-            end
-
-            if humanoid.Health > 0 then
-                humanoid.Sit = false
-                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Standing) end)
-            end
-
-            -- reactivar salto/caída
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-        end
-
-        if root and root.Parent then
-            -- levantar un poco para evitar trabarse
-            pcall(function()
-                root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
+            hu.MaxHealth = math.huge
+            hu.Health = math.huge
+            local hpC = hu.HealthChanged:Connect(function()
+                if hu and hu.Parent then hu.Health = math.huge end
             end)
-        end
-    end
 
-    isSitting = false
-end
+            hu.WalkSpeed = 0
+            hu.JumpPower = 0
+            hu.PlatformStand = true
+            hu.HipHeight = 0
+            hu.AutoRotate = false
 
-    end
-})
+            local done, stT, cnt = false, tick(), 0
+            local SPD = 9e4
+            local successFling = false
 
-
-
-
-
-
-
-
-
-
-
-
--- Toggle para activar/desactivar Doggy
-JugadoresTab:CreateToggle({
-    Name = "Movimiento de boca",
-    CurrentValue = false,
-    Callback = function(value)
-        doggyEnabled = value
-
-        if doggyEnabled and selectedPlayer then
-            PlayDoggy(selectedPlayer)
-        else
-            StopDoggy()
-
-            -- Hacer que el jugador salte al desactivar
-            local player = game:GetService("Players").LocalPlayer
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            function gt()
+                local tc2 = t.Character
+                if not tc2 or not tc2.Parent then return nil end
+                return tc2:FindFirstChild("HumanoidRootPart") or tc2:FindFirstChild("UpperTorso") or tc2:FindFirstChild("Torso") or tc2:FindFirstChild("Head")
             end
-        end
-    end
-})
 
-
--- Slider para ajustar la velocidad del movimiento Doggy
-JugadoresTab:CreateSlider({
-    Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
-    Increment = 0.1,
-    Suffix = "vel",
-    CurrentValue = doggySpeed,
-    Callback = function(value)
-        doggySpeed = value
-        if doggyEnabled and selectedPlayer then
-            -- Reiniciar el movimiento de Doggy para aplicar la nueva velocidad
-            StopDoggy()
-            PlayDoggy(selectedPlayer)
-        end
-    end
-})
-
-
-
--- Toggle para activar/desactivar Pata
-JugadoresTab:CreateToggle({
-    Name = "Movimiento de pata",
-    CurrentValue = false,
-    Callback = function(value)
-        pataEnabled = value
-
-        if pataEnabled and selectedPlayer then
-            PlayPata(selectedPlayer)
-        else
-            StopPata()
-
-            -- Hacer que el jugador salte al desactivar
-            local player = game:GetService("Players").LocalPlayer
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            function td()
+                local tc2 = t.Character
+                if not tc2 or not tc2.Parent then return true end
+                local th = tc2:FindFirstChildOfClass("Humanoid")
+                return th and th.Health <= 0
             end
-        end
-    end
-})
 
+            function df()
+                if done or forceStop or not c or not c.Parent or not h or not h.Parent then
+                    done = true return
+                end
+                local th = gt()
+                if not th then done = true return end
+                if td() then done = true return end
 
--- Slider para ajustar la velocidad del movimiento Pata
-JugadoresTab:CreateSlider({
-    Name = "Velocidad",
-    Range = {1, 15}, -- Rango de velocidad, ajustable según tus necesidades
-    Increment = 0.1,
-    Suffix = "vel",
-    CurrentValue = pataSpeed,
-    Callback = function(value)
-        pataSpeed = value
-        if pataEnabled and selectedPlayer then
-            -- Reiniciar el movimiento de Pata para aplicar la nueva velocidad
-            StopPata()
-            PlayPata(selectedPlayer)
-        end
-    end
-})
+                if targetStartPos and (th.Position - targetStartPos).Magnitude >= 200 then
+                    successFling = true
+                    done = true
+                    return
+                end
 
+                cnt = cnt + 1
+                local predictedPos = predictPosition(th, 0.18)
 
+                local rz = (math.random() > 0.5 and 1 or -1) * (math.random() * 3 + 0.5)
+                local rx = (math.random() - 0.5) * 2
+                local ry = (math.random() - 0.5) * 1.5
+                if cnt % 3 == 0 then rz, rx, ry = 0, 0, 0 end
 
+                h.CFrame = CFrame.new(predictedPos) * CFrame.new(rx, ry, rz)
 
----Perro---
-
- RunService = game:GetService("RunService")
- Players = game:GetService("Players")
-
--- Configuración de Perro
-local perroEnabled = false
-local perroConnection
-local perroAnimId = 123646621028812
-local perroAnimTime = 1.44
-local perroSpeed = 1
-local perroDirection = 1
-local perroCurrentDistance = 3
-local perroTargetDistance = 4
-local savedCollisions = {}
-
--- Evitar o restaurar colisiones
- function SetNoCollision(char, state)
-    if state then
-        savedCollisions[char] = {}
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                savedCollisions[char][part] = part.CanCollide
-                part.CanCollide = false
-            end
-        end
-    else
-        if savedCollisions[char] then
-            for part, original in pairs(savedCollisions[char]) do
-                if part and part:IsA("BasePart") then
-                    part.CanCollide = original
+                if math.abs(rz) < 1.5 then
+                    for _, v in ipairs(pts) do
+                        if v and v.Parent then
+                            v.AssemblyLinearVelocity = Vector3.new(SPD, SPD, SPD)
+                            v.AssemblyAngularVelocity = Vector3.new(SPD, SPD, SPD)
+                            v.CanCollide = (v == h)
+                        end
+                    end
+                else
+                    for _, v in ipairs(pts) do
+                        if v and v.Parent then
+                            v.AssemblyLinearVelocity = Vector3.zero
+                            v.AssemblyAngularVelocity = Vector3.zero
+                            v.CanCollide = false
+                        end
+                    end
                 end
             end
-            savedCollisions[char] = nil
+
+            local c1 = game:GetService("RunService").Stepped:Connect(df)
+            local c2 = game:GetService("RunService").Heartbeat:Connect(df)
+            local c3 = game:GetService("RunService").RenderStepped:Connect(df)
+
+            repeat task.wait(0.05) until done or forceStop or tick() - stT >= 3
+
+            c1 = safeDC(c1)
+            c2 = safeDC(c2)
+            c3 = safeDC(c3)
+            hpC = safeDC(hpC)
+
+            for _, v in ipairs(pts) do
+                pcall(function()
+                    if v and v.Parent then
+                        v.AssemblyLinearVelocity = Vector3.zero
+                        v.AssemblyAngularVelocity = Vector3.zero
+                        v.CanCollide = pp[v] and pp[v][3] or true
+                    end
+                end)
+            end
+
+            for pt, pr in pairs(pp) do
+                pcall(function()
+                    if pt and pt.Parent then
+                        pt.CustomPhysicalProperties = pr[1]
+                        pt.Massless = pr[2]
+                        pt.CanCollide = pr[3]
+                    end
+                end)
+            end
+
+            pcall(function()
+                for _, s in ipairs(deadStates) do hu:SetStateEnabled(s, true) end
+            end)
+
+            task.wait(0.1)
+
+            safeReturnTo(h, hu, originCF, omh, ohh)
+
+            fg = false
+
+            if not forceStop then
+                if successFling then
+                    Rayfield:Notify({Title = "Fling", Content = "Eliminado! (+200 studs)", Duration = 2, Image = 4483362458})
+                elseif td() then
+                    Rayfield:Notify({Title = "Fling", Content = "Eliminado!", Duration = 2, Image = 4483362458})
+                else
+                    Rayfield:Notify({Title = "Fling", Content = "Flingeado!", Duration = 2, Image = 4483362458})
+                end
+            end
+        end)
+        if not ok then
+            fg = false
+            Rayfield:Notify({Title = "Error", Content = "Fling fallido", Duration = 2, Image = 4483362458})
         end
-    end
-end
-
--- Animación Perro
- perroAnim = Instance.new("Animation")
-perroAnim.AnimationId = "rbxassetid://" .. perroAnimId
-
--- Ejecutar Perro
- function PlayPerro(target)
-    if not target or not target.Character then return end
-    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local root = char:WaitForChild("HumanoidRootPart")
-    local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
-    if not humanoid or not root or not targetRoot then return end
-
-    local track = humanoid:LoadAnimation(perroAnim)
-    track:Play()
-    track.TimePosition = perroAnimTime
-    track:AdjustSpeed(0)
-
-    humanoid.AutoRotate = false
-    humanoid.WalkSpeed = 0
-    humanoid.JumpPower = 0
-    SetNoCollision(char, true)
-
-    perroConnection = RunService.Heartbeat:Connect(function(dt)
-        if not targetRoot.Parent then return end
-
-        perroCurrentDistance = perroCurrentDistance + (perroSpeed * perroDirection * dt)
-
-        if perroCurrentDistance >= perroTargetDistance then
-            perroDirection = -1
-        elseif perroCurrentDistance <= 2 then
-            perroDirection = 1
-        end
-
-        local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * perroCurrentDistance + Vector3.new(0, 0.23, 0)
-root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position) * CFrame.Angles(0, math.rad(180), 0)
-
     end)
 end
 
--- Detener Perro
- function StopPerro()
-    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChild("Humanoid")
-
-    if perroConnection then
-        perroConnection:Disconnect()
-        perroConnection = nil
-    end
-
-    if humanoid then
-        humanoid.AutoRotate = true
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        for _, track in humanoid:GetPlayingAnimationTracks() do
-            if tostring(track.Animation.AnimationId):find(tostring(perroAnimId)) then
-                track:Stop()
+task.spawn(function()
+    while true do
+        task.wait(2)
+        for plr, _ in pairs(loopFlingTargets) do
+            if forceStop then break end
+            if plr and plr.Parent and plr.Character and not fg then
+                fling(plr)
+                repeat task.wait(0.1) until not fg
+                task.wait(1)
             end
         end
     end
+end)
 
-    SetNoCollision(char, false)
-end
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if kaOn and not fg and not forceStop then
+            pcall(function()
+                local _, h = safeChar()
+                if not h then return end
+                for _, p in game.Players:GetPlayers() do
+                    if forceStop then break end
+                    if p ~= game.Players.LocalPlayer and p.Character then
+                        local th = p.Character:FindFirstChild("HumanoidRootPart")
+                        if th and (h.Position - th.Position).Magnitude < 20 then
+                            fling(p)
+                            repeat task.wait(0.1) until not fg
+                            task.wait(0.3)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
 
--- Toggle para activar/desactivar Perro
-JugadoresTab:CreateToggle({
-    Name = "Movimiento de perro",
-    CurrentValue = false,
-    Callback = function(value)
-        perroEnabled = value
-        if perroEnabled and selectedPlayer then
-            PlayPerro(selectedPlayer)
+JugadoresTab:CreateSection("Fling")
+
+JugadoresTab:CreateButton({
+    Name = "Fling",
+    Callback = function()
+        if selectedPlayer then
+            fling(selectedPlayer)
         else
-            StopPerro()
-            local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+            Rayfield:Notify({Title = "Error", Content = "Selecciona un jugador primero!", Duration = 2, Image = 4483362458})
         end
     end
 })
 
--- Slider para velocidad de Perro
-JugadoresTab:CreateSlider({
-    Name = "Velocidad",
-    Range = {1, 15},
-    Increment = 0.1,
-    Suffix = "vel",
-    CurrentValue = perroSpeed,
-    Callback = function(value)
-        perroSpeed = value
-        if perroEnabled and selectedPlayer then
-            StopPerro()
-            PlayPerro(selectedPlayer)
-        end
-    end
-})
-
-
-
---Separacion por si me pongo pendejo
-
-
-
-
-
-
-
-
--- Toggle para activar/desactivar Cari
 JugadoresTab:CreateToggle({
-    Name = "Dar Cariño",
+    Name = "Loop Fling",
     CurrentValue = false,
-    Callback = function(value)
-        cariEnabled = value
-
-        if cariEnabled and selectedPlayer then
-            PlayCari(selectedPlayer)
+    Callback = function(state)
+        if not selectedPlayer then
+            Rayfield:Notify({Title = "Error", Content = "Selecciona un jugador primero!", Duration = 2, Image = 4483362458})
+            return
+        end
+        if state then
+            loopFlingTargets[selectedPlayer] = true
+            Rayfield:Notify({Title = "Loop Fling", Content = "Activo: " .. selectedPlayer.Name, Duration = 2, Image = 4483362458})
         else
-            StopCari()
+            loopFlingTargets[selectedPlayer] = nil
+            Rayfield:Notify({Title = "Loop Fling", Content = "Apagado: " .. selectedPlayer.Name, Duration = 2, Image = 4483362458})
+        end
+    end
+})
 
-            -- Hacer que el jugador salte al desactivar
-            local player = game:GetService("Players").LocalPlayer
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+JugadoresTab:CreateButton({
+    Name = "Fling a Todos",
+    Callback = function()
+        Rayfield:Notify({Title = "Fling All", Content = "Mandando a volar a todos...", Duration = 2, Image = 4483362458})
+        task.spawn(function()
+            for _, p in game.Players:GetPlayers() do
+                if forceStop then break end
+                if p ~= game.Players.LocalPlayer and p.Character then
+                    fling(p)
+                    repeat task.wait(0.1) until not fg
+                    task.wait(0.5)
+                end
             end
-        end
+            if not forceStop then
+                Rayfield:Notify({Title = "Fling All", Content = "Listo!", Duration = 2, Image = 4483362458})
+            end
+        end)
     end
 })
 
--- Slider para ajustar la velocidad del movimiento Cari
-JugadoresTab:CreateSlider({
-    Name = "Velocidad",
-    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
-    Increment = 0.1,
-    Suffix = "vel",
-    CurrentValue = cariSpeed,
-    Callback = function(value)
-        cariSpeed = value
-        if cariEnabled and selectedPlayer then
-            -- Reiniciar el movimiento de Cari para aplicar la nueva velocidad
-            StopCari()
-            PlayCari(selectedPlayer)
-        end
-    end
-})
-
-
--- Toggle para activar/desactivar Wata
 JugadoresTab:CreateToggle({
-    Name = "Dar Wata",
+    Name = "Kill Aura",
     CurrentValue = false,
-    Callback = function(value)
-        wataEnabled = value
+    Callback = function(state)
+        kaOn = state
+        Rayfield:Notify({Title = "Kill Aura", Content = state and "Activo" or "Apagado", Duration = 2, Image = 4483362458})
+    end
+})
 
-        if wataEnabled and selectedPlayer then
-            PlayWata(selectedPlayer)
+JugadoresTab:CreateButton({
+    Name = "Detener Fling",
+    Callback = function()
+        forceStop = true
+        kaOn = false
+        for k in pairs(loopFlingTargets) do loopFlingTargets[k] = nil end
+        Rayfield:Notify({Title = "Force Stop", Content = "Todo detenido!", Duration = 3, Image = 4483362458})
+        task.wait(0.5)
+        forceStop = false
+    end
+})
+
+JugadoresTab:CreateButton({
+    Name = "Copiar Nombre",
+    Callback = function()
+        if selectedPlayer then
+            pcall(function() setclipboard(selectedPlayer.Name) end)
+            Rayfield:Notify({Title = "Copiado", Content = selectedPlayer.Name, Duration = 2, Image = 4483362458})
         else
-            StopWata()
-
-            -- Hacer que el jugador salte al desactivar
-            local player = game:GetService("Players").LocalPlayer
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+            Rayfield:Notify({Title = "Error", Content = "Selecciona un jugador primero!", Duration = 2, Image = 4483362458})
         end
     end
 })
-
--- Slider para ajustar la velocidad del movimiento Wata
-JugadoresTab:CreateSlider({
-    Name = "Velocidad",
-    Range = {1, 20}, -- Rango de velocidad, ajustable según tus necesidades
-    Increment = 0.1,
-    Suffix = "vel",
-    CurrentValue = wataSpeed,
-    Callback = function(value)
-        wataSpeed = value
-        if wataEnabled and selectedPlayer then
-            -- Reiniciar el movimiento de Wata para aplicar la nueva velocidad
-            StopWata()
-            PlayWata(selectedPlayer)
-        end
-    end
-})
-
