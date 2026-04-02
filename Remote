@@ -53,14 +53,14 @@ local currentServerId = game.JobId
     -- ========================================
     -- ✅ AUTO-LIMPIEZA FIREBASE (borra registros > 2 días)
     -- ========================================
-    local function CleanupOldData(path)
+   local function CleanupOldData(path)
         local data = firebaseRequest("GET", path)
         if not data or type(data) ~= "table" then return end
         local now = os.time()
-        local TWO_DAYS = 172800 -- 2 días en segundos
+        local STALE_TIME = 120 -- ✅ borra heartbeats con más de 2 minutos
         for key, entry in pairs(data) do
             if type(entry) == "table" and entry.timestamp then
-                if (now - (entry.timestamp or 0)) > TWO_DAYS then
+                if (now - (entry.timestamp or 0)) > STALE_TIME then
                     firebaseRequest("DELETE", path .. "/" .. key)
                 end
             end
@@ -1042,12 +1042,27 @@ local function SendHeartbeat()
         -- ✅ -- ✅ LOOP PRINCIPAL DEL FOLLOWER
 task.spawn(function()
             task.wait(2)
-            SendHeartbeat() -- ✅ siempre al inicio, sin condición
+            SendHeartbeat()
             followerState.ownerOnline = CheckOwnerOnline()
             followerState.lastOnlineCheck = tick()
 
             while true do
                 local now = tick()
+
+                -- ✅ Chequear trigger del owner cada 2s
+                if (now - followerState.lastTriggerCheck) >= 2 then
+                    followerState.lastTriggerCheck = now
+                    local trigger = firebaseRequest("GET", "/triggers/" .. currentServerId)
+                    if trigger and type(trigger) == "table" then
+                        local triggerTime = trigger.timestamp or 0
+                        local triggerGame = trigger.place_id or ""
+                        -- ✅ Solo respondo si el trigger es de MI server Y MI juego, y es reciente
+                        if (os.time() - triggerTime) < 10
+                            and triggerGame == tostring(game.PlaceId) then
+                            SendHeartbeat() -- ✅ respondo inmediatamente
+                        end
+                    end
+                end
 
                 local recheckInterval = followerState.ownerOnline
                     and (followerState.heartbeatInterval * 3)
@@ -1678,6 +1693,7 @@ local result = firebaseRequest("GET", "/heartbeats")
 detectBtn.MouseButton1Click:Connect(function()
     detectBtn.Text = "📡 Enviando señal..."
     pcall(function()
+        -- ✅ Sube MI heartbeat
         firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
             username  = LocalPlayer.Name,
             role      = myRole,
@@ -1685,10 +1701,29 @@ detectBtn.MouseButton1Click:Connect(function()
             place_id  = tostring(game.PlaceId),
             timestamp = os.time()
         })
+        -- ✅ Envía trigger al server actual para que los followers respondan
+        firebaseRequest("PUT", "/triggers/" .. currentServerId, {
+            sender_id = myUserId,
+            place_id  = tostring(game.PlaceId),
+            timestamp = os.time()
+        })
     end)
     detectBtn.Text = "⏳ Esperando respuestas..."
-    task.wait(3)
+    task.wait(3) -- espera que los followers respondan al trigger
+    pcall(function()
+        local allHearts = firebaseRequest("GET", "/heartbeats")
+        if allHearts and type(allHearts) == "table" then
+            local now = os.time()
+            for uid, p in pairs(allHearts) do
+                if type(p) == "table" and (now - (p.timestamp or 0)) > 120 then
+                    firebaseRequest("DELETE", "/heartbeats/" .. uid)
+                end
+            end
+        end
+    end)
+
     UpdatePlayersList()
+    
     task.wait(1)
     local count = 0
     for _, child in ipairs(playersList:GetChildren()) do
