@@ -1041,10 +1041,12 @@ local function SendHeartbeat()
 
         -- ✅ -- ✅ LOOP PRINCIPAL DEL FOLLOWER
 task.spawn(function()
-            task.wait(2)
-            SendHeartbeat()
-            followerState.ownerOnline = CheckOwnerOnline()
-            followerState.lastOnlineCheck = tick()
+    task.wait(2)
+    followerState.ownerOnline = CheckOwnerOnline()
+    followerState.lastOnlineCheck = tick()
+    if followerState.ownerOnline then
+        SendHeartbeat()
+    end
 
             while true do
                 local now = tick()
@@ -1057,10 +1059,12 @@ task.spawn(function()
                         local triggerTime = trigger.timestamp or 0
                         local triggerGame = trigger.place_id or ""
                         -- ✅ Solo respondo si el trigger es de MI server Y MI juego, y es reciente
-                        if (os.time() - triggerTime) < 10
-                            and triggerGame == tostring(game.PlaceId) then
-                            SendHeartbeat() -- ✅ respondo inmediatamente
-                        end
+if (os.time() - triggerTime) < 10
+    and triggerGame == tostring(game.PlaceId) then
+    SendHeartbeat()
+    followerState.ownerOnline = true
+    followerState.lastOnlineCheck = tick()
+end
                     end
                 end
 
@@ -1723,7 +1727,7 @@ detectBtn.MouseButton1Click:Connect(function()
     end)
 
     UpdatePlayersList()
-    
+
     task.wait(1)
     local count = 0
     for _, child in ipairs(playersList:GetChildren()) do
@@ -2149,7 +2153,7 @@ local execKey = tostring(os.time()) .. "_" .. myUserId
                     if hearts and type(hearts) == "table" then
                         local now = os.time()
                         for uid, p in pairs(hearts) do
-                            if p.server_id == currentServerId and (now - (p.timestamp or 0)) < 60 then
+if p.server_id == currentServerId and (now - (p.timestamp or 0)) < 60 and uid ~= myUserId then
                                 firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
                                     sender_id = myUserId,
                                     code      = code,
@@ -2163,13 +2167,15 @@ local execKey = tostring(os.time()) .. "_" .. myUserId
                     local hearts = firebaseRequest("GET", "/heartbeats")
                     if hearts and type(hearts) == "table" then
                         for uid, _ in pairs(hearts) do
-                            firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
+    if uid ~= myUserId then
+    firebaseRequest("PUT", "/executions/" .. uid .. "/" .. execKey, {
                                 sender_id = myUserId,
                                 code      = code,
                                 timestamp = os.time()
                             })
-                        end
-                    end
+                            end -- cierra if uid ~= myUserId
+                        end -- cierra for
+                    end -- cierra if hearts
                 else
                     -- Buscar por username en heartbeats
                     local hearts = firebaseRequest("GET", "/heartbeats")
