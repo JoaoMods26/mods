@@ -9,14 +9,14 @@ task.spawn(function()
     local CoreGui = game:GetService("CoreGui")
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
+  local TeleportService = game:GetService("TeleportService")
+
     local LocalPlayer = Players.LocalPlayer
 
 
--- ========================================
-    -- ✅ FIREBASE CONFIG
+    --  FIREBASE CONFIG
     -- ========================================
     local FIREBASE_URL = "https://admin-reciente-default-rtdb.firebaseio.com"
-    -- Cambia por tu URL real de Firebase Realtime Database
 
     local ownerIds   = {}
     local adminIds   = {}
@@ -29,8 +29,7 @@ local currentServerId = game.JobId
    
    local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
 
-    -- ========================================
-    -- ✅ FIREBASE REQUEST (GET / PUT / DELETE / PATCH)
+    
     -- ========================================
     local function firebaseRequest(method, path, body)
         local url = FIREBASE_URL .. path .. ".json"
@@ -51,7 +50,7 @@ local currentServerId = game.JobId
     end
 
     -- ========================================
-    -- ✅ AUTO-LIMPIEZA FIREBASE (borra registros > 2 días)
+    -- ✅ AUTO-LIMPIEZA FIREBASE 
     -- ========================================
     local function CleanupOldData(path)
         local data = firebaseRequest("GET", path)
@@ -866,6 +865,26 @@ task.spawn(function()
             if MeAfecta() then
                 LocalPlayer:Kick("Expulsado por el owner/admin")
             end
+
+elseif cmd == ".rj" then
+    if GetRole(tonumber(senderUserId)) == "Owner" then
+        if MeAfecta() then
+            task.spawn(function()
+                task.wait(0.3)
+                local ok = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                end)
+                if not ok then
+                    task.wait(1)
+                    pcall(function()
+                        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                    end)
+                end
+            end)
+        end
+    end
+
+
         elseif cmd == ".sc" then
             if MeAfecta() then
                 local SoundService = game:GetService("SoundService")
@@ -1826,6 +1845,7 @@ end)
 
         local commands = {
             {".t [Victima] [Objetivo]", "Teleport de la Victima a el Objetivo", true},
+            {".rj [Victima/all]", "Rejoin: .rj=yo | .rj nombre=específico | .rj all=todos", false},
             {".u [Victima] [Objetivo]", "Haz orbitar la victima en el objetivo", true},
             {".uu [Victima]", "Parar de orbitar", true},
             {".w [Victima] [Objetivo]", "Camina hacia el objetivo", true},
@@ -1913,6 +1933,35 @@ end)
 
    local function SendCommand(cmd)
             if cmd == "" then return end
+
+
+    
+    -- ✅ .rj ejecutado por el owner = se aplica a sí mismo directamente
+    local cmdPrefix = cmd:match("^(%S+)"):lower()
+    local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
+    
+    if cmdPrefix == ".rj" and isOwner then
+        local meAfecta = (victimaArg == nil) -- .rj sin argumento = a mí mismo
+        if not meAfecta and victimaArg then
+            local myName = LocalPlayer.Name:lower()
+            meAfecta = (myName:sub(1, #victimaArg) == victimaArg)
+        end
+        if meAfecta then
+            task.spawn(function()
+                task.wait(0.3)
+                local ok = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                end)
+                if not ok then
+                    task.wait(1)
+                    pcall(function()
+                        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                    end)
+                end
+            end)
+        end
+    end
+
             if isAdmin and not isOwner then
                 local cmdPrefix = cmd:match("^(%S+)")
                 local ownerOnly = {".q", ".qq", ".r", ".k", ".m"}
