@@ -3809,6 +3809,26 @@ AimbotTab:CreateButton({
 
 
 
+AimbotTab:CreateButton({
+    Name = "Cargar Aimbot NPCs",
+    Callback = function()
+        if antiguoCargado then return end -- impedir doble click
+
+        antiguoCargado = true
+
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/aimnpc"))()
+        end)
+
+        if success then
+    
+        end
+    end
+})
+
+
+
+
 
 
 
