@@ -2,21 +2,22 @@ task.spawn(function()
     repeat task.wait() until game:IsLoaded()
     repeat task.wait() until _G.AimbotTab
 
-    local Players         = game:GetService("Players")
-    local RunService      = game:GetService("RunService")
+    local Players          = game:GetService("Players")
+    local RunService       = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
-    local Camera          = workspace.CurrentCamera
-    local LocalPlayer     = Players.LocalPlayer
-    local AimbotTab       = _G.AimbotTab
+    local Camera           = workspace.CurrentCamera
+    local LocalPlayer      = Players.LocalPlayer
+    local AimbotTab        = _G.AimbotTab
 
     -- =============================================
-    --              CONFIGURACIÓN
+    --              CONFIGURACION
     -- =============================================
     local S = {
         Enabled            = false,
-        AimMode            = "Camara",   -- "Camara" | "Mouse"
+        AimMode            = "Camara",
         AutoAim            = false,
-        HoldToAim          = false,      -- controlado por keybind
+        HoldToAim          = false,
+        AimbotPaused       = false,
         FOVRadius          = 300,
         FOVColor           = Color3.fromRGB(255, 165, 0),
         FOVVisible         = true,
@@ -32,23 +33,78 @@ task.spawn(function()
         WallCheck          = false,
         OnlyClose          = false,
         MaxDistance        = 300,
-        -- Cámara
         CamSensitivity     = 5,
-        -- Mouse
         MouseSmoothness    = 3,
-        -- Predicción
         PredictionEnabled  = false,
         PredictionStrength = 0.15,
-        -- Rainbow
         RainbowEnabled     = false,
         RainbowSpeed       = 5,
-        -- NPC scan
-        MaxNPCs            = 200,        -- aumentado
-        ScanDepth          = 6,          -- profundidad de búsqueda en workspace
+        MaxNPCs            = 200,
+        ScanDepth          = 6,
     }
 
-    local Holding          = false       -- click derecho
+    local PauseKeybind = Enum.KeyCode.Q
+    local Holding      = false
     local drawingSupported = false
+
+    -- =============================================
+    --   SISTEMA DE TARGET ACTUAL
+    --
+    --   CurrentTarget guarda el entry del NPC al
+    --   que se esta apuntando ahora mismo.
+    --
+    --   Se SUELTA si:
+    --     - Health llega a 0 (murio)
+    --     - Estado es Dead, FallingDown, Ragdoll
+    --     - El modelo desaparece del workspace
+    --
+    --   Puede VOLVER A SER SELECCIONADO si:
+    --     - El NPC se levanta (estado normal)
+    --     - Su Health es > 0 de nuevo
+    --     - Vuelve a estar dentro del FOV
+    -- =============================================
+    local CurrentTarget = nil
+
+    -- Estados del Humanoid que bloquean el targeting
+    local BLOCKED_STATES = {
+        [Enum.HumanoidStateType.Dead]        = true,
+        [Enum.HumanoidStateType.FallingDown] = true,
+        [Enum.HumanoidStateType.Ragdoll]     = true,
+        [Enum.HumanoidStateType.Physics]     = true,
+    }
+
+    -- Verifica si un NPC esta en condicion de ser apuntado
+    -- (vivo, de pie, no en ragdoll, modelo existente)
+    local function IsNPCApuntable(entry)
+        if not entry then return false end
+        -- Verificar existencia del modelo y sus partes
+        if not entry.model or not entry.model.Parent then return false end
+        if not entry.hum   or not entry.hum.Parent   then return false end
+        if not entry.hrp   or not entry.hrp.Parent   then return false end
+        -- Verificar salud
+        if entry.hum.Health <= 0 then return false end
+        -- Verificar estado del humanoid
+        -- Si esta caido, en ragdoll o muerto: no apuntable
+        local ok, state = pcall(function() return entry.hum:GetState() end)
+        if ok and BLOCKED_STATES[state] then return false end
+        return true
+    end
+
+    -- Valida el CurrentTarget en tiempo real.
+    -- Si sigue siendo apuntable retorna true.
+    -- Si cayo o murio lo limpia y retorna false.
+    -- Cuando el NPC se levante, IsNPCApuntable
+    -- volvera a ser true y sera re-seleccionado
+    -- automaticamente por GetClosestNPC.
+    local function ValidateCurrentTarget()
+        if CurrentTarget == nil then return false end
+        if IsNPCApuntable(CurrentTarget) then
+            return true     -- target valido, mantener
+        end
+        -- Perdio la condicion: soltar target
+        CurrentTarget = nil
+        return false
+    end
 
     -- =============================================
     --           VERIFICAR DRAWING API
@@ -64,12 +120,12 @@ task.spawn(function()
     local FOVCircle
     if drawingSupported then
         pcall(function()
-            FOVCircle           = Drawing.new("Circle")
-            FOVCircle.Filled    = false
-            FOVCircle.Thickness = 1.5
-            FOVCircle.NumSides  = 80
+            FOVCircle              = Drawing.new("Circle")
+            FOVCircle.Filled       = false
+            FOVCircle.Thickness    = 1.5
+            FOVCircle.NumSides     = 80
             FOVCircle.Transparency = 1
-            FOVCircle.Visible   = false
+            FOVCircle.Visible      = false
         end)
     end
 
@@ -101,22 +157,21 @@ task.spawn(function()
     Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshRealPlayers() end)
 
     -- =============================================
-    --    VALIDAR NPC (rápido, sin loops internos)
+    --    VALIDAR NPC
     -- =============================================
     local function IsValidNPC(model)
-        if not model:IsA("Model")                          then return false end
-        if realPlayerSet[model]                            then return false end
-        if model == LocalPlayer.Character                  then return false end
+        if not model:IsA("Model")         then return false end
+        if realPlayerSet[model]           then return false end
+        if model == LocalPlayer.Character then return false end
         local hum = model:FindFirstChildOfClass("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart")
-        if not hum or not hrp                             then return false end
-        if hum.Health <= 0                                then return false end
+        if not hum or not hrp            then return false end
+        if hum.Health <= 0               then return false end
         return true, hum, hrp
     end
 
     -- =============================================
-    --    CACHE DE NPCs — refresco cada 2s
-    --    SIN límite artificial, busca en profundidad
+    --    CACHE DE NPCs - refresco cada 2s
     -- =============================================
     local npcCache       = {}
     local lastNPCRefresh = 0
@@ -133,7 +188,6 @@ task.spawn(function()
                 if valid then
                     table.insert(result, {model=obj, hum=hum, hrp=hrp})
                 else
-                    -- puede ser un modelo contenedor con NPCs dentro
                     ScanContainer(obj, result, depth - 1)
                 end
             elseif obj:IsA("Folder") then
@@ -152,15 +206,14 @@ task.spawn(function()
 
     -- =============================================
     --    OBTENER NPCs VIVOS DEL CACHE
-    --    (valida salud en tiempo real, no recorre workspace)
+    --    Solo devuelve NPCs apuntables (vivos,
+    --    de pie, no en ragdoll ni cayendo)
     -- =============================================
     local function GetLiveNPCs()
         local live = {}
         for _, entry in ipairs(npcCache) do
-            local ok = pcall(function()
-                if entry.model and entry.model.Parent
-                and entry.hum and entry.hum.Health > 0
-                and entry.hrp and entry.hrp.Parent then
+            pcall(function()
+                if IsNPCApuntable(entry) then
                     table.insert(live, entry)
                 end
             end)
@@ -186,14 +239,30 @@ task.spawn(function()
     end
 
     -- =============================================
-    --       OBTENER NPC MÁS CERCANO AL CURSOR
+    --       OBTENER NPC MAS CERCANO AL CURSOR
+    --
+    --   Logica de target sticky:
+    --   1. Si CurrentTarget sigue siendo apuntable
+    --      → mantenerlo (no buscar otro)
+    --   2. Si CurrentTarget cayo o murio
+    --      → se limpia solo (ValidateCurrentTarget)
+    --      → buscar el siguiente mas cercano
+    --   3. Si el NPC caido se levanta luego
+    --      → volvera a estar en liveNPCs y puede
+    --        ser re-seleccionado normalmente
     -- =============================================
     local function GetClosestNPC(liveNPCs)
         if not LocalPlayer.Character then return nil end
         local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not myHRP then return nil end
 
-        local mousePos  = UserInputService:GetMouseLocation()
+        -- Target actual sigue vivo y de pie: mantener
+        if ValidateCurrentTarget() then
+            return CurrentTarget
+        end
+
+        -- Buscar el NPC mas cercano al cursor dentro del FOV
+        local mousePos       = UserInputService:GetMouseLocation()
         local best, bestDist = nil, math.huge
 
         for _, entry in ipairs(liveNPCs) do
@@ -218,56 +287,72 @@ task.spawn(function()
             end
         end
 
-        return best
+        CurrentTarget = best
+        return CurrentTarget
     end
 
     -- =============================================
-    --              PREDICCIÓN
+    --              PREDICCION
     -- =============================================
     local function PredictPos(entry)
-        local part = entry.model:FindFirstChild(S.AimPart)
-                  or entry.hrp
+        local part = entry.model:FindFirstChild(S.AimPart) or entry.hrp
         if not S.PredictionEnabled then return part.Position end
         local vel = entry.hrp.AssemblyLinearVelocity or Vector3.new()
         return part.Position + vel * S.PredictionStrength
     end
 
     -- =============================================
-    --     INPUT — click derecho + keybind
+    --     INPUT - KEYBIND DE PAUSA (TOGGLE)
     -- =============================================
     UserInputService.InputBegan:Connect(function(i, gp)
         if gp then return end
+
         if i.UserInputType == Enum.UserInputType.MouseButton2 then
             Holding = true
         end
+
+        if i.UserInputType == Enum.UserInputType.Keyboard then
+            if i.KeyCode == PauseKeybind then
+                if S.Enabled then
+                    S.AimbotPaused = not S.AimbotPaused
+                    if S.AimbotPaused then
+                        CurrentTarget = nil
+                        if FOVCircle then
+                            pcall(function() FOVCircle.Visible = false end)
+                        end
+                    end
+                    print("[Aimbot] " .. (S.AimbotPaused and "PAUSADO" or "REANUDADO"))
+                end
+            end
+        end
     end)
+
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton2 then
             Holding = false
+            CurrentTarget = nil   -- al soltar click, buscar de nuevo al presionar
         end
     end)
 
     -- =============================================
-    --           ESP — CACHE PERSISTENTE
-    --  Drawing objects se crean UNA VEZ, luego
-    --  solo se actualizan sus propiedades
+    --           ESP - CACHE PERSISTENTE
     -- =============================================
-    local ESPCache    = {}   -- key: model instance
-    local TracerCache = {}
+    local ESPCache       = {}
+    local TracerCache    = {}
     local BillboardCache = {}
-    local ESPFolder = Instance.new("Folder", game.CoreGui)
-    ESPFolder.Name  = "NPCESP_" .. math.random(1,99999)
+    local ESPFolder      = Instance.new("Folder", game.CoreGui)
+    ESPFolder.Name       = "NPCESP_" .. math.random(1, 99999)
 
     local function GetESP(model)
         if ESPCache[model] then return ESPCache[model] end
         local box, text
         pcall(function()
-            box           = Drawing.new("Square")
-            box.Thickness = 2
-            box.Filled    = false
+            box              = Drawing.new("Square")
+            box.Thickness    = 2
+            box.Filled       = false
             box.Transparency = 1
-            box.Visible   = false
-            box.ZIndex    = 1
+            box.Visible      = false
+            box.ZIndex       = 1
         end)
         pcall(function()
             text          = Drawing.new("Text")
@@ -287,11 +372,11 @@ task.spawn(function()
         if TracerCache[model] then return TracerCache[model] end
         local line
         pcall(function()
-            line             = Drawing.new("Line")
-            line.Thickness   = 1.5
+            line              = Drawing.new("Line")
+            line.Thickness    = 1.5
             line.Transparency = 1
-            line.Visible     = false
-            line.ZIndex      = 1
+            line.Visible      = false
+            line.ZIndex       = 1
         end)
         if line then TracerCache[model] = {line=line} end
         return TracerCache[model]
@@ -312,7 +397,6 @@ task.spawn(function()
         end
     end
 
-    -- Limpiar entradas de NPCs que ya no existen
     local function PruneDeadESP(liveSet)
         for model, cache in pairs(ESPCache) do
             if not liveSet[model] then
@@ -340,38 +424,40 @@ task.spawn(function()
         local hrp   = entry.hrp
         if BillboardCache[model] and BillboardCache[model].Parent then return end
 
-        local bb = Instance.new("BillboardGui")
-        bb.Adornee      = hrp
-        bb.Size         = UDim2.new(4,0,5,0)
-        bb.StudsOffset  = Vector3.new(0,1,0)
-        bb.AlwaysOnTop  = true
-        bb.ResetOnSpawn = false
-        bb.Parent       = ESPFolder
+        local bb            = Instance.new("BillboardGui")
+        bb.Adornee          = hrp
+        bb.Size             = UDim2.new(4, 0, 5, 0)
+        bb.StudsOffset      = Vector3.new(0, 1, 0)
+        bb.AlwaysOnTop      = true
+        bb.ResetOnSpawn     = false
+        bb.Parent           = ESPFolder
 
-        local f = Instance.new("Frame", bb)
-        f.Size                = UDim2.new(1,0,1,0)
+        local f                  = Instance.new("Frame", bb)
+        f.Size                   = UDim2.new(1, 0, 1, 0)
         f.BackgroundTransparency = 1
 
         local col = ActiveColor()
-        local function mkBorder(p,s)
-            local b = Instance.new("Frame",f)
-            b.Position = p; b.Size = s
-            b.BackgroundColor3 = col; b.BorderSizePixel = 0
+        local function mkBorder(p, s)
+            local b            = Instance.new("Frame", f)
+            b.Position         = p
+            b.Size             = s
+            b.BackgroundColor3 = col
+            b.BorderSizePixel  = 0
         end
-        mkBorder(UDim2.new(0,0,0,0),  UDim2.new(1,0,0,2))
-        mkBorder(UDim2.new(0,0,1,-2), UDim2.new(1,0,0,2))
-        mkBorder(UDim2.new(0,0,0,0),  UDim2.new(0,2,1,0))
-        mkBorder(UDim2.new(1,-2,0,0), UDim2.new(0,2,1,0))
+        mkBorder(UDim2.new(0, 0, 0, 0),   UDim2.new(1, 0, 0, 2))
+        mkBorder(UDim2.new(0, 0, 1, -2),  UDim2.new(1, 0, 0, 2))
+        mkBorder(UDim2.new(0, 0, 0, 0),   UDim2.new(0, 2, 1, 0))
+        mkBorder(UDim2.new(1, -2, 0, 0),  UDim2.new(0, 2, 1, 0))
 
-        local lbl = Instance.new("TextLabel", f)
-        lbl.Size     = UDim2.new(1,0,0,20)
-        lbl.Position = UDim2.new(0,0,-0.15,0)
+        local lbl                  = Instance.new("TextLabel", f)
+        lbl.Size                   = UDim2.new(1, 0, 0, 20)
+        lbl.Position               = UDim2.new(0, 0, -0.15, 0)
         lbl.BackgroundTransparency = 1
-        lbl.Text     = S.ShowNPCNames and model.Name or "NPC"
-        lbl.TextColor3 = col
+        lbl.Text                   = S.ShowNPCNames and model.Name or "NPC"
+        lbl.TextColor3             = col
         lbl.TextStrokeTransparency = 0.5
-        lbl.Font     = Enum.Font.SourceSansBold
-        lbl.TextSize = 14
+        lbl.Font                   = Enum.Font.SourceSansBold
+        lbl.TextSize               = 14
 
         BillboardCache[model] = bb
     end
@@ -379,32 +465,31 @@ task.spawn(function()
     -- =============================================
     --            LOOP PRINCIPAL
     -- =============================================
-    local lastAimFrame  = tick()
-    local lastESPFrame  = tick()
-    local idleSkip      = 0
+    local lastAimFrame = tick()
+    local lastESPFrame = tick()
+    local idleSkip     = 0
 
     RunService.RenderStepped:Connect(function()
         local now = tick()
 
-        -- Refrescar cache NPCs (solo cada 2s)
         RefreshNPCCache()
 
         local anyActive = S.Enabled or S.ESPEnabled or S.TracersEnabled or S.UseAltESP
 
-        -- Si nada está activo, ocultar cada 30 frames y salir
         if not anyActive then
             idleSkip += 1
             if idleSkip >= 30 then
-                HideAllESP(); HideAllTracers(); idleSkip = 0
+                HideAllESP(); HideAllTracers()
+                CurrentTarget = nil
+                idleSkip = 0
             end
             return
         end
         idleSkip = 0
 
-        local col    = ActiveColor()
+        local col      = ActiveColor()
         local liveNPCs = GetLiveNPCs()
 
-        -- Construir set de modelos vivos (para PruneDeadESP)
         local liveSet = {}
         for _, e in ipairs(liveNPCs) do liveSet[e.model] = true end
 
@@ -414,7 +499,8 @@ task.spawn(function()
 
             -- FOV CIRCLE
             if drawingSupported and FOVCircle then
-                local showFOV = S.Enabled and S.FOVVisible and (Holding or S.AutoAim)
+                local aimbotActivo = S.Enabled and not S.AimbotPaused
+                local showFOV      = aimbotActivo and S.FOVVisible and (Holding or S.AutoAim)
                 if showFOV then
                     local mp = UserInputService:GetMouseLocation()
                     FOVCircle.Position = Vector2.new(mp.X, mp.Y)
@@ -427,13 +513,12 @@ task.spawn(function()
             end
 
             -- AIMBOT
-            if S.Enabled and (Holding or S.AutoAim) then
+            if S.Enabled and not S.AimbotPaused and (Holding or S.AutoAim) then
                 local entry = GetClosestNPC(liveNPCs)
                 if entry then
                     local predictedPos = PredictPos(entry)
 
                     if S.AimMode == "Mouse" then
-                        -- ===== MODO MOUSE =====
                         if getfenv and getfenv().mousemoverel then
                             local screen, onScreen = Camera:WorldToViewportPoint(predictedPos)
                             if onScreen and screen.Z > 0 then
@@ -446,7 +531,6 @@ task.spawn(function()
                             end
                         end
                     else
-                        -- ===== MODO CÁMARA =====
                         pcall(function()
                             local cur   = Camera.CFrame
                             local tgt   = CFrame.new(cur.Position, predictedPos)
@@ -464,13 +548,10 @@ task.spawn(function()
         if now - lastESPFrame < 0.033 then return end
         lastESPFrame = now
 
-        -- Limpiar Drawing objects de NPCs muertos
         PruneDeadESP(liveSet)
 
-        -- ESP Drawing API
         if drawingSupported and S.ESPEnabled and not S.UseAltESP then
             HideAllESP()
-
             for _, entry in ipairs(liveNPCs) do
                 local hrp   = entry.hrp
                 local model = entry.model
@@ -478,10 +559,10 @@ task.spawn(function()
                 if not onScreen or sp.Z <= 0 then continue end
 
                 local scale = 1000 / (sp.Z * 10)
-                local h = math.clamp(scale * S.ESPSize, 20, 400)
-                local w = h / 1.5
-                local pos = Vector2.new(sp.X - w/2, sp.Y - h/2)
-                local sz  = Vector2.new(w, h)
+                local h     = math.clamp(scale * S.ESPSize, 20, 400)
+                local w     = h / 1.5
+                local pos   = Vector2.new(sp.X - w/2, sp.Y - h/2)
+                local sz    = Vector2.new(w, h)
 
                 local cache = GetESP(model)
                 if not cache then continue end
@@ -505,12 +586,10 @@ task.spawn(function()
             HideAllESP()
         end
 
-        -- ESP Alternativo (Billboard)
         if S.UseAltESP then
             for _, entry in ipairs(liveNPCs) do
                 CreateBillboard(entry)
             end
-            -- Limpiar billboards de NPCs muertos
             for model, bb in pairs(BillboardCache) do
                 if not liveSet[model] then
                     pcall(function() if bb and bb.Parent then bb:Destroy() end end)
@@ -521,10 +600,9 @@ task.spawn(function()
             if next(BillboardCache) then ClearBillboards() end
         end
 
-        -- TRACERS
         if drawingSupported and S.TracersEnabled then
             HideAllTracers()
-            local tracerCol = S.RainbowEnabled and GetRainbow() or S.TracerColor
+            local tracerCol    = S.RainbowEnabled and GetRainbow() or S.TracerColor
             local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
 
             for _, entry in ipairs(liveNPCs) do
@@ -549,37 +627,54 @@ task.spawn(function()
     -- =============================================
     --                   UI
     -- =============================================
-    AimbotTab:CreateSection("⚙️ Aimbot NPCs")
+    AimbotTab:CreateSection("Aimbot NPCs")
 
     AimbotTab:CreateToggle({
         Name = "Activar Aimbot",
         CurrentValue = false,
-        Callback = function(v) S.Enabled = v end
+        Callback = function(v)
+            S.Enabled = v
+            if not v then
+                S.AimbotPaused = false
+                CurrentTarget  = nil
+            end
+        end
     })
 
     AimbotTab:CreateKeybind({
-        Name = "Hold para apuntar",
+        Name = "Tecla Pausa / Reanudar Aimbot",
         CurrentKeybind = "Q",
-        Hold = true,
-        Callback = function(holding)
-            Holding = holding
+        Hold = false,
+        Callback = function(keybind)
+            if typeof(keybind) == "EnumItem" then
+                PauseKeybind = keybind
+            elseif typeof(keybind) == "string" then
+                local ok, kc = pcall(function() return Enum.KeyCode[keybind] end)
+                if ok and kc then PauseKeybind = kc end
+            end
         end
     })
 
     AimbotTab:CreateToggle({
         Name = "Auto Apuntar",
         CurrentValue = false,
-        Callback = function(v) S.AutoAim = v end
+        Callback = function(v)
+            S.AutoAim = v
+            if not v then CurrentTarget = nil end
+        end
     })
 
     AimbotTab:CreateDropdown({
         Name = "Modo Aimbot",
         Options = {"Camara", "Mouse"},
         CurrentOption = "Camara",
-        Callback = function(v) S.AimMode = v end
+        Callback = function(v)
+            S.AimMode     = v
+            CurrentTarget = nil
+        end
     })
 
-    AimbotTab:CreateSection("🎯 FOV")
+    AimbotTab:CreateSection("FOV")
 
     AimbotTab:CreateToggle({
         Name = "Mostrar FOV",
@@ -588,7 +683,7 @@ task.spawn(function()
     })
 
     AimbotTab:CreateSlider({
-        Name = "Tamaño FOV",
+        Name = "Tamano FOV",
         Range = {10, 1000},
         Increment = 5,
         CurrentValue = S.FOVRadius,
@@ -601,17 +696,17 @@ task.spawn(function()
         Callback = function(v) S.FOVColor = v end
     })
 
-    AimbotTab:CreateSection("🎮 Modo Cámara")
+    AimbotTab:CreateSection("Modo Camara")
 
     AimbotTab:CreateSlider({
-        Name = "Sensibilidad Cámara",
+        Name = "Sensibilidad Camara",
         Range = {0, 100},
         Increment = 1,
         CurrentValue = S.CamSensitivity,
         Callback = function(v) S.CamSensitivity = v end
     })
 
-    AimbotTab:CreateSection("🖱️ Modo Mouse")
+    AimbotTab:CreateSection("Modo Mouse")
 
     AimbotTab:CreateSlider({
         Name = "Suavizado Mouse",
@@ -621,7 +716,7 @@ task.spawn(function()
         Callback = function(v) S.MouseSmoothness = v end
     })
 
-    AimbotTab:CreateSection("🎯 Target")
+    AimbotTab:CreateSection("Target")
 
     AimbotTab:CreateDropdown({
         Name = "Parte a Apuntar",
@@ -643,30 +738,30 @@ task.spawn(function()
     })
 
     AimbotTab:CreateSlider({
-        Name = "Distancia Máxima",
+        Name = "Distancia Maxima",
         Range = {10, 1000},
         Increment = 10,
         CurrentValue = S.MaxDistance,
         Callback = function(v) S.MaxDistance = v end
     })
 
-    AimbotTab:CreateSection("🔮 Predicción")
+    AimbotTab:CreateSection("Prediccion")
 
     AimbotTab:CreateToggle({
-        Name = "Activar Predicción",
+        Name = "Activar Prediccion",
         CurrentValue = false,
         Callback = function(v) S.PredictionEnabled = v end
     })
 
     AimbotTab:CreateSlider({
-        Name = "Fuerza de Predicción",
+        Name = "Fuerza de Prediccion",
         Range = {1, 50},
         Increment = 1,
         CurrentValue = 15,
         Callback = function(v) S.PredictionStrength = v / 100 end
     })
 
-    AimbotTab:CreateSection("👁️ ESP & Visuals")
+    AimbotTab:CreateSection("ESP y Visuals")
 
     AimbotTab:CreateToggle({
         Name = "ESP NPCs",
@@ -708,7 +803,7 @@ task.spawn(function()
     })
 
     AimbotTab:CreateColorPicker({
-        Name = "Color ESP / Tracers",
+        Name = "Color ESP y Tracers",
         Color = S.ESPColor,
         Callback = function(v)
             S.ESPColor    = v
@@ -717,14 +812,14 @@ task.spawn(function()
     })
 
     AimbotTab:CreateSlider({
-        Name = "Tamaño ESP",
+        Name = "Tamano ESP",
         Range = {2, 30},
         Increment = 1,
         CurrentValue = S.ESPSize,
         Callback = function(v) S.ESPSize = v end
     })
 
-    AimbotTab:CreateSection("🌈 Extras")
+    AimbotTab:CreateSection("Extras")
 
     AimbotTab:CreateToggle({
         Name = "Rainbow",
@@ -741,7 +836,7 @@ task.spawn(function()
     })
 
     AimbotTab:CreateSlider({
-        Name = "Límite de NPCs",
+        Name = "Limite de NPCs",
         Range = {10, 500},
         Increment = 10,
         CurrentValue = S.MaxNPCs,
@@ -749,12 +844,12 @@ task.spawn(function()
     })
 
     AimbotTab:CreateSlider({
-        Name = "Profundidad de Búsqueda",
+        Name = "Profundidad de Busqueda",
         Range = {1, 10},
         Increment = 1,
         CurrentValue = S.ScanDepth,
         Callback = function(v) S.ScanDepth = v end
     })
 
-    print("✅ Aimbot NPCs listo | Modo: " .. S.AimMode)
+    print("Aimbot NPCs listo | Modo: " .. S.AimMode)
 end)
