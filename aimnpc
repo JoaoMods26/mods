@@ -2,378 +2,444 @@ task.spawn(function()
     repeat task.wait() until game:IsLoaded()
     repeat task.wait() until _G.AimbotTab
 
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
+    local Players         = game:GetService("Players")
+    local RunService      = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
-    local Camera = workspace.CurrentCamera
-    local LocalPlayer = Players.LocalPlayer
-    local AimbotTab = _G.AimbotTab
+    local Camera          = workspace.CurrentCamera
+    local LocalPlayer     = Players.LocalPlayer
+    local AimbotTab       = _G.AimbotTab
 
-    AimbotTab:CreateSection("Aimbot NPCs - Mouse/Cámara")
-
-    -- ===== CONFIGURACIÓN =====
-    local Settings = {
-        Enabled          = false,
-        AutoAim          = false,
-        UseMouseMode     = false,   -- NUEVO: false = modo cámara, true = modo mouse
-        FOVRadius        = 300,
-        FOVColor         = Color3.fromRGB(255, 165, 0),
-        FOVVisible       = true,
-        ESPEnabled       = false,
-        ESPColor         = Color3.fromRGB(255, 165, 0),
-        ESPSize          = 10,
-        ShowNPCNames     = true,
-        ShowNamesOnly    = false,
-        TracersEnabled   = false,
-        TracerColor      = Color3.fromRGB(255, 165, 0),
-        AimPart          = "Head",
-        WallCheck        = false,
-        OnlyClose        = false,
-        MaxDistance      = 150,
-        Sensitivity      = 5,       -- Para modo cámara
-        MouseSmoothness  = 3,       -- Para modo mouse
-        PredictionEnabled = false,
+    -- =============================================
+    --              CONFIGURACIÓN
+    -- =============================================
+    local S = {
+        Enabled            = false,
+        AimMode            = "Camara",   -- "Camara" | "Mouse"
+        AutoAim            = false,
+        HoldToAim          = false,      -- controlado por keybind
+        FOVRadius          = 300,
+        FOVColor           = Color3.fromRGB(255, 165, 0),
+        FOVVisible         = true,
+        ESPEnabled         = false,
+        UseAltESP          = false,
+        ESPColor           = Color3.fromRGB(255, 165, 0),
+        ESPSize            = 10,
+        ShowNPCNames       = true,
+        ShowNamesOnly      = false,
+        TracersEnabled     = false,
+        TracerColor        = Color3.fromRGB(255, 165, 0),
+        AimPart            = "Head",
+        WallCheck          = false,
+        OnlyClose          = false,
+        MaxDistance        = 300,
+        -- Cámara
+        CamSensitivity     = 5,
+        -- Mouse
+        MouseSmoothness    = 3,
+        -- Predicción
+        PredictionEnabled  = false,
         PredictionStrength = 0.15,
-        RainbowEnabled   = false,
-        RainbowSpeed     = 5,
-        MaxNPCs          = 50,
-        UseAltESP        = false,
+        -- Rainbow
+        RainbowEnabled     = false,
+        RainbowSpeed       = 5,
+        -- NPC scan
+        MaxNPCs            = 200,        -- aumentado
+        ScanDepth          = 6,          -- profundidad de búsqueda en workspace
     }
 
-    local Holding = false
+    local Holding          = false       -- click derecho
     local drawingSupported = false
 
-    -- ===== VERIFICAR DRAWING =====
+    -- =============================================
+    --           VERIFICAR DRAWING API
+    -- =============================================
     pcall(function()
-        local t = Drawing.new("Circle")
-        t:Remove()
+        local t = Drawing.new("Circle"); t:Remove()
         drawingSupported = true
     end)
 
-    -- ===== FOV CIRCLE =====
+    -- =============================================
+    --               FOV CIRCLE
+    -- =============================================
     local FOVCircle
     if drawingSupported then
         pcall(function()
-            FOVCircle = Drawing.new("Circle")
-            FOVCircle.Filled = false
+            FOVCircle           = Drawing.new("Circle")
+            FOVCircle.Filled    = false
             FOVCircle.Thickness = 1.5
-            FOVCircle.NumSides = 80
+            FOVCircle.NumSides  = 80
             FOVCircle.Transparency = 1
-            FOVCircle.Visible = false
+            FOVCircle.Visible   = false
         end)
     end
 
-    -- ===== RAINBOW =====
+    -- =============================================
+    --                 RAINBOW
+    -- =============================================
     local function GetRainbow()
-        return Color3.fromHSV((tick() * Settings.RainbowSpeed / 10) % 1, 1, 1)
+        return Color3.fromHSV((tick() * S.RainbowSpeed / 10) % 1, 1, 1)
     end
 
-    -- ===== CACHE DE JUGADORES REALES =====
-    local realPlayers = {}
+    local function ActiveColor()
+        return S.RainbowEnabled and GetRainbow() or S.ESPColor
+    end
+
+    -- =============================================
+    --         CACHE DE JUGADORES REALES
+    -- =============================================
+    local realPlayerSet = {}
+
     local function RefreshRealPlayers()
-        realPlayers = {}
-        for _, p in pairs(Players:GetPlayers()) do
-            realPlayers[p.Name] = true
-            if p.Character then realPlayers[p.Character.Name] = true end
+        realPlayerSet = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            realPlayerSet[p] = true
+            if p.Character then realPlayerSet[p.Character] = true end
         end
     end
     RefreshRealPlayers()
+    Players.PlayerAdded:Connect(function() task.wait(0.5); RefreshRealPlayers() end)
+    Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshRealPlayers() end)
 
-    Players.PlayerAdded:Connect(RefreshRealPlayers)
-    Players.PlayerRemoving:Connect(function()
-        task.wait(0.1)
-        RefreshRealPlayers()
-    end)
-
-    -- ===== CACHE DE NPCs (se refresca cada 2 segundos, no cada frame) =====
-    local npcCache = {}
-    local lastNPCRefresh = 0
-    local NPC_REFRESH_INTERVAL = 2 -- segundos
-
+    -- =============================================
+    --    VALIDAR NPC (rápido, sin loops internos)
+    -- =============================================
     local function IsValidNPC(model)
-        if not model:IsA("Model") then return false end
+        if not model:IsA("Model")                          then return false end
+        if realPlayerSet[model]                            then return false end
+        if model == LocalPlayer.Character                  then return false end
         local hum = model:FindFirstChildOfClass("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart")
-        if not hum or not hrp then return false end
-        if hum.Health <= 0 then return false end
-        if model == LocalPlayer.Character then return false end
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character == model then return false end
-        end
-        if realPlayers[model.Name] then return false end
-        return true
+        if not hum or not hrp                             then return false end
+        if hum.Health <= 0                                then return false end
+        return true, hum, hrp
     end
 
-    local function SearchWorkspace(container, result, count)
-        for _, obj in pairs(container:GetChildren()) do
-            if count[1] >= Settings.MaxNPCs then break end
-            if obj:IsA("Model") and IsValidNPC(obj) then
-                table.insert(result, obj)
-                count[1] = count[1] + 1
-            end
-            if obj:IsA("Folder") or obj:IsA("Model") then
-                SearchWorkspace(obj, result, count)
+    -- =============================================
+    --    CACHE DE NPCs — refresco cada 2s
+    --    SIN límite artificial, busca en profundidad
+    -- =============================================
+    local npcCache       = {}
+    local lastNPCRefresh = 0
+    local REFRESH_RATE   = 2
+
+    local function ScanContainer(container, result, depth)
+        if depth <= 0 then return end
+        local ok, children = pcall(function() return container:GetChildren() end)
+        if not ok then return end
+        for _, obj in ipairs(children) do
+            if #result >= S.MaxNPCs then break end
+            if obj:IsA("Model") then
+                local valid, hum, hrp = IsValidNPC(obj)
+                if valid then
+                    table.insert(result, {model=obj, hum=hum, hrp=hrp})
+                else
+                    -- puede ser un modelo contenedor con NPCs dentro
+                    ScanContainer(obj, result, depth - 1)
+                end
+            elseif obj:IsA("Folder") then
+                ScanContainer(obj, result, depth - 1)
             end
         end
     end
 
     local function RefreshNPCCache()
         local now = tick()
-        if now - lastNPCRefresh < NPC_REFRESH_INTERVAL then return end
+        if now - lastNPCRefresh < REFRESH_RATE then return end
         lastNPCRefresh = now
         npcCache = {}
-        local count = {0}
-        SearchWorkspace(workspace, npcCache, count)
+        ScanContainer(workspace, npcCache, S.ScanDepth)
     end
 
-    -- Llamada inicial
-    task.delay(1, RefreshNPCCache)
+    -- =============================================
+    --    OBTENER NPCs VIVOS DEL CACHE
+    --    (valida salud en tiempo real, no recorre workspace)
+    -- =============================================
+    local function GetLiveNPCs()
+        local live = {}
+        for _, entry in ipairs(npcCache) do
+            local ok = pcall(function()
+                if entry.model and entry.model.Parent
+                and entry.hum and entry.hum.Health > 0
+                and entry.hrp and entry.hrp.Parent then
+                    table.insert(live, entry)
+                end
+            end)
+        end
+        return live
+    end
 
-    -- ===== VISIBILIDAD (wall check) =====
-    local function IsVisible(targetChar)
-        if not Settings.WallCheck then return true end
-        local hrp = targetChar:FindFirstChild("HumanoidRootPart")
-        if not hrp then return false end
+    -- =============================================
+    --          WALL CHECK
+    -- =============================================
+    local function IsVisible(hrp, targetModel)
+        if not S.WallCheck then return true end
         local ok, res = pcall(function()
-            local dir = (hrp.Position - Camera.CFrame.Position)
-            local rp = RaycastParams.new()
-            rp.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
-            rp.FilterType = Enum.RaycastFilterType.Blacklist
+            local dir = hrp.Position - Camera.CFrame.Position
+            local rp  = RaycastParams.new()
+            rp.FilterDescendantsInstances = {LocalPlayer.Character, targetModel}
+            rp.FilterType  = Enum.RaycastFilterType.Blacklist
             rp.IgnoreWater = true
             local hit = workspace:Raycast(Camera.CFrame.Position, dir, rp)
-            return hit == nil or targetChar:IsAncestorOf(hit.Instance)
+            return hit == nil or targetModel:IsAncestorOf(hit.Instance)
         end)
         return ok and res
     end
 
-    -- ===== OBTENER NPC MÁS CERCANO =====
-    local function GetClosestNPC()
-        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
-        local mousePos = UserInputService:GetMouseLocation()
-        local closest, bestDist = nil, math.huge
+    -- =============================================
+    --       OBTENER NPC MÁS CERCANO AL CURSOR
+    -- =============================================
+    local function GetClosestNPC(liveNPCs)
+        if not LocalPlayer.Character then return nil end
+        local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return nil end
 
-        for _, npc in pairs(npcCache) do
-            -- Validar que siga vivo (cache puede tener NPCs muertos)
-            local hum = npc:FindFirstChildOfClass("Humanoid")
-            local hrp = npc:FindFirstChild("HumanoidRootPart")
-            if not hum or not hrp or hum.Health <= 0 then continue end
-            if not IsVisible(npc) then continue end
+        local mousePos  = UserInputService:GetMouseLocation()
+        local best, bestDist = nil, math.huge
+
+        for _, entry in ipairs(liveNPCs) do
+            local hrp = entry.hrp
+
+            if S.OnlyClose then
+                local wd = (hrp.Position - myHRP.Position).Magnitude
+                if wd > S.MaxDistance then continue end
+            end
+
+            if not IsVisible(hrp, entry.model) then continue end
 
             local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            if not onScreen then continue end
+            if not onScreen or sp.Z <= 0 then continue end
 
             local dist = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
-            if dist >= Settings.FOVRadius then continue end
-
-            if Settings.OnlyClose then
-                local wd = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if wd > Settings.MaxDistance then continue end
-            end
+            if dist >= S.FOVRadius then continue end
 
             if dist < bestDist then
                 bestDist = dist
-                closest = npc
+                best     = entry
             end
         end
-        return closest
+
+        return best
     end
 
-    -- ===== INPUT =====
-    UserInputService.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton2 then Holding = true end
+    -- =============================================
+    --              PREDICCIÓN
+    -- =============================================
+    local function PredictPos(entry)
+        local part = entry.model:FindFirstChild(S.AimPart)
+                  or entry.hrp
+        if not S.PredictionEnabled then return part.Position end
+        local vel = entry.hrp.AssemblyLinearVelocity or Vector3.new()
+        return part.Position + vel * S.PredictionStrength
+    end
+
+    -- =============================================
+    --     INPUT — click derecho + keybind
+    -- =============================================
+    UserInputService.InputBegan:Connect(function(i, gp)
+        if gp then return end
+        if i.UserInputType == Enum.UserInputType.MouseButton2 then
+            Holding = true
+        end
     end)
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton2 then Holding = false end
+        if i.UserInputType == Enum.UserInputType.MouseButton2 then
+            Holding = false
+        end
     end)
 
-    -- ===== ESP - CACHE PERSISTENTE (no recrear cada frame) =====
-    local ESPCache    = {}  -- key: tostring(model)
+    -- =============================================
+    --           ESP — CACHE PERSISTENTE
+    --  Drawing objects se crean UNA VEZ, luego
+    --  solo se actualizan sus propiedades
+    -- =============================================
+    local ESPCache    = {}   -- key: model instance
     local TracerCache = {}
-    local BillboardESPs = {}
+    local BillboardCache = {}
     local ESPFolder = Instance.new("Folder", game.CoreGui)
-    ESPFolder.Name = "NPCESPFolder_" .. math.random(1,9999)
+    ESPFolder.Name  = "NPCESP_" .. math.random(1,99999)
 
-    local function GetOrCreateESP(key, npcName)
-        if ESPCache[key] then return ESPCache[key] end
+    local function GetESP(model)
+        if ESPCache[model] then return ESPCache[model] end
         local box, text
         pcall(function()
-            box = Drawing.new("Square")
+            box           = Drawing.new("Square")
             box.Thickness = 2
-            box.Filled = false
+            box.Filled    = false
             box.Transparency = 1
-            box.Visible = false
-            box.ZIndex = 1
+            box.Visible   = false
+            box.ZIndex    = 1
         end)
         pcall(function()
-            text = Drawing.new("Text")
-            text.Size = 16
-            text.Center = true
-            text.Outline = true
-            text.Visible = false
-            text.ZIndex = 2
+            text          = Drawing.new("Text")
+            text.Size     = 16
+            text.Center   = true
+            text.Outline  = true
+            text.Visible  = false
+            text.ZIndex   = 2
         end)
         if box and text then
-            ESPCache[key] = {box=box, text=text}
+            ESPCache[model] = {box=box, text=text}
         end
-        return ESPCache[key]
+        return ESPCache[model]
     end
 
-    local function GetOrCreateTracer(key)
-        if TracerCache[key] then return TracerCache[key] end
+    local function GetTracer(model)
+        if TracerCache[model] then return TracerCache[model] end
         local line
         pcall(function()
-            line = Drawing.new("Line")
-            line.Thickness = 1.5
+            line             = Drawing.new("Line")
+            line.Thickness   = 1.5
             line.Transparency = 1
-            line.Visible = false
-            line.ZIndex = 1
+            line.Visible     = false
+            line.ZIndex      = 1
         end)
-        if line then TracerCache[key] = {line=line} end
-        return TracerCache[key]
+        if line then TracerCache[model] = {line=line} end
+        return TracerCache[model]
     end
 
     local function HideAllESP()
         for _, c in pairs(ESPCache) do
             pcall(function()
-                if c.box  then c.box.Visible  = false end
-                if c.text then c.text.Visible = false end
+                c.box.Visible  = false
+                c.text.Visible = false
             end)
         end
     end
 
     local function HideAllTracers()
         for _, c in pairs(TracerCache) do
-            pcall(function() if c.line then c.line.Visible = false end end)
+            pcall(function() c.line.Visible = false end)
+        end
+    end
+
+    -- Limpiar entradas de NPCs que ya no existen
+    local function PruneDeadESP(liveSet)
+        for model, cache in pairs(ESPCache) do
+            if not liveSet[model] then
+                pcall(function() cache.box:Remove(); cache.text:Remove() end)
+                ESPCache[model] = nil
+            end
+        end
+        for model, cache in pairs(TracerCache) do
+            if not liveSet[model] then
+                pcall(function() cache.line:Remove() end)
+                TracerCache[model] = nil
+            end
         end
     end
 
     local function ClearBillboards()
-        for _, b in pairs(BillboardESPs) do
-            pcall(function() if b and b.Parent then b:Destroy() end end)
+        for _, bb in pairs(BillboardCache) do
+            pcall(function() if bb and bb.Parent then bb:Destroy() end end)
         end
-        BillboardESPs = {}
+        BillboardCache = {}
     end
 
-    local function CreateBillboard(npc)
-        local hrp = npc:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        local key = tostring(npc)
-        if BillboardESPs[key] and BillboardESPs[key].Parent then return end
+    local function CreateBillboard(entry)
+        local model = entry.model
+        local hrp   = entry.hrp
+        if BillboardCache[model] and BillboardCache[model].Parent then return end
 
         local bb = Instance.new("BillboardGui")
-        bb.Adornee = hrp
-        bb.Size = UDim2.new(4,0,5,0)
-        bb.StudsOffset = Vector3.new(0,1,0)
-        bb.AlwaysOnTop = true
+        bb.Adornee      = hrp
+        bb.Size         = UDim2.new(4,0,5,0)
+        bb.StudsOffset  = Vector3.new(0,1,0)
+        bb.AlwaysOnTop  = true
         bb.ResetOnSpawn = false
-        bb.Parent = ESPFolder
+        bb.Parent       = ESPFolder
 
         local f = Instance.new("Frame", bb)
-        f.Size = UDim2.new(1,0,1,0)
+        f.Size                = UDim2.new(1,0,1,0)
         f.BackgroundTransparency = 1
 
-        local col = Settings.RainbowEnabled and GetRainbow() or Settings.ESPColor
-        local function border(pos, sz)
-            local b = Instance.new("Frame", f)
-            b.Position = pos; b.Size = sz
+        local col = ActiveColor()
+        local function mkBorder(p,s)
+            local b = Instance.new("Frame",f)
+            b.Position = p; b.Size = s
             b.BackgroundColor3 = col; b.BorderSizePixel = 0
         end
-        border(UDim2.new(0,0,0,0),   UDim2.new(1,0,0,2))
-        border(UDim2.new(0,0,1,-2),  UDim2.new(1,0,0,2))
-        border(UDim2.new(0,0,0,0),   UDim2.new(0,2,1,0))
-        border(UDim2.new(1,-2,0,0),  UDim2.new(0,2,1,0))
+        mkBorder(UDim2.new(0,0,0,0),  UDim2.new(1,0,0,2))
+        mkBorder(UDim2.new(0,0,1,-2), UDim2.new(1,0,0,2))
+        mkBorder(UDim2.new(0,0,0,0),  UDim2.new(0,2,1,0))
+        mkBorder(UDim2.new(1,-2,0,0), UDim2.new(0,2,1,0))
 
         local lbl = Instance.new("TextLabel", f)
-        lbl.Size = UDim2.new(1,0,0,20)
+        lbl.Size     = UDim2.new(1,0,0,20)
         lbl.Position = UDim2.new(0,0,-0.15,0)
         lbl.BackgroundTransparency = 1
-        lbl.Text = Settings.ShowNPCNames and npc.Name or "NPC"
+        lbl.Text     = S.ShowNPCNames and model.Name or "NPC"
         lbl.TextColor3 = col
         lbl.TextStrokeTransparency = 0.5
-        lbl.Font = Enum.Font.SourceSansBold
+        lbl.Font     = Enum.Font.SourceSansBold
         lbl.TextSize = 14
 
-        BillboardESPs[key] = bb
+        BillboardCache[model] = bb
     end
 
-    -- ===== PREDICCIÓN =====
-    local function PredictPos(part)
-        if not Settings.PredictionEnabled or not part or not part.Parent then return part.Position end
-        local hrp = part.Parent:FindFirstChild("HumanoidRootPart")
-        if not hrp then return part.Position end
-        local vel = hrp.AssemblyLinearVelocity or Vector3.new()
-        return part.Position + (vel * Settings.PredictionStrength)
-    end
-
-    -- ===== VARIABLES MOUSE MODE =====
-    local currentTarget = nil
-    local stickyLock = false
-    local targetLockTime = 0
-
-    -- ===== LOOP PRINCIPAL =====
-    local lastFrame = tick()
-    local lastESPFrame = tick()
-    local frameSkip = 0
+    -- =============================================
+    --            LOOP PRINCIPAL
+    -- =============================================
+    local lastAimFrame  = tick()
+    local lastESPFrame  = tick()
+    local idleSkip      = 0
 
     RunService.RenderStepped:Connect(function()
         local now = tick()
 
-        -- Refrescar cache de NPCs (cada 2s, no cada frame)
+        -- Refrescar cache NPCs (solo cada 2s)
         RefreshNPCCache()
 
-        local anyActive = Settings.Enabled or Settings.ESPEnabled
-            or Settings.TracersEnabled or Settings.UseAltESP or Settings.RainbowEnabled
+        local anyActive = S.Enabled or S.ESPEnabled or S.TracersEnabled or S.UseAltESP
 
+        -- Si nada está activo, ocultar cada 30 frames y salir
         if not anyActive then
-            frameSkip += 1
-            if frameSkip >= 30 then
-                HideAllESP(); HideAllTracers(); frameSkip = 0
+            idleSkip += 1
+            if idleSkip >= 30 then
+                HideAllESP(); HideAllTracers(); idleSkip = 0
             end
             return
         end
+        idleSkip = 0
 
-        -- Limitar aimbot a ~60fps
-        if now - lastFrame < 0.016 then return end
-        lastFrame = now
+        local col    = ActiveColor()
+        local liveNPCs = GetLiveNPCs()
 
-        -- RAINBOW
-        local activeColor = Settings.RainbowEnabled and GetRainbow() or Settings.ESPColor
-        local tracerCol   = Settings.RainbowEnabled and GetRainbow() or Settings.TracerColor
-        local fovCol      = Settings.RainbowEnabled and GetRainbow() or Settings.FOVColor
+        -- Construir set de modelos vivos (para PruneDeadESP)
+        local liveSet = {}
+        for _, e in ipairs(liveNPCs) do liveSet[e.model] = true end
 
-        -- FOV CIRCLE
-        if drawingSupported and FOVCircle then
-            local shouldShow = (Holding or Settings.AutoAim) and Settings.Enabled and Settings.FOVVisible
-            if shouldShow then
-                local mp = UserInputService:GetMouseLocation()
-                FOVCircle.Position = Vector2.new(mp.X, mp.Y)
-                FOVCircle.Radius = Settings.FOVRadius
-                FOVCircle.Color = fovCol
-                FOVCircle.Visible = true
-            else
-                FOVCircle.Visible = false
+        -- ============ AIMBOT (60 fps cap) ============
+        if now - lastAimFrame >= 0.016 then
+            lastAimFrame = now
+
+            -- FOV CIRCLE
+            if drawingSupported and FOVCircle then
+                local showFOV = S.Enabled and S.FOVVisible and (Holding or S.AutoAim)
+                if showFOV then
+                    local mp = UserInputService:GetMouseLocation()
+                    FOVCircle.Position = Vector2.new(mp.X, mp.Y)
+                    FOVCircle.Radius   = S.FOVRadius
+                    FOVCircle.Color    = S.RainbowEnabled and GetRainbow() or S.FOVColor
+                    FOVCircle.Visible  = true
+                else
+                    FOVCircle.Visible = false
+                end
             end
-        end
 
-        -- ===== AIMBOT =====
-        if Settings.Enabled and (Holding or Settings.AutoAim) then
-            local target = GetClosestNPC()
+            -- AIMBOT
+            if S.Enabled and (Holding or S.AutoAim) then
+                local entry = GetClosestNPC(liveNPCs)
+                if entry then
+                    local predictedPos = PredictPos(entry)
 
-            if target then
-                local aimPart = target:FindFirstChild(Settings.AimPart)
-                    or target:FindFirstChild("HumanoidRootPart")
-
-                if aimPart then
-                    local predictedPos = PredictPos(aimPart)
-
-                    if Settings.UseMouseMode then
-                        -- ===== MODO MOUSE (mousemoverel) =====
+                    if S.AimMode == "Mouse" then
+                        -- ===== MODO MOUSE =====
                         if getfenv and getfenv().mousemoverel then
                             local screen, onScreen = Camera:WorldToViewportPoint(predictedPos)
                             if onScreen and screen.Z > 0 then
                                 local mp = UserInputService:GetMouseLocation()
-                                local dx = (screen.X - mp.X) / Settings.MouseSmoothness
-                                local dy = (screen.Y - mp.Y) / Settings.MouseSmoothness
+                                local dx = (screen.X - mp.X) / math.max(S.MouseSmoothness, 0.1)
+                                local dy = (screen.Y - mp.Y) / math.max(S.MouseSmoothness, 0.1)
                                 if math.abs(dx) < 300 and math.abs(dy) < 300 then
                                     getfenv().mousemoverel(dx, dy)
                                 end
@@ -382,11 +448,11 @@ task.spawn(function()
                     else
                         -- ===== MODO CÁMARA =====
                         pcall(function()
-                            local cur = Camera.CFrame
-                            local tgt = CFrame.new(cur.Position, predictedPos)
-                            local alpha = Settings.Sensitivity <= 0
+                            local cur   = Camera.CFrame
+                            local tgt   = CFrame.new(cur.Position, predictedPos)
+                            local alpha = S.CamSensitivity <= 0
                                 and 1
-                                or math.clamp(0.1 + Settings.Sensitivity / 100, 0, 1)
+                                or math.clamp(0.05 + S.CamSensitivity / 100, 0.05, 1)
                             Camera.CFrame = cur:Lerp(tgt, alpha)
                         end)
                     end
@@ -394,216 +460,202 @@ task.spawn(function()
             end
         end
 
-        -- ===== ESP (limitar a 30fps para ahorrar recursos) =====
+        -- ============ ESP (30 fps cap) ============
         if now - lastESPFrame < 0.033 then return end
         lastESPFrame = now
 
-        -- ESP Drawing
-        if drawingSupported and Settings.ESPEnabled and not Settings.UseAltESP then
+        -- Limpiar Drawing objects de NPCs muertos
+        PruneDeadESP(liveSet)
+
+        -- ESP Drawing API
+        if drawingSupported and S.ESPEnabled and not S.UseAltESP then
             HideAllESP()
 
-            for _, npc in pairs(npcCache) do
-                local hum = npc:FindFirstChildOfClass("Humanoid")
-                local hrp = npc:FindFirstChild("HumanoidRootPart")
-                if not hum or not hrp or hum.Health <= 0 then continue end
-
+            for _, entry in ipairs(liveNPCs) do
+                local hrp   = entry.hrp
+                local model = entry.model
                 local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                 if not onScreen or sp.Z <= 0 then continue end
 
-                local key = tostring(npc)
                 local scale = 1000 / (sp.Z * 10)
-                local h = math.clamp(scale * Settings.ESPSize, 20, 400)
+                local h = math.clamp(scale * S.ESPSize, 20, 400)
                 local w = h / 1.5
                 local pos = Vector2.new(sp.X - w/2, sp.Y - h/2)
                 local sz  = Vector2.new(w, h)
 
-                local cache = GetOrCreateESP(key, npc.Name)
-                if cache then
-                    pcall(function()
-                        if cache.box then
-                            if Settings.ShowNamesOnly then
-                                cache.box.Visible = false
-                            else
-                                cache.box.Color = activeColor
-                                cache.box.Size = sz
-                                cache.box.Position = pos
-                                cache.box.Visible = true
-                            end
-                        end
-                        if cache.text then
-                            cache.text.Text = Settings.ShowNPCNames and npc.Name or "NPC"
-                            cache.text.Color = activeColor
-                            cache.text.Position = Vector2.new(pos.X + sz.X/2, pos.Y - 20)
-                            cache.text.Visible = true
-                        end
-                    end)
-                end
+                local cache = GetESP(model)
+                if not cache then continue end
+
+                pcall(function()
+                    if S.ShowNamesOnly then
+                        cache.box.Visible = false
+                    else
+                        cache.box.Color    = col
+                        cache.box.Size     = sz
+                        cache.box.Position = pos
+                        cache.box.Visible  = true
+                    end
+                    cache.text.Text     = S.ShowNPCNames and model.Name or "NPC"
+                    cache.text.Color    = col
+                    cache.text.Position = Vector2.new(pos.X + sz.X/2, pos.Y - 20)
+                    cache.text.Visible  = true
+                end)
             end
+        elseif not S.ESPEnabled then
+            HideAllESP()
         end
 
-        -- ESP Alternativo
-        if Settings.UseAltESP then
-            local active = {}
-            for _, npc in pairs(npcCache) do
-                local hum = npc:FindFirstChildOfClass("Humanoid")
-                local hrp = npc:FindFirstChild("HumanoidRootPart")
-                if hum and hrp and hum.Health > 0 then
-                    local key = tostring(npc)
-                    active[key] = true
-                    if not BillboardESPs[key] or not BillboardESPs[key].Parent then
-                        CreateBillboard(npc)
-                    end
-                end
+        -- ESP Alternativo (Billboard)
+        if S.UseAltESP then
+            for _, entry in ipairs(liveNPCs) do
+                CreateBillboard(entry)
             end
-            for key, bb in pairs(BillboardESPs) do
-                if not active[key] then
+            -- Limpiar billboards de NPCs muertos
+            for model, bb in pairs(BillboardCache) do
+                if not liveSet[model] then
                     pcall(function() if bb and bb.Parent then bb:Destroy() end end)
-                    BillboardESPs[key] = nil
+                    BillboardCache[model] = nil
                 end
             end
         else
-            ClearBillboards()
+            if next(BillboardCache) then ClearBillboards() end
         end
 
         -- TRACERS
-        if drawingSupported and Settings.TracersEnabled then
+        if drawingSupported and S.TracersEnabled then
             HideAllTracers()
-            for _, npc in pairs(npcCache) do
-                local hum = npc:FindFirstChildOfClass("Humanoid")
-                local hrp = npc:FindFirstChild("HumanoidRootPart")
-                if not hum or not hrp or hum.Health <= 0 then continue end
+            local tracerCol = S.RainbowEnabled and GetRainbow() or S.TracerColor
+            local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
 
-                local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            for _, entry in ipairs(liveNPCs) do
+                local sp, onScreen = Camera:WorldToViewportPoint(entry.hrp.Position)
                 if not onScreen or sp.Z <= 0 then continue end
 
-                local key = tostring(npc)
-                local cache = GetOrCreateTracer(key)
-                if cache and cache.line then
-                    pcall(function()
-                        cache.line.Color = tracerCol
-                        cache.line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                        cache.line.To   = Vector2.new(sp.X, sp.Y)
-                        cache.line.Visible = true
-                    end)
-                end
-            end
-        end
-    end)
+                local cache = GetTracer(entry.model)
+                if not cache then continue end
 
-    -- ===== LIMPIEZA AL SALIR =====
-    Players.PlayerRemoving:Connect(function(p)
-        if p == LocalPlayer then
-            for _, c in pairs(ESPCache) do
                 pcall(function()
-                    if c.box  then c.box:Remove()  end
-                    if c.text then c.text:Remove() end
+                    cache.line.Color   = tracerCol
+                    cache.line.From    = screenCenter
+                    cache.line.To      = Vector2.new(sp.X, sp.Y)
+                    cache.line.Visible = true
                 end)
             end
-            for _, c in pairs(TracerCache) do
-                pcall(function() if c.line then c.line:Remove() end end)
-            end
-            ClearBillboards()
-            if FOVCircle then pcall(function() FOVCircle:Remove() end) end
+        elseif not S.TracersEnabled then
+            HideAllTracers()
         end
     end)
 
-    -- ===== UI =====
+    -- =============================================
+    --                   UI
+    -- =============================================
+    AimbotTab:CreateSection("⚙️ Aimbot NPCs")
+
     AimbotTab:CreateToggle({
-        Name = "Aimbot NPCs",
+        Name = "Activar Aimbot",
         CurrentValue = false,
-        Callback = function(v) Settings.Enabled = v end
+        Callback = function(v) S.Enabled = v end
+    })
+
+    AimbotTab:CreateKeybind({
+        Name = "Hold para apuntar",
+        CurrentKeybind = "Q",
+        Hold = true,
+        Callback = function(holding)
+            Holding = holding
+        end
     })
 
     AimbotTab:CreateToggle({
         Name = "Auto Apuntar",
         CurrentValue = false,
-        Callback = function(v) Settings.AutoAim = v end
+        Callback = function(v) S.AutoAim = v end
     })
 
-    -- NUEVO TOGGLE MODO MOUSE/CAMARA
-    AimbotTab:CreateToggle({
-        Name = "Modo Mouse (OFF = Modo Cámara)",
-        CurrentValue = false,
-        Callback = function(v)
-            Settings.UseMouseMode = v
-        end
+    AimbotTab:CreateDropdown({
+        Name = "Modo Aimbot",
+        Options = {"Camara", "Mouse"},
+        CurrentOption = "Camara",
+        Callback = function(v) S.AimMode = v end
     })
+
+    AimbotTab:CreateSection("🎯 FOV")
 
     AimbotTab:CreateToggle({
         Name = "Mostrar FOV",
         CurrentValue = true,
-        Callback = function(v) Settings.FOVVisible = v end
+        Callback = function(v) S.FOVVisible = v end
     })
 
     AimbotTab:CreateSlider({
-        Name = "Tamaño del FOV",
+        Name = "Tamaño FOV",
         Range = {10, 1000},
-        Increment = 1,
-        CurrentValue = Settings.FOVRadius,
-        Callback = function(v) Settings.FOVRadius = v end
+        Increment = 5,
+        CurrentValue = S.FOVRadius,
+        Callback = function(v) S.FOVRadius = v end
     })
 
     AimbotTab:CreateColorPicker({
-        Name = "Color del FOV",
-        Color = Settings.FOVColor,
-        Callback = function(v) Settings.FOVColor = v end
+        Name = "Color FOV",
+        Color = S.FOVColor,
+        Callback = function(v) S.FOVColor = v end
     })
 
-    AimbotTab:CreateSection("Modo Cámara")
+    AimbotTab:CreateSection("🎮 Modo Cámara")
 
     AimbotTab:CreateSlider({
         Name = "Sensibilidad Cámara",
         Range = {0, 100},
         Increment = 1,
-        CurrentValue = Settings.Sensitivity,
-        Callback = function(v) Settings.Sensitivity = v end
+        CurrentValue = S.CamSensitivity,
+        Callback = function(v) S.CamSensitivity = v end
     })
 
-    AimbotTab:CreateSection("Modo Mouse")
+    AimbotTab:CreateSection("🖱️ Modo Mouse")
 
     AimbotTab:CreateSlider({
         Name = "Suavizado Mouse",
         Range = {1, 20},
         Increment = 1,
-        CurrentValue = Settings.MouseSmoothness,
-        Callback = function(v) Settings.MouseSmoothness = v end
+        CurrentValue = S.MouseSmoothness,
+        Callback = function(v) S.MouseSmoothness = v end
     })
 
-    AimbotTab:CreateSection("Target")
+    AimbotTab:CreateSection("🎯 Target")
 
     AimbotTab:CreateDropdown({
         Name = "Parte a Apuntar",
         Options = {"Head", "HumanoidRootPart", "Torso", "UpperTorso"},
         CurrentOption = "Head",
-        Callback = function(v) Settings.AimPart = v end
+        Callback = function(v) S.AimPart = v end
     })
 
     AimbotTab:CreateToggle({
         Name = "Verificar Paredes",
         CurrentValue = false,
-        Callback = function(v) Settings.WallCheck = v end
+        Callback = function(v) S.WallCheck = v end
     })
 
     AimbotTab:CreateToggle({
         Name = "Solo NPCs Cercanos",
         CurrentValue = false,
-        Callback = function(v) Settings.OnlyClose = v end
+        Callback = function(v) S.OnlyClose = v end
     })
 
     AimbotTab:CreateSlider({
         Name = "Distancia Máxima",
-        Range = {10, 500},
-        Increment = 5,
-        CurrentValue = Settings.MaxDistance,
-        Callback = function(v) Settings.MaxDistance = v end
+        Range = {10, 1000},
+        Increment = 10,
+        CurrentValue = S.MaxDistance,
+        Callback = function(v) S.MaxDistance = v end
     })
 
-    AimbotTab:CreateSection("Predicción")
+    AimbotTab:CreateSection("🔮 Predicción")
 
     AimbotTab:CreateToggle({
         Name = "Activar Predicción",
         CurrentValue = false,
-        Callback = function(v) Settings.PredictionEnabled = v end
+        Callback = function(v) S.PredictionEnabled = v end
     })
 
     AimbotTab:CreateSlider({
@@ -611,16 +663,16 @@ task.spawn(function()
         Range = {1, 50},
         Increment = 1,
         CurrentValue = 15,
-        Callback = function(v) Settings.PredictionStrength = v / 100 end
+        Callback = function(v) S.PredictionStrength = v / 100 end
     })
 
-    AimbotTab:CreateSection("ESP & Visuals")
+    AimbotTab:CreateSection("👁️ ESP & Visuals")
 
     AimbotTab:CreateToggle({
         Name = "ESP NPCs",
         CurrentValue = false,
         Callback = function(v)
-            Settings.ESPEnabled = v
+            S.ESPEnabled = v
             if not v then HideAllESP() end
         end
     })
@@ -629,29 +681,38 @@ task.spawn(function()
         Name = "ESP Alternativo (Billboard)",
         CurrentValue = false,
         Callback = function(v)
-            Settings.UseAltESP = v
+            S.UseAltESP = v
             if not v then ClearBillboards() end
         end
     })
 
     AimbotTab:CreateToggle({
-        Name = "Mostrar Nombres NPCs",
+        Name = "Tracers",
+        CurrentValue = false,
+        Callback = function(v)
+            S.TracersEnabled = v
+            if not v then HideAllTracers() end
+        end
+    })
+
+    AimbotTab:CreateToggle({
+        Name = "Mostrar Nombres",
         CurrentValue = true,
-        Callback = function(v) Settings.ShowNPCNames = v end
+        Callback = function(v) S.ShowNPCNames = v end
     })
 
     AimbotTab:CreateToggle({
         Name = "Solo Nombres",
         CurrentValue = false,
-        Callback = function(v) Settings.ShowNamesOnly = v end
+        Callback = function(v) S.ShowNamesOnly = v end
     })
 
     AimbotTab:CreateColorPicker({
-        Name = "Color ESP/Tracers",
-        Color = Settings.ESPColor,
+        Name = "Color ESP / Tracers",
+        Color = S.ESPColor,
         Callback = function(v)
-            Settings.ESPColor = v
-            Settings.TracerColor = v
+            S.ESPColor    = v
+            S.TracerColor = v
         end
     })
 
@@ -659,42 +720,41 @@ task.spawn(function()
         Name = "Tamaño ESP",
         Range = {2, 30},
         Increment = 1,
-        CurrentValue = Settings.ESPSize,
-        Callback = function(v) Settings.ESPSize = v end
+        CurrentValue = S.ESPSize,
+        Callback = function(v) S.ESPSize = v end
     })
 
-    AimbotTab:CreateToggle({
-        Name = "Tracers",
-        CurrentValue = false,
-        Callback = function(v)
-            Settings.TracersEnabled = v
-            if not v then HideAllTracers() end
-        end
-    })
-
-    AimbotTab:CreateSlider({
-        Name = "Límite de NPCs",
-        Range = {5, 100},
-        Increment = 5,
-        CurrentValue = Settings.MaxNPCs,
-        Callback = function(v) Settings.MaxNPCs = v end
-    })
-
-    AimbotTab:CreateSection("Extras")
+    AimbotTab:CreateSection("🌈 Extras")
 
     AimbotTab:CreateToggle({
         Name = "Rainbow",
         CurrentValue = false,
-        Callback = function(v) Settings.RainbowEnabled = v end
+        Callback = function(v) S.RainbowEnabled = v end
     })
 
     AimbotTab:CreateSlider({
         Name = "Velocidad Rainbow",
         Range = {1, 20},
         Increment = 1,
-        CurrentValue = Settings.RainbowSpeed,
-        Callback = function(v) Settings.RainbowSpeed = v end
+        CurrentValue = S.RainbowSpeed,
+        Callback = function(v) S.RainbowSpeed = v end
     })
 
-    print("✅ Aimbot NPCs cargado - Modo Mouse/Cámara disponible")
+    AimbotTab:CreateSlider({
+        Name = "Límite de NPCs",
+        Range = {10, 500},
+        Increment = 10,
+        CurrentValue = S.MaxNPCs,
+        Callback = function(v) S.MaxNPCs = v end
+    })
+
+    AimbotTab:CreateSlider({
+        Name = "Profundidad de Búsqueda",
+        Range = {1, 10},
+        Increment = 1,
+        CurrentValue = S.ScanDepth,
+        Callback = function(v) S.ScanDepth = v end
+    })
+
+    print("✅ Aimbot NPCs listo | Modo: " .. S.AimMode)
 end)
