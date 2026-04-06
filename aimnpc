@@ -9,9 +9,6 @@ task.spawn(function()
     local LocalPlayer      = Players.LocalPlayer
     local AimbotTab        = _G.AimbotTab
 
-    -- =============================================
-    --              CONFIGURACION
-    -- =============================================
     local S = {
         Enabled            = false,
         AimMode            = "Camara",
@@ -47,25 +44,8 @@ task.spawn(function()
     local Holding      = false
     local drawingSupported = false
 
-    -- =============================================
-    --   SISTEMA DE TARGET ACTUAL
-    --
-    --   CurrentTarget guarda el entry del NPC al
-    --   que se esta apuntando ahora mismo.
-    --
-    --   Se SUELTA si:
-    --     - Health llega a 0 (murio)
-    --     - Estado es Dead, FallingDown, Ragdoll
-    --     - El modelo desaparece del workspace
-    --
-    --   Puede VOLVER A SER SELECCIONADO si:
-    --     - El NPC se levanta (estado normal)
-    --     - Su Health es > 0 de nuevo
-    --     - Vuelve a estar dentro del FOV
-    -- =============================================
     local CurrentTarget = nil
 
-    -- Estados del Humanoid que bloquean el targeting
     local BLOCKED_STATES = {
         [Enum.HumanoidStateType.Dead]        = true,
         [Enum.HumanoidStateType.FallingDown] = true,
@@ -73,8 +53,6 @@ task.spawn(function()
         [Enum.HumanoidStateType.Physics]     = true,
     }
 
-    -- Verifica si un NPC esta en condicion de ser apuntado
-    -- (vivo, de pie, no en ragdoll, modelo existente)
     local function IsNPCApuntable(entry)
         if not entry then return false end
         -- Verificar existencia del modelo y sus partes
@@ -90,12 +68,6 @@ task.spawn(function()
         return true
     end
 
-    -- Valida el CurrentTarget en tiempo real.
-    -- Si sigue siendo apuntable retorna true.
-    -- Si cayo o murio lo limpia y retorna false.
-    -- Cuando el NPC se levante, IsNPCApuntable
-    -- volvera a ser true y sera re-seleccionado
-    -- automaticamente por GetClosestNPC.
     local function ValidateCurrentTarget()
         if CurrentTarget == nil then return false end
         if IsNPCApuntable(CurrentTarget) then
@@ -106,17 +78,11 @@ task.spawn(function()
         return false
     end
 
-    -- =============================================
-    --           VERIFICAR DRAWING API
-    -- =============================================
     pcall(function()
         local t = Drawing.new("Circle"); t:Remove()
         drawingSupported = true
     end)
 
-    -- =============================================
-    --               FOV CIRCLE
-    -- =============================================
     local FOVCircle
     if drawingSupported then
         pcall(function()
@@ -130,8 +96,6 @@ task.spawn(function()
     end
 
     -- =============================================
-    --                 RAINBOW
-    -- =============================================
     local function GetRainbow()
         return Color3.fromHSV((tick() * S.RainbowSpeed / 10) % 1, 1, 1)
     end
@@ -140,8 +104,6 @@ task.spawn(function()
         return S.RainbowEnabled and GetRainbow() or S.ESPColor
     end
 
-    -- =============================================
-    --         CACHE DE JUGADORES REALES
     -- =============================================
     local realPlayerSet = {}
 
@@ -157,8 +119,6 @@ task.spawn(function()
     Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshRealPlayers() end)
 
     -- =============================================
-    --    VALIDAR NPC
-    -- =============================================
     local function IsValidNPC(model)
         if not model:IsA("Model")         then return false end
         if realPlayerSet[model]           then return false end
@@ -170,9 +130,6 @@ task.spawn(function()
         return true, hum, hrp
     end
 
-    -- =============================================
-    --    CACHE DE NPCs - refresco cada 2s
-    -- =============================================
     local npcCache       = {}
     local lastNPCRefresh = 0
     local REFRESH_RATE   = 2
@@ -204,11 +161,7 @@ task.spawn(function()
         ScanContainer(workspace, npcCache, S.ScanDepth)
     end
 
-    -- =============================================
-    --    OBTENER NPCs VIVOS DEL CACHE
-    --    Solo devuelve NPCs apuntables (vivos,
-    --    de pie, no en ragdoll ni cayendo)
-    -- =============================================
+
     local function GetLiveNPCs()
         local live = {}
         for _, entry in ipairs(npcCache) do
@@ -221,9 +174,7 @@ task.spawn(function()
         return live
     end
 
-    -- =============================================
-    --          WALL CHECK
-    -- =============================================
+
     local function IsVisible(hrp, targetModel)
         if not S.WallCheck then return true end
         local ok, res = pcall(function()
@@ -238,19 +189,6 @@ task.spawn(function()
         return ok and res
     end
 
-    -- =============================================
-    --       OBTENER NPC MAS CERCANO AL CURSOR
-    --
-    --   Logica de target sticky:
-    --   1. Si CurrentTarget sigue siendo apuntable
-    --      → mantenerlo (no buscar otro)
-    --   2. Si CurrentTarget cayo o murio
-    --      → se limpia solo (ValidateCurrentTarget)
-    --      → buscar el siguiente mas cercano
-    --   3. Si el NPC caido se levanta luego
-    --      → volvera a estar en liveNPCs y puede
-    --        ser re-seleccionado normalmente
-    -- =============================================
     local function GetClosestNPC(liveNPCs)
         if not LocalPlayer.Character then return nil end
         local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -291,9 +229,7 @@ task.spawn(function()
         return CurrentTarget
     end
 
-    -- =============================================
-    --              PREDICCION
-    -- =============================================
+
     local function PredictPos(entry)
         local part = entry.model:FindFirstChild(S.AimPart) or entry.hrp
         if not S.PredictionEnabled then return part.Position end
@@ -301,9 +237,6 @@ task.spawn(function()
         return part.Position + vel * S.PredictionStrength
     end
 
-    -- =============================================
-    --     INPUT - KEYBIND DE PAUSA (TOGGLE)
-    -- =============================================
     UserInputService.InputBegan:Connect(function(i, gp)
         if gp then return end
 
@@ -334,9 +267,7 @@ task.spawn(function()
         end
     end)
 
-    -- =============================================
-    --           ESP - CACHE PERSISTENTE
-    -- =============================================
+   
     local ESPCache       = {}
     local TracerCache    = {}
     local BillboardCache = {}
@@ -462,8 +393,7 @@ task.spawn(function()
         BillboardCache[model] = bb
     end
 
-    -- =============================================
-    --            LOOP PRINCIPAL
+
     -- =============================================
     local lastAimFrame = tick()
     local lastESPFrame = tick()
@@ -493,7 +423,7 @@ task.spawn(function()
         local liveSet = {}
         for _, e in ipairs(liveNPCs) do liveSet[e.model] = true end
 
-        -- ============ AIMBOT (60 fps cap) ============
+        -- ============ AIMBOT 
         if now - lastAimFrame >= 0.016 then
             lastAimFrame = now
 
@@ -544,7 +474,7 @@ task.spawn(function()
             end
         end
 
-        -- ============ ESP (30 fps cap) ============
+        -- ============ ESP 
         if now - lastESPFrame < 0.033 then return end
         lastESPFrame = now
 
@@ -625,8 +555,7 @@ task.spawn(function()
     end)
 
     -- =============================================
-    --                   UI
-    -- =============================================
+ 
     AimbotTab:CreateSection("Aimbot NPCs")
 
     AimbotTab:CreateToggle({
@@ -851,5 +780,5 @@ task.spawn(function()
         Callback = function(v) S.ScanDepth = v end
     })
 
-    print("Aimbot NPCs listo | Modo: " .. S.AimMode)
+
 end)
