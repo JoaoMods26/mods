@@ -2674,10 +2674,16 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 
 
 
+
+
 ----JUGADORES---
-
-
-
+ 
+_G.Window = Window
+ 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Jugadores"))()
+ 
+ 
+ 
 
 
 
@@ -2714,7 +2720,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 
 
 ----Scripts
-_G.Window = Window
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Script%20y%20de%20juegos"))()
 
