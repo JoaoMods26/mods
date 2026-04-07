@@ -2677,12 +2677,12 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/
 ----JUGADORES---
 JugadoresTab = Window:CreateTab("Jugadores")
 JugadoresTab:CreateSection("Acciones")
-
+ 
 local ServicioRun = game:GetService("RunService")
 local Latido = ServicioRun.Heartbeat
 local Render = ServicioRun.RenderStepped
 local VelocidadNula = Vector3.zero
-
+ 
 local selectedPlayer = nil
 local characterAddedConnection
 local aimlockEnabled = false
@@ -2704,7 +2704,7 @@ local doggySpeed = 1
 local doggyDirection = 1
 local doggyCurrentDistance = 2.7
 local doggyTargetDistance = 4
-
+ 
 local pataEnabled = false
 local pataConnection
 local pataAnimId = 18526288497
@@ -2713,7 +2713,7 @@ local pataSpeed = 1
 local pataDirection = 1
 local pataCurrentDistance = 3
 local pataTargetDistance = 4
-
+ 
 local cariEnabled = false
 local cariConnection
 local cariAnimId = 15679624464
@@ -2722,7 +2722,7 @@ local cariSpeed = 5
 local cariDirection = 1
 local cariCurrentDistance = 2.7
 local cariTargetDistance = 4
-
+ 
 local wataEnabled = false
 local wataConnection
 local wataAnimId = 12992262118
@@ -2732,7 +2732,7 @@ local wataDirection = 1
 local wataCurrentDistance = 2
 local wataTargetDistance = 3
 local savedCollisions = {}
-
+ 
 local perroEnabled = false
 local perroConnection
 local perroAnimId = 123646621028812
@@ -2741,18 +2741,18 @@ local perroSpeed = 1
 local perroDirection = 1
 local perroCurrentDistance = 3
 local perroTargetDistance = 4
-
+ 
 local antiCaidaConnection
-
+ 
  function ActivarAntiCaida()
     local Jugador = game.Players.LocalPlayer
     local personaje = Jugador.Character or Jugador.CharacterAdded:Wait()
     local Raiz = personaje:WaitForChild("HumanoidRootPart")
-    
+ 
     if antiCaidaConnection then
         antiCaidaConnection:Disconnect()
     end
-    
+ 
     antiCaidaConnection = Latido:Connect(function()
         if not Raiz.Parent then
             antiCaidaConnection:Disconnect()
@@ -2765,14 +2765,14 @@ local antiCaidaConnection
         Raiz.AssemblyLinearVelocity = velocidadAnt
     end)
 end
-
+ 
 function DesactivarAntiCaida()
     if antiCaidaConnection then
         antiCaidaConnection:Disconnect()
         antiCaidaConnection = nil
     end
 end
-
+ 
 function VerificarYActualizarAntiCaida()
     if doggyEnabled or pataEnabled or cariEnabled or wataEnabled or perroEnabled then
         if not antiCaidaConnection then
@@ -2782,7 +2782,7 @@ function VerificarYActualizarAntiCaida()
         DesactivarAntiCaida()
     end
 end
-
+ 
  function SetNoCollision(char, state)
     if state then
         savedCollisions[char] = {}
@@ -2803,7 +2803,7 @@ end
         end
     end
 end
-
+ 
  function PlayWata(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -2811,45 +2811,45 @@ end
     local root = char:WaitForChild("HumanoidRootPart")
     local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
     if not humanoid or not root or not targetRoot then return end
-
+ 
     local anim = Instance.new("Animation")
     anim.AnimationId = "rbxassetid://" .. wataAnimId
     local track = humanoid:LoadAnimation(anim)
     track:Play()
     track.TimePosition = wataAnimTime
     track:AdjustSpeed(0)
-
+ 
     humanoid.AutoRotate = false
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     SetNoCollision(char, true)
-
+ 
     wataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
         if not targetRoot.Parent then return end
-
+ 
         wataCurrentDistance = wataCurrentDistance + (wataSpeed * wataDirection * game:GetService("RunService").Heartbeat:Wait())
-
+ 
         if wataCurrentDistance >= wataTargetDistance then
             wataDirection = -1
         elseif wataCurrentDistance <= 1.2 then
             wataDirection = 1
         end
-
+ 
         local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * wataCurrentDistance + Vector3.new(0, 0.23, 0)
         root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
     end)
 end
-
+ 
  function StopWata()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
-
+ 
     if wataConnection then
         wataConnection:Disconnect()
         wataConnection = nil
     end
-
+ 
     if humanoid then
         humanoid.AutoRotate = true
         humanoid.WalkSpeed = 16
@@ -2860,12 +2860,12 @@ end
             end
         end
     end
-
+ 
     if char then
         SetNoCollision(char, false)
     end
 end
-
+ 
  function PlayCari(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -2873,45 +2873,45 @@ end
     local root = char:WaitForChild("HumanoidRootPart")
     local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
     if not humanoid or not root or not targetRoot then return end
-
+ 
     local anim = Instance.new("Animation")
     anim.AnimationId = "rbxassetid://" .. cariAnimId
     local track = humanoid:LoadAnimation(anim)
     track:Play()
     track.TimePosition = cariAnimTime
     track:AdjustSpeed(0)
-
+ 
     humanoid.AutoRotate = false
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     SetNoCollision(char, true)
-
+ 
     cariConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
         if not targetRoot.Parent then return end
-
+ 
         cariCurrentDistance = cariCurrentDistance + (cariSpeed * cariDirection * game:GetService("RunService").Heartbeat:Wait())
-
+ 
         if cariCurrentDistance >= cariTargetDistance then
             cariDirection = -1
         elseif cariCurrentDistance <= 1.2 then
             cariDirection = 1
         end
-
+ 
         local offsetPosition = targetRoot.Position - targetRoot.CFrame.LookVector * cariCurrentDistance + Vector3.new(0, 0.23, 0)
         root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
     end)
 end
-
+ 
  function StopCari()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
-
+ 
     if cariConnection then
         cariConnection:Disconnect()
         cariConnection = nil
     end
-
+ 
     if humanoid then
         humanoid.AutoRotate = true
         humanoid.WalkSpeed = 16
@@ -2922,12 +2922,12 @@ end
             end
         end
     end
-
+ 
     if char then
         SetNoCollision(char, false)
     end
 end
-
+ 
  function findPlayerByPartialName(name)
     name = name:lower()
     for _, player in ipairs(game.Players:GetPlayers()) do
@@ -2938,7 +2938,7 @@ end
         end
     end
 end
-
+ 
 function PlayPata(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -2946,45 +2946,45 @@ function PlayPata(target)
     local root = char:WaitForChild("HumanoidRootPart")
     local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
     if not humanoid or not root or not targetRoot then return end
-
+ 
     local anim = Instance.new("Animation")
     anim.AnimationId = "rbxassetid://" .. pataAnimId
     local track = humanoid:LoadAnimation(anim)
     track:Play()
     track.TimePosition = pataAnimTime
     track:AdjustSpeed(0)
-
+ 
     humanoid.AutoRotate = false
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     SetNoCollision(char, true)
-
+ 
     pataConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
         if not targetRoot.Parent then return end
-
+ 
         pataCurrentDistance = pataCurrentDistance + (pataSpeed * pataDirection * game:GetService("RunService").Heartbeat:Wait())
-
+ 
         if pataCurrentDistance >= pataTargetDistance then
             pataDirection = -1
         elseif pataCurrentDistance <= 2.7 then
             pataDirection = 1
         end
-
+ 
         local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * pataCurrentDistance + Vector3.new(0, 0.23, 0)
         root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
     end)
 end
-
+ 
 function StopPata()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
-
+ 
     if pataConnection then
         pataConnection:Disconnect()
         pataConnection = nil
     end
-
+ 
     if humanoid then
         humanoid.AutoRotate = true
         humanoid.WalkSpeed = 16
@@ -2995,12 +2995,12 @@ function StopPata()
             end
         end
     end
-
+ 
     if char then
         SetNoCollision(char, false)
     end
 end
-
+ 
 function PlayDoggy(target)
     if not target or not target.Character then return end
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -3008,45 +3008,45 @@ function PlayDoggy(target)
     local root = char:WaitForChild("HumanoidRootPart")
     local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
     if not humanoid or not root or not targetRoot then return end
-
+ 
     local anim = Instance.new("Animation")
     anim.AnimationId = "rbxassetid://" .. doggyAnimId
     local track = humanoid:LoadAnimation(anim)
     track:Play()
     track.TimePosition = doggyAnimTime
     track:AdjustSpeed(0)
-
+ 
     humanoid.AutoRotate = false
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     SetNoCollision(char, true)
-
+ 
     doggyConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
         if not targetRoot.Parent then return end
-
+ 
         doggyCurrentDistance = doggyCurrentDistance + (doggySpeed * doggyDirection * game:GetService("RunService").Heartbeat:Wait())
-
+ 
         if doggyCurrentDistance >= doggyTargetDistance then
             doggyDirection = -1
         elseif doggyCurrentDistance <= 2.7 then
             doggyDirection = 1
         end
-
+ 
         local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * doggyCurrentDistance + Vector3.new(0, 0.23, 0)
         root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position)
     end)
 end
-
+ 
 function StopDoggy()
     local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
-
+ 
     if doggyConnection then
         doggyConnection:Disconnect()
         doggyConnection = nil
     end
-
+ 
     if humanoid then
         humanoid.AutoRotate = true
         humanoid.WalkSpeed = 16
@@ -3057,14 +3057,14 @@ function StopDoggy()
             end
         end
     end
-
+ 
     if char then
         SetNoCollision(char, false)
     end
 end
-
+ 
 local characterAddedConnection
-
+ 
 JugadoresTab:CreateInput({
     Name = "Nombre del Jugador",
     PlaceholderText = "Ej. juan, maria...",
@@ -3073,33 +3073,33 @@ JugadoresTab:CreateInput({
         local player = findPlayerByPartialName(text)
         if player then
             selectedPlayer = player
-            
+ 
             if characterAddedConnection then
                 characterAddedConnection:Disconnect()
             end
-            
-             function onTargetCharacterAdded(character)
-                task.wait(0.5)
-                
-                if doggyEnabled then
-                    PlayDoggy(selectedPlayer)
-                end
-                if pataEnabled then
-                    PlayPata(selectedPlayer)
-                end
-                if cariEnabled then
-                    PlayCari(selectedPlayer)
-                end
-                if wataEnabled then
-                    PlayWata(selectedPlayer)
-                end
-                if perroEnabled then
-                    PlayPerro(selectedPlayer)
-                end
-            end
-            
+ 
+             local function onTargetCharacterAdded(character)
+    task.wait(0.5)
+ 
+    if doggyEnabled then
+        PlayDoggy(selectedPlayer)
+    end
+    if pataEnabled then
+        PlayPata(selectedPlayer)
+    end
+    if cariEnabled then
+        PlayCari(selectedPlayer)
+    end
+    if wataEnabled then
+        PlayWata(selectedPlayer)
+    end
+    if perroEnabled then
+        PlayPerro(selectedPlayer)
+    end
+end
+ 
             characterAddedConnection = selectedPlayer.CharacterAdded:Connect(onTargetCharacterAdded)
-            
+ 
             Rayfield:Notify({
                 Title = "Jugador Seleccionado",
                 Content = player.Name .. " ha sido seleccionado.",
@@ -3116,20 +3116,20 @@ JugadoresTab:CreateInput({
         end
     end
 })
-
+ 
 local selectorTool = nil
 local isToolActive = false
-
+ 
  function CreateSelectorTool()
     if selectorTool then
         selectorTool:Destroy()
         selectorTool = nil
     end
-    
+ 
     selectorTool = Instance.new("Tool")
     selectorTool.Name = "Selector de Jugadores"
     selectorTool.RequiresHandle = false
-    
+ 
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(0.2, 0.2, 1)
@@ -3137,32 +3137,32 @@ local isToolActive = false
     handle.BrickColor = BrickColor.new("Bright blue")
     handle.CanCollide = false
     handle.Parent = selectorTool
-    
+ 
     selectorTool.Activated:Connect(function()
         local player = game.Players.LocalPlayer
         local mouse = player:GetMouse()
-        
+ 
         if mouse.Target and mouse.Target.Parent then
             local targetCharacter = mouse.Target.Parent
             local targetPlayer = nil
-            
+ 
             for _, plr in ipairs(game.Players:GetPlayers()) do
                 if plr.Character == targetCharacter then
                     targetPlayer = plr
                     break
                 end
             end
-            
+ 
             if targetPlayer and targetPlayer ~= player then
                 selectedPlayer = targetPlayer
-                
+ 
                 Rayfield:Notify({
                     Title = "Jugador Seleccionado",
                     Content = targetPlayer.DisplayName .. " (" .. targetPlayer.Name .. ") ha sido seleccionado.",
                     Duration = 3,
                     Image = 4483362458
                 })
-                
+ 
                 selectorTool.Parent = player.Backpack
             else
                 Rayfield:Notify({
@@ -3174,7 +3174,7 @@ local isToolActive = false
             end
         end
     end)
-    
+ 
     selectorTool.Equipped:Connect(function()
         Rayfield:Notify({
             Title = "Herramienta Equipada",
@@ -3183,7 +3183,7 @@ local isToolActive = false
             Image = 4483362458
         })
     end)
-    
+ 
     selectorTool.Unequipped:Connect(function()
         Rayfield:Notify({
             Title = "Herramienta Guardada",
@@ -3192,19 +3192,19 @@ local isToolActive = false
             Image = 4483362458
         })
     end)
-    
+ 
     return selectorTool
 end
-
+ 
 JugadoresTab:CreateButton({
     Name = "Herramienta Selector",
     Callback = function()
         local player = game.Players.LocalPlayer
-        
+ 
         local tool = CreateSelectorTool()
-        
+ 
         tool.Parent = player.Backpack
-        
+ 
         Rayfield:Notify({
             Title = "Herramienta Creada",
             Content = "Revisa tu inventario y equipa el 'Selector de Jugadores'.",
@@ -3213,17 +3213,17 @@ JugadoresTab:CreateButton({
         })
     end
 })
-
+ 
 local espectando = false
 local cameraSubjectBackup
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Espectar",
     CurrentValue = false,
     Callback = function(Value)
         local camera = workspace.CurrentCamera
         local localPlayer = game.Players.LocalPlayer
-
+ 
         if Value then
             if selectedPlayer and selectedPlayer.Character then
                 cameraSubjectBackup = camera.CameraSubject
@@ -3238,7 +3238,7 @@ JugadoresTab:CreateToggle({
         end
     end
 })
-
+ 
 JugadoresTab:CreateButton({
     Name = "Teleportarse",
     Callback = function()
@@ -3248,7 +3248,7 @@ JugadoresTab:CreateButton({
         end
     end
 })
-
+ 
 function SaveCollisions(char)
     savedCollisions[char] = {}
     for _, part in ipairs(char:GetDescendants()) do
@@ -3257,7 +3257,7 @@ function SaveCollisions(char)
         end
     end
 end
-
+ 
 function RestoreCollisions(char)
     if savedCollisions[char] then
         for part, original in pairs(savedCollisions[char]) do
@@ -3268,7 +3268,7 @@ function RestoreCollisions(char)
         savedCollisions[char] = nil
     end
 end
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad de Órbita",
     Range = {1, 200},
@@ -3279,7 +3279,7 @@ JugadoresTab:CreateSlider({
         orbitSpeed = value
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Distancia de Órbita",
     Range = {1, 40},
@@ -3290,7 +3290,7 @@ JugadoresTab:CreateSlider({
         orbitDistance = value
     end
 })
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Órbita (girar alrededor del jugador)",
     CurrentValue = false,
@@ -3300,14 +3300,14 @@ JugadoresTab:CreateToggle({
             orbitConnection:Disconnect()
             orbitConnection = nil
         end
-
+ 
         if orbitEnabled and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local targetHRP = selectedPlayer.Character.HumanoidRootPart
             local localChar = game.Players.LocalPlayer.Character
             local angle = 0
-
+ 
             SaveCollisions(localChar)
-            
+ 
             orbitConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
                 if localChar and localChar:FindFirstChild("HumanoidRootPart") then
                     angle = angle + orbitSpeed * dt
@@ -3317,7 +3317,7 @@ JugadoresTab:CreateToggle({
                     hrp.CFrame = CFrame.new(newPos, targetHRP.Position)
                 end
             end)
-
+ 
             for _, part in pairs(localChar:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false
@@ -3328,17 +3328,17 @@ JugadoresTab:CreateToggle({
             if localChar and localChar:FindFirstChild("HumanoidRootPart") then
                 local safePos = localChar.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
                 localChar.HumanoidRootPart.CFrame = CFrame.new(safePos)
-
+ 
                 RestoreCollisions(localChar)
             end
         end
     end
 })
-
+ 
 local sitToggle = false
 local isSitting = false
 local originalStats = {}
-
+ 
  function clearAlign(localChar)
     if not localChar then return end
     local root = localChar:FindFirstChild("HumanoidRootPart")
@@ -3349,7 +3349,7 @@ local originalStats = {}
         end
     end
 end
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Sentarse en la cabeza",
     Default = false,
@@ -3358,40 +3358,40 @@ JugadoresTab:CreateToggle({
         if not player then return end
         local localChar = player.Character
         if not localChar then return end
-
+ 
         local humanoid = localChar:FindFirstChildOfClass("Humanoid")
         local root = localChar:FindFirstChild("HumanoidRootPart")
-
+ 
         if not humanoid or not root then return end
         sitToggle = state
-
+ 
         if sitToggle and selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("Head") then
             local head = selectedPlayer.Character.Head
             if not head then return end
-
+ 
             originalStats = {
                 WalkSpeed = humanoid.WalkSpeed,
                 JumpPower = humanoid.JumpPower,
                 JumpHeight = humanoid.JumpHeight
             }
-
+ 
             clearAlign(localChar)
-
+ 
             root.CFrame = head.CFrame * CFrame.new(0, 1, 0)
-
+ 
             humanoid.Sit = true
             humanoid.WalkSpeed = 0
             humanoid.JumpPower = 0
             humanoid.JumpHeight = 0
             humanoid:ChangeState(Enum.HumanoidStateType.Seated)
-
+ 
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-
+ 
             local rootAttachment = Instance.new("Attachment", root)
             local headAttachment = Instance.new("Attachment", head)
             headAttachment.Position = Vector3.new(0, 1, 0)
-
+ 
             local alignPos = Instance.new("AlignPosition")
             alignPos.Attachment0 = rootAttachment
             alignPos.Attachment1 = headAttachment
@@ -3399,7 +3399,7 @@ JugadoresTab:CreateToggle({
             alignPos.Responsiveness = math.huge
             alignPos.MaxForce = math.huge
             alignPos.Parent = root
-
+ 
             local alignOri = Instance.new("AlignOrientation")
             alignOri.Attachment0 = rootAttachment
             alignOri.Attachment1 = headAttachment
@@ -3407,12 +3407,12 @@ JugadoresTab:CreateToggle({
             alignOri.Responsiveness = math.huge
             alignOri.MaxTorque = math.huge
             alignOri.Parent = root
-
+ 
             isSitting = true
         elseif not sitToggle then
             if localChar and localChar.Parent then
                 clearAlign(localChar)
-
+ 
                 if humanoid and humanoid.Parent then
                     if originalStats.WalkSpeed then
                         humanoid.WalkSpeed = originalStats.WalkSpeed
@@ -3423,52 +3423,52 @@ JugadoresTab:CreateToggle({
                         humanoid.JumpPower = 50
                         humanoid.JumpHeight = 7.2
                     end
-
+ 
                     if humanoid.Health > 0 then
                         humanoid.Sit = false
                         pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Standing) end)
                     end
-
+ 
                     humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
                     humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
                 end
-
+ 
                 if root and root.Parent then
                     pcall(function()
                         root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
                     end)
                 end
             end
-
+ 
             isSitting = false
         end
     end
 })
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Movimiento de boca",
     CurrentValue = false,
     Callback = function(value)
         doggyEnabled = value
-
+ 
         if doggyEnabled and selectedPlayer then
             PlayDoggy(selectedPlayer)
             VerificarYActualizarAntiCaida()
         else
             StopDoggy()
             VerificarYActualizarAntiCaida()
-
+ 
             local player = game:GetService("Players").LocalPlayer
             local character = player.Character or player.CharacterAdded:Wait()
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
+ 
             if humanoid then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
     Range = {1, 15},
@@ -3483,31 +3483,31 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Movimiento de pata",
     CurrentValue = false,
     Callback = function(value)
         pataEnabled = value
-
+ 
         if pataEnabled and selectedPlayer then
             PlayPata(selectedPlayer)
             VerificarYActualizarAntiCaida()
         else
             StopPata()
             VerificarYActualizarAntiCaida()
-
+ 
             local player = game:GetService("Players").LocalPlayer
             local character = player.Character or player.CharacterAdded:Wait()
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
+ 
             if humanoid then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
     Range = {1, 15},
@@ -3522,56 +3522,56 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
-RunService = game:GetService("RunService")
-Players = game:GetService("Players")
-
-perroAnim = Instance.new("Animation")
+ 
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+ 
+local perroAnim = Instance.new("Animation")
 perroAnim.AnimationId = "rbxassetid://" .. perroAnimId
-
-function PlayPerro(target)
+ 
+local function PlayPerro(target)
     if not target or not target.Character then return end
     local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:WaitForChild("Humanoid")
     local root = char:WaitForChild("HumanoidRootPart")
     local targetRoot = target.Character:WaitForChild("HumanoidRootPart")
     if not humanoid or not root or not targetRoot then return end
-
+ 
     local track = humanoid:LoadAnimation(perroAnim)
     track:Play()
     track.TimePosition = perroAnimTime
     track:AdjustSpeed(0)
-
+ 
     humanoid.AutoRotate = false
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     SetNoCollision(char, true)
-
+ 
     perroConnection = RunService.Heartbeat:Connect(function(dt)
         if not targetRoot.Parent then return end
-
+ 
         perroCurrentDistance = perroCurrentDistance + (perroSpeed * perroDirection * dt)
-
+ 
         if perroCurrentDistance >= perroTargetDistance then
             perroDirection = -1
         elseif perroCurrentDistance <= 2 then
             perroDirection = 1
         end
-
+ 
         local offsetPosition = targetRoot.Position + targetRoot.CFrame.LookVector * perroCurrentDistance + Vector3.new(0, 0.23, 0)
         root.CFrame = CFrame.lookAt(offsetPosition, targetRoot.Position) * CFrame.Angles(0, math.rad(180), 0)
     end)
 end
-
-function StopPerro()
+ 
+local function StopPerro()
     local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChild("Humanoid")
-
+ 
     if perroConnection then
         perroConnection:Disconnect()
         perroConnection = nil
     end
-
+ 
     if humanoid then
         humanoid.AutoRotate = true
         humanoid.WalkSpeed = 16
@@ -3582,10 +3582,12 @@ function StopPerro()
             end
         end
     end
-
+ 
     SetNoCollision(char, false)
 end
-
+ 
+ 
+ 
 JugadoresTab:CreateToggle({
     Name = "Movimiento de perro",
     CurrentValue = false,
@@ -3604,7 +3606,7 @@ JugadoresTab:CreateToggle({
         end
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
     Range = {1, 15},
@@ -3619,31 +3621,31 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Dar Cariño",
     CurrentValue = false,
     Callback = function(value)
         cariEnabled = value
-
+ 
         if cariEnabled and selectedPlayer then
             PlayCari(selectedPlayer)
             VerificarYActualizarAntiCaida()
         else
             StopCari()
             VerificarYActualizarAntiCaida()
-
+ 
             local player = game:GetService("Players").LocalPlayer
             local character = player.Character or player.CharacterAdded:Wait()
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
+ 
             if humanoid then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
     Range = {1, 20},
@@ -3658,31 +3660,31 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
+ 
 JugadoresTab:CreateToggle({
     Name = "Dar Wata",
     CurrentValue = false,
     Callback = function(value)
         wataEnabled = value
-
+ 
         if wataEnabled and selectedPlayer then
             PlayWata(selectedPlayer)
             VerificarYActualizarAntiCaida()
         else
             StopWata()
             VerificarYActualizarAntiCaida()
-
+ 
             local player = game:GetService("Players").LocalPlayer
             local character = player.Character or player.CharacterAdded:Wait()
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
+ 
             if humanoid then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
 })
-
+ 
 JugadoresTab:CreateSlider({
     Name = "Velocidad",
     Range = {1, 20},
@@ -3697,6 +3699,7 @@ JugadoresTab:CreateSlider({
         end
     end
 })
+ 
 
 
 
