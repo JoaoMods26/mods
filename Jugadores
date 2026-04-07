@@ -1,19 +1,26 @@
 
+-- Esperar a que Window esté disponible por si hay delay
 local Window = _G.Window
 local Rayfield = _G.Rayfield
 
 -- Verificación de seguridad
-if not Window or not Rayfield then
-    warn("JugadoresTab: Window o Rayfield no encontrados en _G")
+if not Window then
+    warn("[Jugadores] _G.Window es nil, abortando")
     return
 end
+if not Rayfield then
+    warn("[Jugadores] _G.Rayfield es nil, abortando")
+    return
+end
+
 local JugadoresTab = Window:CreateTab("Jugadores")
 JugadoresTab:CreateSection("Acciones")
 
-local ServicioRun = game:GetService("RunService")
-local Latido = ServicioRun.Heartbeat
-local Render = ServicioRun.RenderStepped
-local VelocidadNula = Vector3.zero
+local RunService  = game:GetService("RunService")
+local Players     = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+
 
 local selectedPlayer = nil
 local characterAddedConnection
