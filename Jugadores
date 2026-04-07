@@ -1,4 +1,13 @@
-JugadoresTab = Window:CreateTab("Jugadores")
+
+local Window = _G.Window
+local Rayfield = _G.Rayfield
+
+-- Verificación de seguridad
+if not Window or not Rayfield then
+    warn("JugadoresTab: Window o Rayfield no encontrados en _G")
+    return
+end
+local JugadoresTab = Window:CreateTab("Jugadores")
 JugadoresTab:CreateSection("Acciones")
 
 local ServicioRun = game:GetService("RunService")
