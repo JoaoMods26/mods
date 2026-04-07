@@ -608,6 +608,144 @@ function RestoreCollisions(char)
     end
 end
 
+
+
+
+
+
+
+
+
+
+function SaveCollisions(char)
+    savedCollisions[char] = {}
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            savedCollisions[char][part] = part.CanCollide
+        end
+    end
+end
+
+function RestoreCollisions(char)
+    if savedCollisions[char] then
+        for part, original in pairs(savedCollisions[char]) do
+            if part and part:IsA("BasePart") then
+                part.CanCollide = original
+            end
+        end
+        savedCollisions[char] = nil
+    end
+end
+
+
+function startFollowingPlayer(targetPlayer)
+    if followConnection then
+        followConnection:Disconnect()
+        followConnection = nil
+    end
+    
+    if not targetPlayer then return end
+    
+    -- Guardar velocidad original
+    pcall(function()
+        local _, _, hu = safeChar()
+        if hu then
+            originalWalkSpeed = hu.WalkSpeed
+        end
+    end)
+    
+    followConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not followPlayerOn or forceStop then
+            return
+        end
+        
+        pcall(function()
+            local localChar = game.Players.LocalPlayer.Character
+            if not localChar then return end
+            
+            local targetChar = targetPlayer.Character
+            if not targetChar then return end
+            
+            local localHRP = localChar:FindFirstChild("HumanoidRootPart")
+            local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+            
+            if not localHRP or not targetHRP or not humanoid then return end
+            
+            antiSit()
+            humanoid.PlatformStand = false
+            
+            local distance = (targetHRP.Position - localHRP.Position).Magnitude
+            
+            if distance > 3 then
+                local direction = (targetHRP.Position - localHRP.Position).Unit
+                local targetPos = targetHRP.Position - direction * 3
+                humanoid:MoveTo(targetPos)
+                humanoid.WalkSpeed = 16  -- Velocidad fija para seguir
+            else
+                humanoid:MoveTo(localHRP.Position)
+            end
+        end)
+    end)
+end
+
+function stopFollowingPlayer()
+    followPlayerOn = false  
+
+    if followConnection then
+        followConnection:Disconnect()
+        followConnection = nil
+    end
+
+    pcall(function()
+        local localChar = game.Players.LocalPlayer.Character
+        if not localChar then return end
+
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        local hrp = localChar:FindFirstChild("HumanoidRootPart")
+
+        if humanoid and hrp then
+            -- Esto cancela cualquier MoveTo pendiente
+            humanoid:MoveTo(hrp.Position)
+            -- Pequeño delay y luego mover a sí mismo para "frenar"
+            task.wait(0.05)
+            humanoid.MoveDirection = Vector3.new(0, 0, 0)
+            humanoid.WalkSpeed = originalWalkSpeed
+        end
+    end)
+end
+
+
+JugadoresTab:CreateToggle({
+    Name = "Seguir",
+    CurrentValue = false,
+    Callback = function(state)
+        if not selectedPlayer then
+            Rayfield:Notify({Title = "Error", Content = "Selecciona un jugador primero!", Duration = 2, Image = 4483362458})
+            return
+        end
+        if state then
+            followPlayerOn = true
+            startFollowingPlayer(selectedPlayer)
+            Rayfield:Notify({Title = "Siguiendo", Content = "Siguiendo a " .. selectedPlayer.Name, Duration = 2, Image = 4483362458})
+        else
+            stopFollowingPlayer()
+            Rayfield:Notify({Title = "Seguimiento", Content = "Detenido", Duration = 2, Image = 4483362458})
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
 JugadoresTab:CreateSlider({
     Name = "Velocidad de Órbita",
     Range = {1, 200},
