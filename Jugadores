@@ -1,4 +1,3 @@
-
 -- Esperar a que Window esté disponible por si hay delay
 local Window = _G.Window
 local Rayfield = _G.Rayfield
@@ -404,6 +403,107 @@ end
 
 local characterAddedConnection
 
+
+
+
+
+
+
+
+-- ================================================
+-- INFO ROW - Imagen dinámica con SetPlayerThumbnail
+-- ================================================
+
+local infoRowTarget = LocalPlayer
+
+local function BuildContentLineDeJugador(jugador)
+    local lines = {}
+
+    -- HP actual y máxima
+    if jugador.Character then
+        local hum = jugador.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            table.insert(lines, "❤️ HP: " .. math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth))
+        end
+    end
+
+    -- Datos de cuenta
+    table.insert(lines, "🆔 ID: " .. jugador.UserId)
+    table.insert(lines, "📅 Cuenta: " .. jugador.AccountAge .. " días")
+
+    -- Premium
+    local membership = jugador.MembershipType == Enum.MembershipType.Premium and "⭐ Premium" or "Sin Premium"
+    table.insert(lines, "💎 " .. membership)
+
+    -- Equipo
+    table.insert(lines, "🏳️ Equipo: " .. (jugador.Team and jugador.Team.Name or "Ninguno"))
+
+    -- Posición y distancia
+    if jugador.Character and jugador.Character:FindFirstChild("HumanoidRootPart") then
+        local pos = jugador.Character.HumanoidRootPart.Position
+        table.insert(lines, string.format("📍 Pos: %.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z))
+
+        local tuChar = LocalPlayer.Character
+        if tuChar and tuChar:FindFirstChild("HumanoidRootPart") then
+            local dist = (tuChar.HumanoidRootPart.Position - pos).Magnitude
+            table.insert(lines, string.format("📏 Distancia: %.1f studs", dist))
+        end
+    end
+
+    -- Leaderstats automático
+    local leaderstats = jugador:FindFirstChild("leaderstats")
+    if leaderstats then
+        for _, stat in ipairs(leaderstats:GetChildren()) do
+            if stat:IsA("ValueBase") then
+                local val = stat.Value
+                if type(val) == "number" then val = math.floor(val) end
+                table.insert(lines, "📊 " .. stat.Name .. ": " .. tostring(val))
+            end
+        end
+    end
+
+    return table.concat(lines, "\n")
+end
+
+local InfoRow = JugadoresTab:CreateImageRow({
+    Image       = LocalPlayer.UserId,
+    PlayerImage = true,
+    ImgSize     = 56,
+    Height      = 74,
+    Title       = LocalPlayer.Name .. " (@" .. LocalPlayer.DisplayName .. ")",
+    Content     = "Cargando estadísticas..."
+})
+
+-- Función global para cambiar jugador en el row
+function ActualizarInfoRow(jugador)
+    jugador = jugador or infoRowTarget
+    infoRowTarget = jugador
+
+    InfoRow:SetPlayerThumbnail(jugador.UserId)
+    InfoRow:UpdateTitle(jugador.Name .. " (@" .. jugador.DisplayName .. ")")
+    InfoRow:UpdateContent(BuildContentLineDeJugador(jugador))
+end
+
+-- Loop cada segundo para actualizar en tiempo real
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function()
+            InfoRow:UpdateContent(BuildContentLineDeJugador(infoRowTarget))
+        end)
+    end
+end)
+
+-- Refresca al reaparecer tu personaje
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    pcall(function() ActualizarInfoRow(infoRowTarget) end)
+end)
+
+
+
+
+
 JugadoresTab:CreateInput({
     Name = "Nombre del Jugador",
     PlaceholderText = "Ej. juan, maria...",
@@ -412,7 +512,8 @@ JugadoresTab:CreateInput({
         local player = findPlayerByPartialName(text)
         if player then
             selectedPlayer = player
-            
+ActualizarInfoRow(selectedPlayer)
+
             if characterAddedConnection then
                 characterAddedConnection:Disconnect()
             end
@@ -494,7 +595,8 @@ local isToolActive = false
             
             if targetPlayer and targetPlayer ~= player then
                 selectedPlayer = targetPlayer
-                
+ActualizarInfoRow(selectedPlayer)
+
                 Rayfield:Notify({
                     Title = "Jugador Seleccionado",
                     Content = targetPlayer.DisplayName .. " (" .. targetPlayer.Name .. ") ha sido seleccionado.",
@@ -1174,5 +1276,3 @@ JugadoresTab:CreateSlider({
         end
     end
 })
-
-
