@@ -2578,7 +2578,11 @@ MainTab:CreateSlider({
 ---Shiftlock
 
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Main%20segunda%20parte"))()
+if not _G.MainSegundaCargado then
+    _G.MainSegundaCargado = true
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/mods/refs/heads/main/Main%20segunda%20parte"))()
+end
+
 
 
 
