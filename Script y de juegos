@@ -10,8 +10,6 @@ local Button1 = TPTab:CreateButton({
 })
 
 
-
-
 local Button24 = TPTab:CreateButton({
    Name = "JAnimacionesMods",
    Callback = function()
@@ -20,7 +18,7 @@ loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-JAnimacione
 })
 
 local Button24 = TPTab:CreateButton({
-   Name = "JshadersMods(Shaders)",
+   Name = "JshadersMods( Shaders )",
    Callback = function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/shaders"))()       
    end,
