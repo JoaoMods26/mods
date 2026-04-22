@@ -1095,15 +1095,13 @@ if senderVerified then
     --   · Owner puede forzar detección poniendo un flag en /presence/trigger
     -- ========================================
 task.spawn(function()
-        -- ✅ FIX: Esperar verificación completa antes de iniciar loops de follower
         local waited = 0
         while not myVerified and waited < 20 do
             task.wait(0.5)
             waited = waited + 0.5
         end
-        -- ✅ Si resultó ser owner/admin, no ejecutar nada de follower
         if isOwner or isAdmin then return end
-        if not (isOwner or isAdmin) then -- es follower confirmado
+        -- Es follower confirmado, iniciar loops
 
         -- Estado compartido entre los loops del follower
 local followerState = {
@@ -1356,7 +1354,7 @@ end
 
 -- ========================================
     -- ✅ SISTEMA ADMINS
-        end -- cierra: if not isOwner and not isAdmin (el if interno)
+
     end) -- cierra el task.spawn del follower
     -- ========================================
     -- ✅ SISTEMA ADMINS
