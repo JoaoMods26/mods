@@ -56,12 +56,30 @@ local function CleanupOldData(path)
     local data = firebaseRequest("GET", path)
     if not data or type(data) ~= "table" then return end
     local now = os.time()
--- Todo se borra si tiene más de 1 minuto
     local maxAge = 60
     for key, entry in pairs(data) do
-        if type(entry) == "table" and entry.timestamp then
-            if (now - (entry.timestamp or 0)) > maxAge then
-                firebaseRequest("DELETE", path .. "/" .. key)
+        if type(entry) == "table" then
+            if entry.timestamp then
+                -- ✅ entrada directa con timestamp (heartbeats, triggers, brings, executions)
+                if (now - (entry.timestamp or 0)) > maxAge then
+                    firebaseRequest("DELETE", path .. "/" .. key)
+                end
+            else
+                -- ✅ entrada anidada (commands/{serverId}/{cmdKey}) — un nivel más
+                local allOld = true
+                for subKey, subEntry in pairs(entry) do
+                    if type(subEntry) == "table" and subEntry.timestamp then
+                        if (now - (subEntry.timestamp or 0)) > maxAge then
+                            firebaseRequest("DELETE", path .. "/" .. key .. "/" .. subKey)
+                        else
+                            allOld = false
+                        end
+                    end
+                end
+                -- ✅ si el nodo padre quedó vacío, bórralo también
+                if allOld then
+                    firebaseRequest("DELETE", path .. "/" .. key)
+                end
             end
         end
     end
@@ -174,7 +192,7 @@ if isOwner or isAdmin then
             task.spawn(function()
                 CleanupOldData("/heartbeats")
                 CleanupOldData("/triggers")
-                CleanupOldData("/commands/" .. currentServerId)
+            CleanupOldData("/commands")
                 CleanupOldData("/brings/" .. myUserId)
                 CleanupOldData("/executions/owners/" .. myUserId)
             end)
@@ -196,7 +214,7 @@ task.spawn(function()
 pcall(function()
             CleanupOldData("/heartbeats")
             CleanupOldData("/triggers")
-            CleanupOldData("/commands/" .. currentServerId)
+                CleanupOldData("/commands")
             CleanupOldData("/brings/" .. myUserId)
             CleanupOldData("/executions/owners/" .. myUserId)
         end)
