@@ -52,19 +52,21 @@ local currentServerId = game.JobId
     -- ========================================
     -- ✅ AUTO-LIMPIEZA FIREBASE 
     -- ========================================
-    local function CleanupOldData(path)
-        local data = firebaseRequest("GET", path)
-        if not data or type(data) ~= "table" then return end
-        local now = os.time()
-        local TWO_DAYS = 172800 -- 2 días en segundos
-        for key, entry in pairs(data) do
-            if type(entry) == "table" and entry.timestamp then
-                if (now - (entry.timestamp or 0)) > TWO_DAYS then
-                    firebaseRequest("DELETE", path .. "/" .. key)
-                end
+local function CleanupOldData(path)
+    local data = firebaseRequest("GET", path)
+    if not data or type(data) ~= "table" then return end
+    local now = os.time()
+    -- Heartbeats: borrar si tienen más de 2 minutos
+    -- Resto: borrar si tienen más de 2 días
+    local maxAge = (path:find("heartbeats") or path:find("triggers")) and 120 or 172800
+    for key, entry in pairs(data) do
+        if type(entry) == "table" and entry.timestamp then
+            if (now - (entry.timestamp or 0)) > maxAge then
+                firebaseRequest("DELETE", path .. "/" .. key)
             end
         end
     end
+end
 
     -- ========================================
     -- ✅ VERIFICACIÓN TRIPLE: nombre + id + hwid
@@ -72,96 +74,114 @@ local currentServerId = game.JobId
 -- ========================================
     -- ✅ WHITELIST DESDE PASTEBIN
     -- ========================================
-    local WHITELIST_URL = "https://pastebin.com/raw/8C1DcLdb" -- Tu link RAW aquí
+local WORKER_URL = "https://waaaaaa.owomanoxd.workers.dev"
+local WORKER_TOKEN = "tupapijoao"
 
-    local function LoadWhitelist()
-        local ok, data = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet(WHITELIST_URL))
+local function VerifyWithWorker(hwidValue)
+    local ok, result = pcall(function()
+        return request({
+            Url = WORKER_URL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({
+                userId = myUserId,
+                nombre = LocalPlayer.Name,
+                hwid   = hwidValue,
+                token  = WORKER_TOKEN
+            })
+        })
+    end)
+    if ok and result and result.Body then
+        local dok, data = pcall(function()
+            return HttpService:JSONDecode(result.Body)
         end)
-        if not ok or not data then return {owners = {}, admins = {}} end
-        return data
+        if dok and data then return data end
+    end
+    return { valid = false, role = "follower" }
+end
+
+local function VerifySender(sId, sName, sHwid)
+    if sId == "" or sHwid == "" then return false end
+    local ok, result = pcall(function()
+        return request({
+            Url = WORKER_URL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({
+                userId = sId,
+                nombre = sName,
+                hwid   = sHwid,
+                token  = WORKER_TOKEN
+            })
+        })
+    end)
+    if ok and result and result.Body then
+        local dok, data = pcall(function() return HttpService:JSONDecode(result.Body) end)
+        if dok and data then return data.valid == true end
+    end
+    return false
+end
+
+ task.spawn(function()
+    task.wait(1)
+
+    local hwidValue = ""
+    pcall(function()
+        if gethwid then
+            hwidValue = tostring(gethwid())
+        elseif getdeviceid then
+            hwidValue = tostring(getdeviceid())
+        elseif identifyexecutor then
+            local name, ver = identifyexecutor()
+            hwidValue = "exec_" .. tostring(name) .. "_" .. tostring(ver or "0")
+        else
+            hwidValue = "unknown_" .. myUserId
+        end
+    end)
+
+    if hwidValue == "" or hwidValue == "unknown_" .. myUserId then
+        myVerified = true
+        myRole = "follower"
+        return
     end
 
-    task.spawn(function()
-        task.wait(1)
+    local result = VerifyWithWorker(hwidValue)
 
-        -- Obtener HWID
-        local hwidValue = ""
-        pcall(function()
-            if gethwid then
-                hwidValue = tostring(gethwid())
-            elseif getdeviceid then
-                hwidValue = tostring(getdeviceid())
-            elseif identifyexecutor then
-                local name, ver = identifyexecutor()
-                hwidValue = "exec_" .. tostring(name) .. "_" .. tostring(ver or "0")
-            else
-                hwidValue = "unknown_" .. myUserId
-            end
-        end)
-
-        if hwidValue == "" or hwidValue == "unknown_" .. myUserId then return end
-
-
-
-        local myUserIdNum = LocalPlayer.UserId
-        local myName      = LocalPlayer.Name:lower()
-
-        local whitelist = LoadWhitelist()
-
-        -- Verificar owners
-        for _, entry in ipairs(whitelist.owners or {}) do
-            local entryEnabled = entry.enabled
-            if entryEnabled == nil then entryEnabled = true end
-
-            table.insert(ownerIds, tonumber(entry.id))
-
-            if tonumber(entry.id) == myUserIdNum
-                and (entry.nombre or ""):lower() == myName
-                and entry.hwid == hwidValue
-                and hwidValue ~= ""
-                and entryEnabled == true then
-                myRole     = "owner"
-                isOwner    = true
-                myVerified = true
-            end
+    if result.valid then
+        if result.role == "owner" then
+            isOwner = true
+            myRole = "owner"
+        elseif result.role == "admin" then
+            isAdmin = true
+            myRole = "admin"
         end
+    end
 
-        -- Verificar admins
-        for _, entry in ipairs(whitelist.admins or {}) do
-            local entryEnabled = entry.enabled
-            if entryEnabled == nil then entryEnabled = true end
 
-            table.insert(adminIds, tonumber(entry.id))
 
-            if not isOwner
-                and tonumber(entry.id) == myUserIdNum
-                and (entry.nombre or ""):lower() == myName
-                and entry.hwid == hwidValue
-                and hwidValue ~= ""
-                and entryEnabled == true then
-                myRole     = "admin"
-                isAdmin    = true
-                myVerified = true
-            end
+if result.ownerIds then
+        for _, id in ipairs(result.ownerIds) do
+            table.insert(ownerIds, tonumber(id))
         end
-
-        -- Si no coincide nada → follower
-        if not isOwner and not isAdmin then
-            myVerified = true
-            myRole     = "follower"
+    end
+    if result.adminIds then
+        for _, id in ipairs(result.adminIds) do
+            table.insert(adminIds, tonumber(id))
         end
+    end
 
-        -- Limpieza Firebase solo para owners/admins
+    myVerified = true
+
 if isOwner or isAdmin then
             task.spawn(function()
                 CleanupOldData("/heartbeats")
+                CleanupOldData("/triggers")
                 CleanupOldData("/commands/" .. currentServerId)
                 CleanupOldData("/brings/" .. myUserId)
                 CleanupOldData("/executions/owners/" .. myUserId)
             end)
         end
-    end)
+end)
 
 
 -- ✅ Cleanup automático cada 5 minutos (solo owners/admins)
@@ -175,8 +195,9 @@ task.spawn(function()
 
   while true do
         task.wait(300)
-        pcall(function()
+pcall(function()
             CleanupOldData("/heartbeats")
+            CleanupOldData("/triggers")
             CleanupOldData("/commands/" .. currentServerId)
             CleanupOldData("/brings/" .. myUserId)
             CleanupOldData("/executions/owners/" .. myUserId)
@@ -285,26 +306,11 @@ task.spawn(function()
         if result and type(result) == "table" then
             for cmdKey, cmd in pairs(result) do
                 if cmd.command and tostring(cmd.sender_id or "") ~= myUserId then
-                    firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
-                    -- Triple verificación
+firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
                     local sId   = tostring(cmd.sender_id   or "")
                     local sName = tostring(cmd.sender_name  or "")
                     local sHwid = tostring(cmd.sender_hwid  or "")
-                    local verified = false
-                    local whitelist = LoadWhitelist()
-                    local allEntries = {}
-                    for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-                    for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-                    for _, entry in ipairs(allEntries) do
-                        if tostring(entry.id) == sId
-                            and (entry.nombre or ""):lower() == sName:lower()
-                            and entry.hwid == sHwid
-                            and sHwid ~= ""
-                            and entry.enabled == true then
-                            verified = true
-                            break
-                        end
-                    end
+                    local verified = VerifySender(sId, sName, sHwid)
                     if verified then
                         ProcessCommand({
                             command      = cmd.command,
@@ -333,23 +339,8 @@ end)
 local senderName   = tostring(b.sender_name  or "")
 local senderHwid   = tostring(b.sender_hwid  or "")
 if senderIdStr ~= "" then
-    firebaseRequest("DELETE", "/brings/" .. myUserId .. "/" .. bringKey)
-    -- Triple verificación
-    local verified = false
-    local whitelist = LoadWhitelist()
-    local allEntries = {}
-    for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-    for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-    for _, entry in ipairs(allEntries) do
-        if tostring(entry.id) == senderIdStr
-            and (entry.nombre or ""):lower() == senderName:lower()
-            and entry.hwid == senderHwid
-            and senderHwid ~= ""
-            and entry.enabled == true then
-            verified = true
-            break
-        end
-    end
+firebaseRequest("DELETE", "/brings/" .. myUserId .. "/" .. bringKey)
+    local verified = VerifySender(senderIdStr, senderName, senderHwid)
     if verified then
         task.spawn(function()
             for attempt = 1, 3 do
@@ -987,22 +978,7 @@ local text = message.Text
 text = text:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", "")
 local senderRole = GetRole(senderUserId)
 
--- ✅ Verificación doble: ID + nombre contra whitelist
-local senderVerified = false
-if senderRole == "Owner" or senderRole == "Admin" then
-    local whitelist = LoadWhitelist()
-    local allEntries = {}
-    for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-    for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-    for _, entry in ipairs(allEntries) do
-        if tonumber(entry.id) == senderUserId
-            and (entry.nombre or ""):lower() == senderName:lower()
-            and (entry.enabled == true) then
-            senderVerified = true
-            break
-        end
-    end
-end
+local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
 
 if senderVerified then
                             local cleanCommand = text
@@ -1046,22 +1022,7 @@ if senderVerified then
     local senderRole = GetRole(senderUserId)
 
     -- ✅ Verificación doble: ID + nombre contra whitelist
-    local senderVerified = false
-    if senderRole == "Owner" or senderRole == "Admin" then
-        local whitelist = LoadWhitelist()
-        local allEntries = {}
-        for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-        for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-        for _, entry in ipairs(allEntries) do
-            if tonumber(entry.id) == senderUserId
-                and (entry.nombre or ""):lower() == senderName:lower()
-                and (entry.enabled == true) then
-                senderVerified = true
-                break
-            end
-        end
-    end
-
+local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
     if senderVerified then
                             local cleanCommand = text
                             if text:sub(1, 3):lower() == "/e " then
@@ -1221,22 +1182,8 @@ end
                         local senderName  = tostring(b.sender_name or "")
                         local senderHwid  = tostring(b.sender_hwid or "")
                         if senderIdStr ~= "" then
-                            firebaseRequest("DELETE", "/brings/" .. myUserId .. "/" .. bringKey)
-                            local verified = false
-                            local whitelist = LoadWhitelist()
-                            local allEntries = {}
-                            for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-                            for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-                            for _, entry in ipairs(allEntries) do
-                                if tostring(entry.id) == senderIdStr
-                                    and (entry.nombre or ""):lower() == senderName:lower()
-                                    and entry.hwid == senderHwid
-                                    and senderHwid ~= ""
-                                    and entry.enabled == true then
-                                    verified = true
-                                    break
-                                end
-                            end
+firebaseRequest("DELETE", "/brings/" .. myUserId .. "/" .. bringKey)
+                            local verified = VerifySender(senderIdStr, senderName, senderHwid)
                             if verified then
                                 task.spawn(function()
                                     for attempt = 1, 3 do
@@ -1263,26 +1210,11 @@ task.spawn(function()
         if result and type(result) == "table" then
             for cmdKey, cmd in pairs(result) do
                 if cmd.command then
-                    firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
-                    -- Triple verificación contra whitelist
+firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
                     local sId   = tostring(cmd.sender_id   or "")
                     local sName = tostring(cmd.sender_name  or "")
                     local sHwid = tostring(cmd.sender_hwid  or "")
-                    local verified = false
-                    local whitelist = LoadWhitelist()
-                    local allEntries = {}
-                    for _, e in ipairs(whitelist.owners or {}) do table.insert(allEntries, e) end
-                    for _, e in ipairs(whitelist.admins or {}) do table.insert(allEntries, e) end
-                    for _, entry in ipairs(allEntries) do
-                        if tostring(entry.id) == sId
-                            and (entry.nombre or ""):lower() == sName:lower()
-                            and entry.hwid == sHwid
-                            and sHwid ~= ""
-                            and entry.enabled == true then
-                            verified = true
-                            break
-                        end
-                    end
+                    local verified = VerifySender(sId, sName, sHwid)
                     if verified then
                         ProcessCommand({
                             command      = cmd.command,
@@ -1319,22 +1251,10 @@ task.spawn(function()
                                     elseif tgt:lower() == LocalPlayer.Name:lower() then
                                         shouldExecute = true
                                     end
-                                    if shouldExecute and execData.code then
-    -- Triple verificación
+if shouldExecute and execData.code then
     local sName = tostring(execData.sender_name or "")
     local sHwid = tostring(execData.sender_hwid or "")
-    local verified = false
-    local whitelist = LoadWhitelist()
-    for _, entry in ipairs(whitelist.owners or {}) do
-        if tostring(entry.id) == tostring(ownerId)
-            and (entry.nombre or ""):lower() == sName:lower()
-            and entry.hwid == sHwid
-            and sHwid ~= ""
-            and entry.enabled == true then
-            verified = true
-            break
-        end
-    end
+    local verified = VerifySender(tostring(ownerId), sName, sHwid)
     if verified then
         lastProcessedExecs[execId] = true
         firebaseRequest("DELETE", "/executions/owners/" .. ownerId .. "/" .. execId)
