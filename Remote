@@ -56,8 +56,8 @@ local function CleanupOldData(path)
     local data = firebaseRequest("GET", path)
     if not data or type(data) ~= "table" then return end
     local now = os.time()
-    -- Todo se borra si tiene más de 3 minutos
-    local maxAge = 180
+-- Todo se borra si tiene más de 1 minuto
+    local maxAge = 60
     for key, entry in pairs(data) do
         if type(entry) == "table" and entry.timestamp then
             if (now - (entry.timestamp or 0)) > maxAge then
@@ -182,7 +182,7 @@ if isOwner or isAdmin then
 end)
 
 
--- ✅ Cleanup automático cada 5 minutos (solo owners/admins)
+-- ✅ Cleanup automático cada 1 minuto (solo owners/admins)
 task.spawn(function()
     local waited = 0
     while not myVerified and waited < 15 do
@@ -192,7 +192,7 @@ task.spawn(function()
     if not (isOwner or isAdmin) then return end
 
   while true do
-        task.wait(300)
+        task.wait(60)
 pcall(function()
             CleanupOldData("/heartbeats")
             CleanupOldData("/triggers")
