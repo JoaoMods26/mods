@@ -13,8 +13,6 @@ task.spawn(function()
 
     local LocalPlayer = Players.LocalPlayer
 
-
-
     local FIREBASE_URL = "https://admin-reciente-default-rtdb.firebaseio.com"
 
     local ownerIds   = {}
@@ -26,9 +24,7 @@ task.spawn(function()
 local myUserId        = tostring(LocalPlayer.UserId)
 local currentServerId = game.JobId
    
-   local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request
-
-    
+   local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request    
     -- ========================================
     local function firebaseRequest(method, path, body)
         local url = FIREBASE_URL .. path .. ".json"
@@ -47,7 +43,6 @@ local currentServerId = game.JobId
         end
         return nil
     end
-
 
 local function CleanupOldData(path)
     local data = firebaseRequest("GET", path)
@@ -163,8 +158,6 @@ end
         end
     end
 
-
-
 if result.ownerIds then
         for _, id in ipairs(result.ownerIds) do
             table.insert(ownerIds, tonumber(id))
@@ -189,7 +182,6 @@ if isOwner or isAdmin then
         end
 end)
 
-
 task.spawn(function()
     local waited = 0
     while not myVerified and waited < 15 do
@@ -210,7 +202,6 @@ pcall(function()
     end
 end)
 
-
     local detectedFollowers = {}
     local heartbeatActive = false
     local heartbeatInterval = 2
@@ -223,7 +214,6 @@ end)
     local targetForEmoteSync = nil
     local lastCleanupTime = 0
     local cleanupInterval = 300 
-
 
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
@@ -249,9 +239,6 @@ end)
         if IsAdmin(userId) then return "Admin" end
         return "Follower"
     end
-
-
-
 
     task.spawn(function()
         local waited = 0
@@ -1014,7 +1001,6 @@ if senderVerified then
     local senderName = sender.Name
     local senderRole = GetRole(senderUserId)
 
-    -- ✅ Verificación doble: ID + nombre contra whitelist
 local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
     if senderVerified then
                             local cleanCommand = text
@@ -1039,7 +1025,6 @@ local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
             end
         end
     end)
-
 
 task.spawn(function()
         local waited = 0
@@ -1185,7 +1170,7 @@ end
                 end
             end
         end)
--- COMANDOS via Firebase con verificación triple
+
 task.spawn(function()
     local wC = 0
     while not myVerified and wC < 20 do task.wait(0.5) wC = wC + 0.5 end
@@ -1261,9 +1246,6 @@ end
 
 
     end) 
-
-  
-
 
     task.spawn(function()
         -- Esperar a que la verificación de Supabase termine (máx 10s)
@@ -2005,9 +1987,6 @@ end)
 
    local function SendCommand(cmd)
             if cmd == "" then return end
-
-
-    
     --
     local cmdPrefix = cmd:match("^(%S+)"):lower()
     local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
