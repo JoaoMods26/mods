@@ -510,6 +510,14 @@ boton= Juegostab:CreateButton({
 
 
 boton= Juegostab:CreateButton({
+   Name = "DA HOOD UWU (Da hood)",
+   Callback = function()
+       loadstring(game:HttpGet('https://pastebin.com/raw/mPcysmq4'))()
+   end,
+})
+
+
+boton= Juegostab:CreateButton({
    Name = "Veneyork(JVenecofarMods)",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/veko'))()
