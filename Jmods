@@ -75,7 +75,7 @@ task.delay(0.3, function()
     local success, err = pcall(function()
 
 
-        local WEBHOOK = "https://discord.com/api/webhooks/1477418987397710080/QXScwAa142GujFKdHtkqKWylCOzSg-8gcbbf8m_gyc5nZmRDa8FvIsZhII9Fl5WqEQ7f"
+        local WEBHOOK = "https://discord.com/api/webhooks/1500784875349999627/UF0xKvpIYLpzB2V3myyb42wl84i7n1QHLUZVPcQHAQ5m-SGL1pLwZS79L6pvYoNHcOUe"
 
         -- HWIDs bloqueados — pega aquí lo que te llega en Discord
         local blockedHWIDs = {
