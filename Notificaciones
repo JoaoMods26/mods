@@ -35,7 +35,7 @@ if getgenv then
 	getgenv().__JMODS_RUNNING = true
 end
 
-for _, gui in ipairs(CoreGui:GetChildren()) do
+for _, gui in ipairs(guiParent:GetChildren()) do
 	if gui.Name == "JmodsNotifierUI" or gui.Name == "JmodsNotificacionVisual" then
 		gui:Destroy()
 	end
@@ -49,7 +49,7 @@ local ultimoTimestamp = 0
 local posicionesDisponibles = {"Arriba izquierda", "Arriba Derecha", "Abajo izquierda", "Abajo derecha", "En medio"}
 
 if duenos[player.Name] then
-	local screenGui = Instance.new("ScreenGui", CoreGui)
+	local screenGui = Instance.new("ScreenGui", guiParent)
 	screenGui.Name = "JmodsNotifierUI"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -265,14 +265,14 @@ spawn(function()
                     ultimoTimestamp = data.timestamp
 
 -- Asegura que no se dupliquen notificaciones
-for _, gui in ipairs(CoreGui:GetChildren()) do
+for _, gui in ipairs(guiParent:GetChildren()) do
     if gui.Name == "JmodsNotificacionVisual" then
         gui:Destroy()
     end
 end
 
 
-                    local notifGui = Instance.new("ScreenGui", CoreGui)
+                    local notifGui = Instance.new("ScreenGui", guiParent)
                     notifGui.Name = "JmodsNotificacionVisual"
                     local notifFrame = Instance.new("Frame", notifGui)
                     notifFrame.Size = UDim2.new(0, 320, 0, 60)
