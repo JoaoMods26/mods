@@ -1,6 +1,24 @@
+--- JmodsLib
+--- Cargar la librería
+local JmodsLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/pruebasjoao/test/refs/heads/main/JmodsLibV1.0'))()
+
+--- Crear la ventana principal
+local Window = JmodsLib:CreateWindow({
+    Name = "El condon",
+    Icon = 90692784970350,
+    LoadingTitle = "Cargando Script...",
+    LoadingSubtitle = "Inicializando componentes...",
+    Theme = "neon_blue",
+    Intro = true,
+    IntroIcon = 90692784970350,
+    AnimationIntro = 0, --- Animación aleatoria
+    DragImage = 127271155083726
+})
+
+
+
 
 ProteTab = Window:CreateTab("Protecciones", nil) -- Title, Image
-_G.ProteTab = ProteTab
 ProteSection = ProteTab:CreateSection("Protecciones")
 
 local Players = game:GetService("Players")
@@ -326,8 +344,7 @@ lp.CharacterAdded:Connect(function(char)
 end)
 
 
---- 🎮 TAB SCRIPTS (TODAS LAS FUNCIONES CON TOGGLES)
-ProteTab:CreateSection("Scripts de Protección")
+
 
 --- Toggle Fake Position
 ProteTab:CreateToggle({
@@ -426,5 +443,175 @@ ProteTab:CreateToggle({
 })
 
 
+ProteSection = ProteTab:CreateSection("Anti Sits")
 
---- 📋 TAB INFORM
+
+local AntiSitV1 = false
+local antiSitLoop1
+
+ProteTab:CreateToggle({
+    Name = "Anti Sit Basic",
+    CurrentValue = false,
+    Callback = function(state)
+        AntiSitV1 = state
+
+        if state then
+            antiSitLoop1 = RunService.Heartbeat:Connect(function()
+                local char = lp.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+                if hum and hum.Sit then
+                    hum.Sit = false
+                    hum.Jump = true
+                end
+            end)
+        else
+            if antiSitLoop1 then
+                antiSitLoop1:Disconnect()
+                antiSitLoop1 = nil
+            end
+        end
+    end
+})
+
+local AntiSitV2 = false
+
+ProteTab:CreateToggle({
+    Name = "Anti Sit StateBlock",
+    CurrentValue = false,
+    Callback = function(state)
+        AntiSitV2 = state
+
+        local char = lp.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+            hum:SetStateEnabled(Enum.HumanoidStateType.Seated, not state)
+
+            if state then
+                hum.Sit = false
+            end
+        end
+    end
+})
+
+local AntiSitV3 = false
+local antiSitLoop3
+
+ProteTab:CreateToggle({
+    Name = "Anti Sit Weld",
+    CurrentValue = false,
+    Callback = function(state)
+        AntiSitV3 = state
+
+        if state then
+            antiSitLoop3 = RunService.Heartbeat:Connect(function()
+                local char = lp.Character
+                if not char then return end
+
+                for _,v in ipairs(char:GetDescendants()) do
+                    if v:IsA("Weld") and v.Name == "SeatWeld" then
+                        v:Destroy()
+                    end
+                end
+            end)
+        else
+            if antiSitLoop3 then
+                antiSitLoop3:Disconnect()
+                antiSitLoop3 = nil
+            end
+        end
+    end
+})
+
+local AntiSitV4 = false
+local antiSitLoop4
+local savedSeats = {}
+
+ProteTab:CreateToggle({
+    Name = "Anti Sit NoTouch",
+    CurrentValue = false,
+    Callback = function(state)
+        AntiSitV4 = state
+
+        if state then
+            antiSitLoop4 = RunService.Heartbeat:Connect(function()
+                for _,v in ipairs(workspace:GetDescendants()) do
+                    if v:IsA("Seat") or v:IsA("VehicleSeat") then
+                        if savedSeats[v] == nil then
+                            savedSeats[v] = v.CanTouch
+                        end
+
+                        v.CanTouch = false
+                    end
+                end
+            end)
+        else
+            if antiSitLoop4 then
+                antiSitLoop4:Disconnect()
+                antiSitLoop4 = nil
+            end
+
+            for seat,old in pairs(savedSeats) do
+                if seat and seat.Parent then
+                    seat.CanTouch = old
+                end
+            end
+
+            table.clear(savedSeats)
+        end
+    end
+})
+
+
+ProteSection = ProteTab:CreateSection("Anti Freeze")
+
+
+local AntiAnchorEnabled = false
+local antiAnchorLoop
+
+ProteTab:CreateToggle({
+    Name = "Anti Congelado",
+    CurrentValue = false,
+    Callback = function(state)
+        AntiAnchorEnabled = state
+
+        if state then
+            antiAnchorLoop = RunService.Heartbeat:Connect(function()
+                local char = lp.Character
+                if not char then return end
+
+                for _,v in ipairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") and v.Anchored then
+                        v.Anchored = false
+                    end
+                end
+
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+
+                if hrp and hum then
+                    hum.PlatformStand = false
+                    hum.AutoRotate = true
+                end
+            end)
+
+            JmodsLib:Notify({
+                Title = "Anti Anchor Activado",
+                Content = "Protección contra freeze y cinemáticas activada",
+                Duration = 3
+            })
+        else
+            if antiAnchorLoop then
+                antiAnchorLoop:Disconnect()
+                antiAnchorLoop = nil
+            end
+
+            JmodsLib:Notify({
+                Title = "Anti Anchor Desactivado",
+                Content = "Protección deshabilitada",
+                Duration = 2
+            })
+        end
+    end
+})
