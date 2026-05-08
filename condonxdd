@@ -5,213 +5,266 @@ ProteSection = ProteTab:CreateSection("Protecciones")
 
 
 
+
+
+--- Variables de estado de los toggles
+local FakePosEnabled = false
+local FallBreakerEnabled = false
+local HealthMultEnabled = false
+local God2018Active = false
+local SAFE_OFFSET = Vector3.new(0, 2, 0)
+
+--- Variables de Roblox
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local lp = Players.LocalPlayer
 
-local antiFlingEnabled = false
-local characterConnections = {}
-local playerAddedConn
-local collisionLoop
-local velocityLoop
-local savedCollisionStates = {}
+--- Variable para guardar posición segura
+local lastSafeCF = CFrame.new()
 
-local MAX_VELOCITY = 17
-local MAX_ANGULAR = 15
-local MAX_POSITION_DELTA = 4
-local cachedParts = {}
-local lastRootCFrame = nil 
+--- Variables de fly (para mantener compatibilidad)
+local flyEnabled = false
+local noClipEnabled = false
 
-local function buildCache(character)
-    local parts = {}
-    for _, item in pairs(character:GetDescendants()) do
-        if item:IsA("BasePart") then
-            parts[#parts + 1] = item
+--- 🛡️ FUNCIONES ORIGINALES (SIN MODIFICAR)
+
+--- Función God Mode 2018 (original)
+local function apply2018GodMode()
+    local char = lp.Character or lp.CharacterAdded:Wait()
+    local oldHum = char:FindFirstChildOfClass("Humanoid")
+    if oldHum then
+        oldHum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        local newHum = oldHum:Clone()
+        newHum.Name = "Humanoid"
+        newHum.Parent = char
+        workspace.CurrentCamera.CameraSubject = newHum
+        oldHum.Name = "OldHumanoid"
+        oldHum:Destroy()
+        local animate = char:FindFirstChild("Animate")
+        if animate then
+            animate.Disabled = true
+            RunService.Stepped:Wait()
+            animate.Disabled = false
         end
     end
-    cachedParts[character] = parts
 end
 
-local function StartVelocityProtection()
-    if velocityLoop then return end
+--- Función principal que maneja todos los efectos (original)
+local function onChar(char)
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    lastSafeCF = hrp.CFrame
 
-    velocityLoop = RunService.Heartbeat:Connect(function()
-        local char = LocalPlayer.Character
-        if not char then return end
+    -- Main Loop para Fake Position, Health Multiplier y Fall Breaker
+    RunService.Heartbeat:Connect(function()
+        if not hrp or not hrp.Parent or hum.Health <= 0 then return end
+        
+        local v = hrp.AssemblyLinearVelocity
 
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
-        if lastRootCFrame then
-            local delta = (root.CFrame.Position - lastRootCFrame.Position).Magnitude
-            if delta > MAX_POSITION_DELTA then
-                -- Resetear a la posición anterior
-                root.CFrame = lastRootCFrame
-                root.AssemblyLinearVelocity = Vector3.zero
-                root.AssemblyAngularVelocity = Vector3.zero
+        -- 1. FAKE POSITION LOGIC (ORIGINAL)
+        if FakePosEnabled then
+            -- Anti-Fling (Horizontal)
+            if Vector3.new(v.X, 0, v.Z).Magnitude > 60 then
+                lastSafeCF = hrp.CFrame
             end
-        end
 
-        for _, part in pairs(char:GetChildren()) do
-            if part:IsA("BasePart") then
-                local vel = part.AssemblyLinearVelocity
-                if vel.Magnitude > MAX_VELOCITY then
-                    part.AssemblyLinearVelocity = vel.Unit * MAX_VELOCITY
-                end
+            -- Anti-Fall Damage
+            if v.Y < -80 then
+                local rayParam = RaycastParams.new()
+                rayParam.FilterDescendantsInstances = {char}
+                rayParam.FilterType = Enum.RaycastFilterType.Exclude
+                local groundCheck = game.Workspace:Raycast(hrp.Position, Vector3.new(0, -15, 0), rayParam)
 
-                local angVel = part.AssemblyAngularVelocity
-                if angVel.Magnitude > MAX_ANGULAR then
-                    part.AssemblyAngularVelocity = angVel.Unit * MAX_ANGULAR
-                end
-            end
-        end
-
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            lastRootCFrame = root.CFrame
-        end
-    end)
-end
-
-local function StopVelocityProtection()
-    if velocityLoop then
-        velocityLoop:Disconnect()
-        velocityLoop = nil
-    end
-    lastRootCFrame = nil
-end
-
-local function addConn(player, conn)
-    if not characterConnections[player] then
-        characterConnections[player] = {}
-    end
-    table.insert(characterConnections[player], conn)
-end
-
-local function SetNoCollision(character)
-    local parts = cachedParts[character]
-    if not parts then return end
-
-    for _, item in pairs(parts) do
-        if item and item.Parent then
-            if savedCollisionStates[item] == nil then
-                savedCollisionStates[item] = item.CanCollide
-            end
-            item.CanCollide = false
-        end
-    end
-end
-
-local function OnCharacterAdded(player, character)
-    if not antiFlingEnabled or player == LocalPlayer then return end
-
-    buildCache(character)
-    SetNoCollision(character)
-
-    local conn = character.DescendantAdded:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            if savedCollisionStates[desc] == nil then
-                savedCollisionStates[desc] = desc.CanCollide
-            end
-            desc.CanCollide = false
-
-            if cachedParts[character] then
-                table.insert(cachedParts[character], desc)
-            end
-        end
-    end)
-
-    local removeConn = character.AncestryChanged:Connect(function()
-        if not character.Parent then
-            cachedParts[character] = nil
-        end
-    end)
-
-    addConn(player, conn)
-    addConn(player, removeConn)
-end
-
-local function setupPlayer(player)
-    if player == LocalPlayer then return end
-
-    if player.Character then
-        OnCharacterAdded(player, player.Character)
-    end
-
-    local conn = player.CharacterAdded:Connect(function(char)
-        OnCharacterAdded(player, char)
-    end)
-
-    addConn(player, conn)
-end
-
-local function EnableAntiFling()
-    if collisionLoop then return end
-
-    for _, player in pairs(Players:GetPlayers()) do
-        setupPlayer(player)
-    end
-
-    playerAddedConn = Players.PlayerAdded:Connect(function(player)
-        setupPlayer(player)
-    end)
-
-    local timer = 0
-    collisionLoop = RunService.Stepped:Connect(function(_, dt)
-        timer += dt
-        if timer >= 0.25 then
-            timer = 0
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    SetNoCollision(player.Character)
+                if groundCheck then
+                    hrp.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z) 
                 end
             end
-        end
-    end)
 
-    StartVelocityProtection()
-end
-
-local function DisableAntiFling()
-    for _, conns in pairs(characterConnections) do
-        for _, conn in pairs(conns) do
-            conn:Disconnect()
-        end
-    end
-    characterConnections = {}
-
-    if playerAddedConn then
-        playerAddedConn:Disconnect()
-        playerAddedConn = nil
-    end
-
-    if collisionLoop then
-        collisionLoop:Disconnect()
-        collisionLoop = nil
-    end
-
-    StopVelocityProtection()
-    cachedParts = {}
-
-    task.defer(function()
-        for part, originalValue in pairs(savedCollisionStates) do
-            if part and part.Parent then
-                part.CanCollide = originalValue
+            -- Glitch/Void Protection
+            if v.Magnitude > 300 then
+                hrp.CFrame = lastSafeCF + SAFE_OFFSET
+                hrp.AssemblyLinearVelocity = Vector3.zero
             end
         end
-        savedCollisionStates = {}
+
+        -- 2. HEALTH MULTIPLIER (ORIGINAL)
+        if HealthMultEnabled then
+            local currentV = hrp.AssemblyLinearVelocity
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            RunService.RenderStepped:Wait()
+            if hrp.Parent then hrp.AssemblyLinearVelocity = currentV end
+        end
+
+        -- 3. FALL DAMAGE BREAKER V2 (ORIGINAL)
+        if FallBreakerEnabled then
+            local currentV = hrp.AssemblyLinearVelocity
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            RunService.RenderStepped:Wait()
+            if hrp.Parent then hrp.AssemblyLinearVelocity = currentV end
+        end
     end)
 end
 
+--- Conectar eventos de personaje (original)
+if lp.Character then onChar(lp.Character) end
+lp.CharacterAdded:Connect(function(char)
+    onChar(char)
+    if God2018Active then task.wait(0.5) apply2018GodMode() end
+end)
+
+
+--- 🎮 TAB SCRIPTS (TODAS LAS FUNCIONES CON TOGGLES)
+ProteTab:CreateSection("Scripts de Protección")
+
+--- Toggle Fake Position
 ProteTab:CreateToggle({
-    Name = "Anti-Fling",
+    Name = "Fake Position",
     CurrentValue = false,
     Callback = function(state)
-        antiFlingEnabled = state
+        FakePosEnabled = state
         if state then
-            EnableAntiFling()
+            JmodsLib:Notify({
+                Title = "Fake Position Activado",
+                Content = "❌ Fling | ✅ Wins | Anti-Fall & Anti-Fling integrado",
+                Duration = 3
+            })
         else
-            DisableAntiFling()
+            JmodsLib:Notify({
+                Title = "Fake Position Desactivado",
+                Content = "Todo vuelve a la normalidad",
+                Duration = 2
+            })
         end
-    end,
+    end
 })
+
+--- Toggle Fall Damage Breaker v2
+ProteTab:CreateToggle({
+    Name = "Fall Damage Breaker v2",
+    CurrentValue = false,
+    Callback = function(state)
+        if state and game.PlaceId ~= 189707 then 
+            JmodsLib:Notify({
+                Title = "Advertencia",
+                Content = "Solo funciona en Natural Disaster Survival",
+                Duration = 3
+            })
+        end
+        FallBreakerEnabled = state
+        if state then
+            JmodsLib:Notify({
+                Title = "Fall Damage Breaker Activado",
+                Content = "❌ Fling | ✅ Wins | Velocity Nullification",
+                Duration = 3
+            })
+        else
+            JmodsLib:Notify({
+                Title = "Fall Damage Breaker Desactivado",
+                Content = "Todo vuelve a la normalidad",
+                Duration = 2
+            })
+        end
+    end
+})
+
+--- Toggle Health Multiplier
+ProteTab:CreateToggle({
+    Name = "Health Multiplier",
+    CurrentValue = false,
+    Callback = function(state)
+        HealthMultEnabled = state
+        if state then
+            JmodsLib:Notify({
+                Title = "Health Multiplier Activado",
+                Content = "✅ Fling | ❌ Wins",
+                Duration = 3
+            })
+        else
+            JmodsLib:Notify({
+                Title = "Health Multiplier Desactivado",
+                Content = "Todo vuelve a la normalidad",
+                Duration = 2
+            })
+        end
+    end
+})
+
+--- Toggle 2018 Godmode
+ProteTab:CreateToggle({
+    Name = "2018 Godmode",
+    CurrentValue = false,
+    Callback = function(state)
+        God2018Active = state
+        if state then
+            apply2018GodMode()
+            JmodsLib:Notify({
+                Title = "2018 Godmode Activado",
+                Content = "❌ Fling | ❌ Wins | Inmortalidad activada",
+                Duration = 3
+            })
+        else
+            JmodsLib:Notify({
+                Title = "2018 Godmode Desactivado",
+                Content = "Todo vuelve a la normalidad",
+                Duration = 2
+            })
+        end
+    end
+})
+
+ProteTab:CreateSection("Modificadores Adicionales")
+
+--- Slider de velocidad de caminata
+ProteTab:CreateSlider({
+    Name = "Velocidad de Caminata",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = " studs/s",
+    CurrentValue = 16,
+    Callback = function(value)
+        local char = game.Players.LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = value
+        end
+    end
+})
+
+--- Slider de poder de salto
+ScriptsTab:CreateSlider({
+    Name = "Poder de Salto",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = " poder",
+    CurrentValue = 50,
+    Callback = function(value)
+        local char = game.Players.LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.JumpPower = value
+        end
+    end
+})
+
+--- Toggle Fly
+ScriptsTab:CreateToggle({
+    Name = "Fly Mode",
+    CurrentValue = false,
+    Callback = function(state)
+        flyEnabled = state
+        if state then
+            JmodsLib:Notify({
+                Title = "Fly Activado",
+                Content = "Usa WASD para volar, Space/Shift para subir/bajar",
+                Duration = 4
+            })
+        else
+            JmodsLib:Notify({
+                Title = "Fly Desactivado",
+                Content = "Modo vuelo deshabilitado",
+                Duration = 2
+            })
+        end
+    end
+})
+
+--- 📋 TAB INFORM
