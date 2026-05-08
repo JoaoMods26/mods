@@ -201,7 +201,7 @@ local function DisableAntiFling()
     end)
 end
 
-MainTab:CreateToggle({
+ProteTab:CreateToggle({
     Name = "Anti-Fling",
     CurrentValue = false,
     Callback = function(state)
