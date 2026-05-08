@@ -697,7 +697,7 @@ end)
         local victimaInput = parts[2] and parts[2]:lower() or nil
         local destinoOMensaje = parts[3] or nil
 
-
+    
         local isAll = (victimaInput == "all")
         -- Para .m all mensaje → el mensaje empieza en parts[3]
         -- Para .t all joao / .u all joao → destino es parts[3]
