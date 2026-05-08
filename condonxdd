@@ -213,58 +213,6 @@ ProteTab:CreateToggle({
     end
 })
 
-ProteTab:CreateSection("Modificadores Adicionales")
 
---- Slider de velocidad de caminata
-ProteTab:CreateSlider({
-    Name = "Velocidad de Caminata",
-    Range = {16, 200},
-    Increment = 1,
-    Suffix = " studs/s",
-    CurrentValue = 16,
-    Callback = function(value)
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = value
-        end
-    end
-})
-
---- Slider de poder de salto
-ScriptsTab:CreateSlider({
-    Name = "Poder de Salto",
-    Range = {50, 500},
-    Increment = 5,
-    Suffix = " poder",
-    CurrentValue = 50,
-    Callback = function(value)
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.JumpPower = value
-        end
-    end
-})
-
---- Toggle Fly
-ScriptsTab:CreateToggle({
-    Name = "Fly Mode",
-    CurrentValue = false,
-    Callback = function(state)
-        flyEnabled = state
-        if state then
-            JmodsLib:Notify({
-                Title = "Fly Activado",
-                Content = "Usa WASD para volar, Space/Shift para subir/bajar",
-                Duration = 4
-            })
-        else
-            JmodsLib:Notify({
-                Title = "Fly Desactivado",
-                Content = "Modo vuelo deshabilitado",
-                Duration = 2
-            })
-        end
-    end
-})
 
 --- 📋 TAB INFORM
