@@ -213,7 +213,7 @@ ProteTab:CreateToggle({
 })
 
 
-ProteSection = ProteTab:CreateSection("Bloqueo de camara")
+ProteSection = ProteTab:CreateSection("Anti Bloqueo de camara")
 
 -- Servicios y variables necesarias
 local Players = game:GetService("Players")
@@ -263,7 +263,7 @@ local originalCameraSettings = {}
 end
 
 --- Unlock Camera
-MainTab:CreateToggle({
+ProteTab:CreateToggle({
 	Name = "Desbloquear Camara",
 	Flag = "unlockCam",
 	CurrentValue = false,
