@@ -1,20 +1,3 @@
---- JmodsLib
---- Cargar la librería
-local JmodsLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/pruebasjoao/test/refs/heads/main/JmodsLibV1.0'))()
-
---- Crear la ventana principal
-local Window = JmodsLib:CreateWindow({
-    Name = "El condon",
-    Icon = 90692784970350,
-    LoadingTitle = "Cargando Script...",
-    LoadingSubtitle = "Inicializando componentes...",
-    Theme = "neon_blue",
-    Intro = true,
-    IntroIcon = 90692784970350,
-    AnimationIntro = 0, --- Animación aleatoria
-    DragImage = 127271155083726
-})
-
 
 
 
