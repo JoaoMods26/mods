@@ -1,5 +1,4 @@
-ProteTab = Window:CreateTab("Protecciones", nil) -- Title, Image
-_G.Window = Window
+ProteTab = _G.Window:CreateTab("Protecciones", nil) -- Title, Image
 ProteSection = ProteTab:CreateSection("Protecciones")
 
 local Players = game:GetService("Players")
