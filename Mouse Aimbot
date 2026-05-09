@@ -9,8 +9,14 @@ local ESPEnabled = false
 local FOVEnabled = false
 local RainbowMode = false
 local TraceEnabled = false
+local NameESPEnabled = false
+local HealthBarEnabled = false
+local DistanceESPEnabled = false
+local TeamCheckEnabled = false
 local ESPColor = Color3.fromRGB(255, 0, 0)
 local FOVColor = Color3.fromRGB(0, 255, 0)
+local TeamColor = Color3.fromRGB(0, 255, 0)
+local EnemyColor = Color3.fromRGB(255, 0, 0)
 
 local DistanceCheckEnabled = true
 local MaxDistance = 150
@@ -18,36 +24,142 @@ local TargetPart = "Head"
 local PredictionEnabled = false
 local PredictionStrength = 0.15
 
+-- ── WALL CHECKER (NUEVO) ──────────────────────────────────────────────────
+local WallCheckEnabled = false  -- Activado/desactivado desde la UI (Aimbot)
+local WallCheckESP     = false  -- Muestra ESP (cajas) solo si hay línea de visión limpia
+local WallCheckTracers = false  -- Muestra Tracers/Lines solo si hay línea de visión limpia
+
+-- ── Servicios ─────────────────────────────────────────────────────────────
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
+-- ── Helpers ───────────────────────────────────────────────────────────────
+local function getRainbowColor()
+    return Color3.fromHSV((tick() * 0.4) % 1, 1, 1)
+end
+
+local function getESPColor(player)
+    if RainbowMode then return getRainbowColor() end
+    if TeamCheckEnabled and player.Team and LocalPlayer.Team then
+        return player.Team == LocalPlayer.Team and TeamColor or EnemyColor
+    end
+    return ESPColor
+end
+
+local function isEnemy(player)
+    if not TeamCheckEnabled then return true end
+    if not player.Team or not LocalPlayer.Team then return true end
+    return player.Team ~= LocalPlayer.Team
+end
+
+local function getDistance(player)
+    local lc = LocalPlayer.Character
+    local pc = player.Character
+    if not lc or not pc then return math.huge end
+    local lhrp = lc:FindFirstChild("HumanoidRootPart")
+    local phrp = pc:FindFirstChild("HumanoidRootPart")
+    if not lhrp or not phrp then return math.huge end
+    return (lhrp.Position - phrp.Position).Magnitude
+end
+
+local function getHealth(player)
+    if not player.Character then return 0, 100 end
+    local hum = player.Character:FindFirstChild("Humanoid")
+    if not hum then return 0, 100 end
+    return hum.Health, hum.MaxHealth
+end
+
+-- ── WALL CHECK FUNCTION (NUEVO) ───────────────────────────────────────────
+-- Lanza un rayo desde el LocalPlayer hasta la parte objetivo.
+-- Retorna TRUE si hay línea de visión limpia (sin paredes).
+-- Retorna FALSE si hay una pared/obstáculo en el camino.
+local function HasLineOfSight(targetPart)
+    -- Necesitamos el personaje local para saber desde dónde disparar el rayo
+    local localChar = LocalPlayer.Character
+    if not localChar or not targetPart or not targetPart.Parent then
+        return false
+    end
+
+    local origin = localChar:FindFirstChild("HumanoidRootPart")
+    if not origin then return false end
+
+    local startPos  = origin.Position
+    local targetPos = targetPart.Position
+    local direction = (targetPos - startPos)
+
+    -- Lista de partes a ignorar en el raycast:
+    -- el propio personaje local + el personaje del objetivo
+    local ignoreList = { localChar, targetPart.Parent }
+
+    -- También ignoramos todos los accesorios/herramientas del objetivo
+    -- para que no se detecte como "pared" el propio modelo del enemigo
+    local ray = Ray.new(startPos, direction)
+
+    -- FindPartOnRayWithIgnoreList ignora todos los descendientes de los modelos
+    -- pasados en la lista, lo que evita falsos positivos con el propio personaje
+    local hitPart = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+
+    -- Si no golpea nada (nil) → línea de visión limpia
+    -- Si golpea algo → hay una pared
+    if hitPart == nil then
+        return true   -- Línea de visión limpia ✓
+    else
+        return false  -- Hay obstáculo ✗
+    end
+end
+
+-- ── Drawings persistentes por jugador ─────────────────────────────────────
+local ESPCache = {}
+
+local function newDrawing(type, props)
+    local d = Drawing.new(type)
+    for k, v in pairs(props) do d[k] = v end
+    return d
+end
+
+local function createPlayerESP(player)
+    local e = {}
+    e.Outline    = newDrawing("Square", {Thickness=3,   Filled=false, Visible=false, Color=Color3.new(0,0,0),              Transparency=1})
+    e.Box        = newDrawing("Square", {Thickness=1.5, Filled=false, Visible=false, Color=ESPColor,                       Transparency=1})
+    e.Tracer     = newDrawing("Line",   {Thickness=1.5,               Visible=false, Color=ESPColor,                       Transparency=1})
+    e.NameLabel  = newDrawing("Text",   {Size=14, Font=2, Center=true, Outline=true,  Color=Color3.new(1,1,1),   Visible=false, Transparency=1})
+    e.HealthBg   = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.new(0,0,0),              Transparency=0.5})
+    e.HealthBar  = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.fromRGB(0,200,0),        Transparency=1})
+    e.DistLabel  = newDrawing("Text",   {Size=12, Font=2, Center=true, Outline=true,  Color=Color3.fromRGB(200,200,200), Visible=false, Transparency=1})
+    ESPCache[player] = e
+end
+
+local function removePlayerESP(player)
+    local e = ESPCache[player]
+    if not e then return end
+    for _, d in pairs(e) do pcall(function() d:Remove() end) end
+    ESPCache[player] = nil
+end
+
+local function hidePlayerESP(player)
+    local e = ESPCache[player]
+    if not e then return end
+    for _, d in pairs(e) do d.Visible = false end
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then createPlayerESP(p) end
+end
+
+Players.PlayerAdded:Connect(function(p)   createPlayerESP(p) end)
+Players.PlayerRemoving:Connect(function(p) removePlayerESP(p) end)
+
+-- ── UI ────────────────────────────────────────────────────────────────────
 AimbotTab:CreateSection("Aimbot de Mouse")
 
 AimbotTab:CreateToggle({
     Name = "Activar Aimbot",
     CurrentValue = false,
     Flag = "AimbotEnabled",
-    Callback = function(Value)
-        AimbotEnabled = Value
-        if Value then
-            AimbotPaused = false
-            JmodsLib:Notify({
-                Title = "Aimbot Activado",
-                Content = "El aimbot está funcionando",
-                Duration = 3
-            })
-        else
-            AimbotPaused = false
-            JmodsLib:Notify({
-                Title = "Aimbot Desactivado",
-                Content = "El aimbot se ha desactivado",
-                Duration = 3
-            })
-        end
-    end
+    Callback = function(v) AimbotEnabled = v end
 })
 
 AimbotTab:CreateKeybind({
@@ -56,22 +168,7 @@ AimbotTab:CreateKeybind({
     Hold = false,
     Flag = "PauseAimbotKey",
     Callback = function()
-        if AimbotEnabled then
-            AimbotPaused = not AimbotPaused
-            if AimbotPaused then
-                JmodsLib:Notify({
-                    Title = "Aimbot Pausado",
-                    Content = "Presiona E de nuevo para reanudar",
-                    Duration = 3
-                })
-            else
-                JmodsLib:Notify({
-                    Title = "Aimbot Reanudado",
-                    Content = "El aimbot está activo nuevamente",
-                    Duration = 3
-                })
-            end
-        end
+        if AimbotEnabled then AimbotPaused = not AimbotPaused end
     end
 })
 
@@ -79,66 +176,96 @@ AimbotTab:CreateToggle({
     Name = "Mostrar FOV",
     CurrentValue = false,
     Flag = "FOVEnabled",
-    Callback = function(Value)
-        FOVEnabled = Value
-    end
+    Callback = function(v) FOVEnabled = v end
 })
 
 AimbotTab:CreateSlider({
     Name = "FOV del Aimbot",
-    Range = {50, 500},
-    Increment = 1,
-    Suffix = "px",
-    CurrentValue = 300,
+    Range = {50, 500}, Increment = 1, Suffix = "px", CurrentValue = 300,
     Flag = "AimbotFOV",
-    Callback = function(Value)
-        MouseFOV = Value
-    end
+    Callback = function(v) MouseFOV = v end
 })
 
 AimbotTab:CreateSlider({
     Name = "Suavizado",
-    Range = {1, 20},
-    Increment = 1,
-    Suffix = "x",
-    CurrentValue = 3,
+    Range = {1, 20}, Increment = 1, Suffix = "x", CurrentValue = 3,
     Flag = "AimbotSmooth",
-    Callback = function(Value)
-        MouseSmoothness = Value
-    end
+    Callback = function(v) MouseSmoothness = v end
 })
 
 AimbotTab:CreateSection("Target Settings")
 
-local TargetPartDropdown = AimbotTab:CreateDropdown({
+AimbotTab:CreateDropdown({
     Name = "Parte del Cuerpo",
     Options = {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"},
     CurrentOption = "Head",
     Flag = "TargetPart",
-    Callback = function(Option)
-        TargetPart = Option
-    end
+    Callback = function(v) TargetPart = v end
 })
 
 AimbotTab:CreateToggle({
     Name = "Filtro de Distancia",
     CurrentValue = true,
     Flag = "DistanceCheckEnabled",
-    Callback = function(Value)
-        DistanceCheckEnabled = Value
-    end
+    Callback = function(v) DistanceCheckEnabled = v end
 })
 
 AimbotTab:CreateSlider({
     Name = "Distancia Máxima",
-    Range = {10, 500},
-    Increment = 5,
-    Suffix = " studs",
-    CurrentValue = 150,
+    Range = {10, 500}, Increment = 5, Suffix = " studs", CurrentValue = 150,
     Flag = "MaxDistance",
-    Callback = function(Value)
-        MaxDistance = Value
-    end
+    Callback = function(v) MaxDistance = v end
+})
+
+-- ── SECCIÓN WALL CHECKER (NUEVO) ──────────────────────────────────────────
+AimbotTab:CreateSection("Wall Checker")
+
+AimbotTab:CreateToggle({
+    -- Cuando está activo, el aimbot NO apuntará a objetivos detrás de paredes
+    Name = "Wall Check (Aimbot)",
+    CurrentValue = false,
+    Flag = "WallCheckEnabled",
+    Callback = function(v) WallCheckEnabled = v end
+})
+
+AimbotTab:CreateToggle({
+    -- Cuando está activo, el ESP solo muestra jugadores con línea de visión limpia
+    Name = "Wall Check (ESP)",
+    CurrentValue = false,
+    Flag = "WallCheckESP",
+    Callback = function(v) WallCheckESP = v end
+})
+
+AimbotTab:CreateToggle({
+    -- Cuando está activo, los Tracers/Lines solo se dibujan si hay línea de visión limpia
+    Name = "Wall Check (Tracers)",
+    CurrentValue = false,
+    Flag = "WallCheckTracers",
+    Callback = function(v) WallCheckTracers = v end
+})
+
+-- ── Team Checker ──────────────────────────────────────────────────────────
+AimbotTab:CreateSection("Team Checker")
+
+AimbotTab:CreateToggle({
+    Name = "Team Checker (no apuntar aliados)",
+    CurrentValue = false,
+    Flag = "TeamCheckEnabled",
+    Callback = function(v) TeamCheckEnabled = v end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color Aliados (ESP)",
+    Color = Color3.fromRGB(0, 255, 0),
+    Flag = "TeamColor",
+    Callback = function(v) TeamColor = v end
+})
+
+AimbotTab:CreateColorPicker({
+    Name = "Color Enemigos (ESP)",
+    Color = Color3.fromRGB(255, 0, 0),
+    Flag = "EnemyColor",
+    Callback = function(v) EnemyColor = v end
 })
 
 AimbotTab:CreateSection("Prediction")
@@ -147,31 +274,27 @@ AimbotTab:CreateToggle({
     Name = "Activar Predicción",
     CurrentValue = false,
     Flag = "PredictionEnabled",
-    Callback = function(Value)
-        PredictionEnabled = Value
-    end
+    Callback = function(v) PredictionEnabled = v end
 })
 
 AimbotTab:CreateSlider({
     Name = "Fuerza de Predicción",
-    Range = {0.05, 0.5},
-    Increment = 0.01,
-    Suffix = "x",
-    CurrentValue = 0.15,
+    Range = {0.05, 0.5}, Increment = 0.01, Suffix = "x", CurrentValue = 0.15,
     Flag = "PredictionStrength",
-    Callback = function(Value)
-        PredictionStrength = Value
-    end
+    Callback = function(v) PredictionStrength = v end
 })
 
 AimbotTab:CreateSection("ESP & Visuals")
 
 AimbotTab:CreateToggle({
-    Name = "ESP",
+    Name = "ESP (Cajas)",
     CurrentValue = false,
     Flag = "ESPEnabled",
-    Callback = function(Value)
-        ESPEnabled = Value
+    Callback = function(v)
+        ESPEnabled = v
+        if not v then
+            for p, _ in pairs(ESPCache) do hidePlayerESP(p) end
+        end
     end
 })
 
@@ -179,30 +302,44 @@ AimbotTab:CreateToggle({
     Name = "Tracers",
     CurrentValue = false,
     Flag = "TracersEnabled",
-    Callback = function(Value)
-        TraceEnabled = Value
-    end
+    Callback = function(v) TraceEnabled = v end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Nombres",
+    CurrentValue = false,
+    Flag = "NameESPEnabled",
+    Callback = function(v) NameESPEnabled = v end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Barra de Vida",
+    CurrentValue = false,
+    Flag = "HealthBarEnabled",
+    Callback = function(v) HealthBarEnabled = v end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Mostrar Distancia",
+    CurrentValue = false,
+    Flag = "DistanceESPEnabled",
+    Callback = function(v) DistanceESPEnabled = v end
 })
 
 AimbotTab:CreateSlider({
     Name = "Tamaño ESP",
-    Range = {30, 150},
-    Increment = 1,
-    Suffix = "%",
-    CurrentValue = 50,
+    Range = {30, 150}, Increment = 1, Suffix = "%", CurrentValue = 50,
     Flag = "ESPSizing",
-    Callback = function(Value)
-        _G.ESPSizing = Value / 100
-    end
+    Callback = function(v) _G.ESPSizing = v / 100 end
 })
 
 AimbotTab:CreateColorPicker({
-    Name = "Colores",
+    Name = "Color ESP/FOV",
     Color = Color3.fromRGB(255, 0, 0),
     Flag = "FOVColor",
-    Callback = function(Value)
-        ESPColor = Value
-        FOVColor = Value
+    Callback = function(v)
+        ESPColor = v
+        FOVColor = v
     end
 })
 
@@ -210,274 +347,305 @@ AimbotTab:CreateToggle({
     Name = "Arcoíris",
     CurrentValue = false,
     Flag = "RainbowToggle",
-    Callback = function(Value)
-        RainbowMode = Value
-    end
+    Callback = function(v) RainbowMode = v end
 })
 
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Radius = MouseFOV
-FOVCircle.Thickness = 1.5
-FOVCircle.NumSides = 100
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-FOVCircle.ZIndex = 2
-FOVCircle.Color = FOVColor
-
-local function getRainbowColor()
-    local t = tick() * 2
-    return Color3.fromHSV((t % 5) / 5, 1, 1)
-end
-
-local function CreateBox()
-    local box = {
-        Outline = Drawing.new("Square"),
-        Box = Drawing.new("Square")
-    }
-    box.Outline.Thickness = 3
-    box.Box.Thickness = 1
-    box.Outline.Transparency = 1
-    box.Box.Transparency = 1
-    box.Outline.Filled = false
-    box.Box.Filled = false
-    return box
-end
-
-local function CreateTracer()
-    local line = Drawing.new("Line")
-    line.Thickness = 1.5
-    line.Transparency = 1
-    return line
-end
-
-local ESPBoxes = {}
 _G.ESPSizing = 0.5
 
-local function UpdateESP()
-    for _, item in pairs(ESPBoxes) do
-        if item.Box then item.Box:Remove() end
-        if item.Outline then item.Outline:Remove() end
-        if item.Tracer then item.Tracer:Remove() end
-    end
-    table.clear(ESPBoxes)
-    
-    if not (ESPEnabled or TraceEnabled) then return end
-    
+-- ── FOV Circle ────────────────────────────────────────────────────────────
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Radius      = MouseFOV
+FOVCircle.Thickness   = 1.5
+FOVCircle.NumSides    = 64
+FOVCircle.Filled      = false
+FOVCircle.Transparency = 1
+FOVCircle.ZIndex      = 2
+FOVCircle.Color       = FOVColor
+
+-- ── ESP Update ────────────────────────────────────────────────────────────
+local espTimer = 0
+local ESP_RATE = 0.03
+
+local function UpdateESP(dt)
+    espTimer = espTimer + dt
+    if espTimer < ESP_RATE then return end
+    espTimer = 0
+
+    local anyESP = ESPEnabled or TraceEnabled or NameESPEnabled or HealthBarEnabled or DistanceESPEnabled
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local sizing = _G.ESPSizing or 0.5
+
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            local head = player.Character:FindFirstChild("Head")
-            
-            if hrp and head then
-                if DistanceCheckEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local distance = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if distance > MaxDistance then
-                        continue
-                    end
-                end
-                
-                local headPos, onScreen1 = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.3, 0))
-                local rootPos, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 0.3, 0))
-                
-                if onScreen1 and onScreen2 then
-                    local height = math.abs(headPos.Y - rootPos.Y)
-                    local width = height * (_G.ESPSizing or 0.5)
-                    local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
-                    local color = RainbowMode and getRainbowColor() or ESPColor
-                    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                    
-                    local box = ESPEnabled and CreateBox() or { Box = nil, Outline = nil }
-                    local tracer = TraceEnabled and CreateTracer() or nil
-                    
-                    if box.Outline then
-                        box.Outline.Position = topLeft
-                        box.Outline.Size = Vector2.new(width, height)
-                        box.Outline.Color = Color3.new(0, 0, 0)
-                    end
-                    
-                    if box.Box then
-                        box.Box.Position = topLeft
-                        box.Box.Size = Vector2.new(width, height)
-                        box.Box.Color = color
-                    end
-                    
-                    if tracer then
-                        tracer.From = screenCenter
-                        tracer.To = Vector2.new(rootPos.X, rootPos.Y)
-                        tracer.Color = color
-                    end
-                    
-                    table.insert(ESPBoxes, {
-                        Box = box.Box,
-                        Outline = box.Outline,
-                        Tracer = tracer
-                    })
+        if player == LocalPlayer then continue end
+
+        local e = ESPCache[player]
+        if not e then continue end
+
+        if TeamCheckEnabled and not isEnemy(player) then
+            hidePlayerESP(player)
+            continue
+        end
+
+        if not anyESP or not player.Character then
+            hidePlayerESP(player)
+            continue
+        end
+
+        local hrp  = player.Character:FindFirstChild("HumanoidRootPart")
+        local head = player.Character:FindFirstChild("Head")
+        if not hrp or not head then
+            hidePlayerESP(player)
+            continue
+        end
+
+        if DistanceCheckEnabled then
+            local dist = getDistance(player)
+            if dist > MaxDistance then
+                hidePlayerESP(player)
+                continue
+            end
+        end
+
+        -- ── WALL CHECK para ESP (NUEVO) ───────────────────────────────────
+        -- Si WallCheckESP está activo, ocultamos el ESP de jugadores
+        -- que estén detrás de una pared. No afecta al aimbot en absoluto.
+        if WallCheckESP then
+            local checkPart = player.Character:FindFirstChild(TargetPart)
+                           or player.Character:FindFirstChild("Head")
+                           or hrp
+            if not HasLineOfSight(checkPart) then
+                hidePlayerESP(player)
+                continue  -- Está detrás de una pared, no dibujamos su ESP
+            end
+        end
+        -- ─────────────────────────────────────────────────────────────────
+
+        local headPos, onHead = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.3, 0))
+        local rootPos, onRoot = Camera:WorldToViewportPoint(hrp.Position  - Vector3.new(0, 0.3, 0))
+
+        if not (onHead and onRoot) or headPos.Z <= 0 then
+            hidePlayerESP(player)
+            continue
+        end
+
+        local color  = getESPColor(player)
+        local height = math.abs(headPos.Y - rootPos.Y)
+        local width  = height * sizing
+        local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
+
+        if ESPEnabled then
+            e.Outline.Position = topLeft - Vector2.new(1, 1)
+            e.Outline.Size     = Vector2.new(width + 2, height + 2)
+            e.Outline.Visible  = true
+
+            e.Box.Position = topLeft
+            e.Box.Size     = Vector2.new(width, height)
+            e.Box.Color    = color
+            e.Box.Visible  = true
+        else
+            e.Outline.Visible = false
+            e.Box.Visible     = false
+        end
+
+        if TraceEnabled then
+            -- ── WALL CHECK para Tracers (NUEVO) ──────────────────────────
+            -- Toggle independiente: si está activo y hay pared, oculta solo
+            -- el tracer de ese jugador sin afectar cajas, nombres ni aimbot.
+            if WallCheckTracers then
+                local checkPart = player.Character:FindFirstChild(TargetPart)
+                               or player.Character:FindFirstChild("Head")
+                               or hrp
+                if not HasLineOfSight(checkPart) then
+                    e.Tracer.Visible = false
+                    goto continueTracer  -- salta solo el bloque del tracer
                 end
             end
+            -- ─────────────────────────────────────────────────────────────
+            e.Tracer.From    = screenCenter
+            e.Tracer.To      = Vector2.new(rootPos.X, rootPos.Y)
+            e.Tracer.Color   = color
+            e.Tracer.Visible = true
+            ::continueTracer::
+        else
+            e.Tracer.Visible = false
+        end
+
+        if NameESPEnabled then
+            e.NameLabel.Text     = player.DisplayName
+            e.NameLabel.Position = Vector2.new(rootPos.X, headPos.Y - 16)
+            e.NameLabel.Color    = color
+            e.NameLabel.Visible  = true
+        else
+            e.NameLabel.Visible = false
+        end
+
+        if HealthBarEnabled then
+            local hp, maxHp = getHealth(player)
+            local ratio = math.clamp(hp / maxHp, 0, 1)
+            local barW  = 4
+            local barX  = topLeft.X - barW - 2
+
+            e.HealthBg.Position = Vector2.new(barX, headPos.Y)
+            e.HealthBg.Size     = Vector2.new(barW, height)
+            e.HealthBg.Visible  = true
+
+            e.HealthBar.Position = Vector2.new(barX, headPos.Y + height * (1 - ratio))
+            e.HealthBar.Size     = Vector2.new(barW, height * ratio)
+            e.HealthBar.Color    = Color3.fromRGB(
+                math.floor(255 * (1 - ratio)),
+                math.floor(255 * ratio),
+                0
+            )
+            e.HealthBar.Visible = true
+        else
+            e.HealthBg.Visible  = false
+            e.HealthBar.Visible = false
+        end
+
+        if DistanceESPEnabled then
+            local dist = math.floor(getDistance(player))
+            e.DistLabel.Text     = dist .. "m"
+            e.DistLabel.Position = Vector2.new(rootPos.X, rootPos.Y + 4)
+            e.DistLabel.Visible  = true
+        else
+            e.DistLabel.Visible = false
         end
     end
 end
 
+-- ── Aimbot ────────────────────────────────────────────────────────────────
 local function IsReady(Character)
     if not Character then return false end
-    
     local humanoid = Character:FindFirstChild("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return false end
-    
     local part = Character:FindFirstChild(TargetPart)
-    if not part then
-        part = Character:FindFirstChild("Head")
-    end
-    if not part then
-        part = Character:FindFirstChild("HumanoidRootPart")
-    end
-    
+        or Character:FindFirstChild("Head")
+        or Character:FindFirstChild("HumanoidRootPart")
     if not part then return false end
-    
     local pos, visible = Camera:WorldToViewportPoint(part.Position)
-    
-    if not visible then return false end
-    if pos.Z <= 0 then return false end
-    
+    if not visible or pos.Z <= 0 then return false end
     return true, part, pos
 end
 
 local function PredictPosition(part)
-    if not PredictionEnabled or not part or not part.Parent then
-        return part.Position
-    end
-    
-    local rootPart = part.Parent:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return part.Position end
-    
-    local velocity = rootPart.AssemblyLinearVelocity or rootPart.Velocity
-    local predictedPosition = part.Position + (velocity * PredictionStrength)
-    
-    return predictedPosition
+    if not PredictionEnabled or not part or not part.Parent then return part.Position end
+    local root = part.Parent:FindFirstChild("HumanoidRootPart")
+    if not root then return part.Position end
+    local vel = root.AssemblyLinearVelocity or root.Velocity
+    return part.Position + vel * PredictionStrength
 end
 
 local currentTarget = nil
 local targetLockTime = 0
-local maxLockTime = 3
-local lastValidPosition = nil
 local stickyLock = false
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     local mousePos = UserInputService:GetMouseLocation()
-    FOVCircle.Position = mousePos
-    FOVCircle.Radius = MouseFOV
-    FOVCircle.Color = RainbowMode and getRainbowColor() or FOVColor
-    FOVCircle.Visible = FOVEnabled
-    
-    UpdateESP()
-    
-    if not AimbotEnabled then 
+
+    FOVCircle.Position  = mousePos
+    FOVCircle.Radius    = MouseFOV
+    FOVCircle.Color     = RainbowMode and getRainbowColor() or FOVColor
+    FOVCircle.Visible   = FOVEnabled
+
+    UpdateESP(dt)
+
+    if not AimbotEnabled or AimbotPaused then
         currentTarget = nil
-        lastValidPosition = nil
-        stickyLock = false
-        return 
-    end
-    
-    if AimbotPaused then
-        currentTarget = nil
-        lastValidPosition = nil
-        stickyLock = false
+        stickyLock    = false
         return
     end
-    
-    local closest = nil
-    local shortest = math.huge
+
+    local closest     = nil
+    local shortest    = math.huge
     local validTargets = {}
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character then
-            local visible, part, pos = IsReady(plr.Character)
-            
-            if visible and part then
-                if DistanceCheckEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local distance = (part.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if distance > MaxDistance then
-                        continue
-                    end
-                end
-                
-                local screenPos = Vector2.new(pos.X, pos.Y)
-                local dist = (screenPos - mousePos).Magnitude
-                
-                table.insert(validTargets, {
-                    part = part,
-                    distance = dist,
-                    screenPos = screenPos
-                })
-                
-                if dist < shortest and dist <= MouseFOV then
-                    shortest = dist
-                    closest = part
-                end
+        if plr == LocalPlayer then continue end
+
+        if TeamCheckEnabled and not isEnemy(plr) then continue end
+
+        if not plr.Character then continue end
+
+        local visible, part, pos = IsReady(plr.Character)
+        if not (visible and part) then continue end
+
+        if DistanceCheckEnabled then
+            local dist = getDistance(plr)
+            if dist > MaxDistance then continue end
+        end
+
+        -- ── WALL CHECK para Aimbot (NUEVO) ────────────────────────────────
+        -- Solo se ejecuta si el toggle está activo. Si el objetivo está
+        -- detrás de una pared, se salta este jugador. El resto del aimbot
+        -- (smoothness, prediction, FOV, sticky lock) no se toca en absoluto.
+        if WallCheckEnabled then
+            if not HasLineOfSight(part) then
+                continue  -- Detrás de pared, ignoramos este objetivo
             end
+        end
+        -- ─────────────────────────────────────────────────────────────────
+
+        local screenPos = Vector2.new(pos.X, pos.Y)
+        local dist      = (screenPos - mousePos).Magnitude
+
+        table.insert(validTargets, {part = part, distance = dist})
+
+        if dist < shortest and dist <= MouseFOV then
+            shortest = dist
+            closest  = part
         end
     end
-    
+
+    -- Sticky lock
     if stickyLock and currentTarget and currentTarget.Parent then
         local stillValid = false
-        for _, target in pairs(validTargets) do
-            if target.part == currentTarget then
-                stillValid = true
-                closest = currentTarget
-                break
-            end
+        for _, t in pairs(validTargets) do
+            if t.part == currentTarget then stillValid = true break end
         end
-        
-        if not stillValid then
-            stickyLock = false
+        if stillValid then
+            closest = currentTarget
+        else
+            stickyLock    = false
             currentTarget = nil
         end
     end
-    
+
     if closest and closest.Parent then
         if currentTarget ~= closest then
-            currentTarget = closest
+            currentTarget  = closest
             targetLockTime = tick()
-            stickyLock = true
+            stickyLock     = true
         end
-        
+
         if getfenv().mousemoverel then
-            local targetPosition = PredictPosition(closest)
-            local screen, onScreen = Camera:WorldToViewportPoint(targetPosition)
-            
+            local targetPos = PredictPosition(closest)
+            local screen, onScreen = Camera:WorldToViewportPoint(targetPos)
+
             if onScreen and screen.Z > 0 then
                 local screenPos = Vector2.new(screen.X, screen.Y)
-                local distance = (screenPos - mousePos).Magnitude
-                
+                local distance  = (screenPos - mousePos).Magnitude
+
                 if distance > 1 then
-                    local smoothness = MouseSmoothness
-                    
-                    if distance < 50 then
-                        smoothness = MouseSmoothness * 1.5
-                    end
-                    
-                    local dx = (screen.X - mousePos.X) / smoothness
-                    local dy = (screen.Y - mousePos.Y) / smoothness
-                    
+                    local smooth = MouseSmoothness * (distance < 50 and 1.5 or 1)
+                    local dx = (screen.X - mousePos.X) / smooth
+                    local dy = (screen.Y - mousePos.Y) / smooth
+
                     if math.abs(dx) < 200 and math.abs(dy) < 200 then
                         getfenv().mousemoverel(dx, dy)
                     else
                         currentTarget = nil
-                        stickyLock = false
+                        stickyLock    = false
                     end
-                else
-                    lastValidPosition = screenPos
                 end
             else
                 if tick() - targetLockTime > 0.5 then
                     currentTarget = nil
-                    stickyLock = false
+                    stickyLock    = false
                 end
             end
         end
     else
         currentTarget = nil
-        lastValidPosition = nil
-        stickyLock = false
+        stickyLock    = false
     end
 end)
