@@ -492,7 +492,7 @@ local function createFavoritosGui()
 	favoritosGui.ResetOnSpawn = false
 	favoritosGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	favoritosGui.Enabled = favoritosVisible
-	favoritosGui.Parent = CoreGui
+	favoritosGui.Parent = (gethui and gethui()) or CoreGui
 
 	-- ── Botón flotante minimizado ──
 	local miniBtn = Instance.new("TextButton")
@@ -914,7 +914,7 @@ local function createMobileButtons()
 	mobileButtonsGui.Name = "MobileAnimationButtons"
 	mobileButtonsGui.ResetOnSpawn = false
 	mobileButtonsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	mobileButtonsGui.Parent = CoreGui
+	mobileButtonsGui.Parent = (gethui and gethui()) or CoreGui
 
 	playButton = Instance.new("TextButton")
 	playButton.Name = "PlayButton"
