@@ -24,17 +24,17 @@ local TargetPart = "Head"
 local PredictionEnabled = false
 local PredictionStrength = 0.15
 
--- ── WALL CHECKER (NUEVO) ──────────────────────────────────────────────────
-local WallCheckEnabled = false  -- Activado/desactivado desde la UI (Aimbot)
-local WallCheckESP     = false  -- Muestra ESP (cajas) solo si hay línea de visión limpia
-local WallCheckTracers = false  -- Muestra Tracers/Lines solo si hay línea de visión limpia
+-- ── WALL CHECKER ──────────────────────────────────────────────────────────
+local WallCheckEnabled = false
+local WallCheckESP     = false
+local WallCheckTracers = false
 
 -- ── Servicios ─────────────────────────────────────────────────────────────
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+local Camera           = workspace.CurrentCamera
+local LocalPlayer      = Players.LocalPlayer
 
 -- ── Helpers ───────────────────────────────────────────────────────────────
 local function getRainbowColor()
@@ -72,12 +72,9 @@ local function getHealth(player)
     return hum.Health, hum.MaxHealth
 end
 
--- ── WALL CHECK FUNCTION (NUEVO) ───────────────────────────────────────────
--- Lanza un rayo desde el LocalPlayer hasta la parte objetivo.
--- Retorna TRUE si hay línea de visión limpia (sin paredes).
--- Retorna FALSE si hay una pared/obstáculo en el camino.
+-- ── WALL CHECK (FIX #2: reemplazado Ray.new / FindPartOnRayWithIgnoreList) ─
+-- Ahora usa workspace:Raycast() con RaycastParams (API moderna y estable).
 local function HasLineOfSight(targetPart)
-    -- Necesitamos el personaje local para saber desde dónde disparar el rayo
     local localChar = LocalPlayer.Character
     if not localChar or not targetPart or not targetPart.Parent then
         return false
@@ -88,26 +85,22 @@ local function HasLineOfSight(targetPart)
 
     local startPos  = origin.Position
     local targetPos = targetPart.Position
-    local direction = (targetPos - startPos)
+    local direction = targetPos - startPos
 
-    -- Lista de partes a ignorar en el raycast:
-    -- el propio personaje local + el personaje del objetivo
-    local ignoreList = { localChar, targetPart.Parent }
+    -- Configuramos los parámetros del raycast para ignorar
+    -- el personaje local y el personaje del objetivo
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = { localChar, targetPart.Parent }
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
-    -- También ignoramos todos los accesorios/herramientas del objetivo
-    -- para que no se detecte como "pared" el propio modelo del enemigo
-    local ray = Ray.new(startPos, direction)
+    local result = workspace:Raycast(startPos, direction, rayParams)
 
-    -- FindPartOnRayWithIgnoreList ignora todos los descendientes de los modelos
-    -- pasados en la lista, lo que evita falsos positivos con el propio personaje
-    local hitPart = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-
-    -- Si no golpea nada (nil) → línea de visión limpia
-    -- Si golpea algo → hay una pared
-    if hitPart == nil then
-        return true   -- Línea de visión limpia ✓
+    -- Si result es nil → no golpeó nada → línea de visión limpia ✓
+    -- Si result no es nil → hay un obstáculo en el camino ✗
+    if result == nil then
+        return true
     else
-        return false  -- Hay obstáculo ✗
+        return false
     end
 end
 
@@ -122,13 +115,13 @@ end
 
 local function createPlayerESP(player)
     local e = {}
-    e.Outline    = newDrawing("Square", {Thickness=3,   Filled=false, Visible=false, Color=Color3.new(0,0,0),              Transparency=1})
-    e.Box        = newDrawing("Square", {Thickness=1.5, Filled=false, Visible=false, Color=ESPColor,                       Transparency=1})
-    e.Tracer     = newDrawing("Line",   {Thickness=1.5,               Visible=false, Color=ESPColor,                       Transparency=1})
-    e.NameLabel  = newDrawing("Text",   {Size=14, Font=2, Center=true, Outline=true,  Color=Color3.new(1,1,1),   Visible=false, Transparency=1})
-    e.HealthBg   = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.new(0,0,0),              Transparency=0.5})
-    e.HealthBar  = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.fromRGB(0,200,0),        Transparency=1})
-    e.DistLabel  = newDrawing("Text",   {Size=12, Font=2, Center=true, Outline=true,  Color=Color3.fromRGB(200,200,200), Visible=false, Transparency=1})
+    e.Outline   = newDrawing("Square", {Thickness=3,   Filled=false, Visible=false, Color=Color3.new(0,0,0),           Transparency=1})
+    e.Box       = newDrawing("Square", {Thickness=1.5, Filled=false, Visible=false, Color=ESPColor,                    Transparency=1})
+    e.Tracer    = newDrawing("Line",   {Thickness=1.5,               Visible=false, Color=ESPColor,                    Transparency=1})
+    e.NameLabel = newDrawing("Text",   {Size=14, Font=2, Center=true, Outline=true,  Color=Color3.new(1,1,1),  Visible=false, Transparency=1})
+    e.HealthBg  = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.new(0,0,0),           Transparency=0.5})
+    e.HealthBar = newDrawing("Square", {Thickness=1,   Filled=true,  Visible=false, Color=Color3.fromRGB(0,200,0),     Transparency=1})
+    e.DistLabel = newDrawing("Text",   {Size=12, Font=2, Center=true, Outline=true,  Color=Color3.fromRGB(200,200,200), Visible=false, Transparency=1})
     ESPCache[player] = e
 end
 
@@ -149,7 +142,7 @@ for _, p in pairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then createPlayerESP(p) end
 end
 
-Players.PlayerAdded:Connect(function(p)   createPlayerESP(p) end)
+Players.PlayerAdded:Connect(function(p)    createPlayerESP(p) end)
 Players.PlayerRemoving:Connect(function(p) removePlayerESP(p) end)
 
 -- ── UI ────────────────────────────────────────────────────────────────────
@@ -217,11 +210,10 @@ AimbotTab:CreateSlider({
     Callback = function(v) MaxDistance = v end
 })
 
--- ── SECCIÓN WALL CHECKER (NUEVO) ──────────────────────────────────────────
+-- ── SECCIÓN WALL CHECKER ──────────────────────────────────────────────────
 AimbotTab:CreateSection("Wall Checker")
 
 AimbotTab:CreateToggle({
-    -- Cuando está activo, el aimbot NO apuntará a objetivos detrás de paredes
     Name = "Wall Check (Aimbot)",
     CurrentValue = false,
     Flag = "WallCheckEnabled",
@@ -229,7 +221,6 @@ AimbotTab:CreateToggle({
 })
 
 AimbotTab:CreateToggle({
-    -- Cuando está activo, el ESP solo muestra jugadores con línea de visión limpia
     Name = "Wall Check (ESP)",
     CurrentValue = false,
     Flag = "WallCheckESP",
@@ -237,7 +228,6 @@ AimbotTab:CreateToggle({
 })
 
 AimbotTab:CreateToggle({
-    -- Cuando está activo, los Tracers/Lines solo se dibujan si hay línea de visión limpia
     Name = "Wall Check (Tracers)",
     CurrentValue = false,
     Flag = "WallCheckTracers",
@@ -354,13 +344,13 @@ _G.ESPSizing = 0.5
 
 -- ── FOV Circle ────────────────────────────────────────────────────────────
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Radius      = MouseFOV
-FOVCircle.Thickness   = 1.5
-FOVCircle.NumSides    = 64
-FOVCircle.Filled      = false
+FOVCircle.Radius       = MouseFOV
+FOVCircle.Thickness    = 1.5
+FOVCircle.NumSides     = 64
+FOVCircle.Filled       = false
 FOVCircle.Transparency = 1
-FOVCircle.ZIndex      = 2
-FOVCircle.Color       = FOVColor
+FOVCircle.ZIndex       = 2
+FOVCircle.Color        = FOVColor
 
 -- ── ESP Update ────────────────────────────────────────────────────────────
 local espTimer = 0
@@ -406,19 +396,16 @@ local function UpdateESP(dt)
             end
         end
 
-        -- ── WALL CHECK para ESP (NUEVO) ───────────────────────────────────
-        -- Si WallCheckESP está activo, ocultamos el ESP de jugadores
-        -- que estén detrás de una pared. No afecta al aimbot en absoluto.
+        -- Wall Check para ESP
         if WallCheckESP then
             local checkPart = player.Character:FindFirstChild(TargetPart)
                            or player.Character:FindFirstChild("Head")
                            or hrp
             if not HasLineOfSight(checkPart) then
                 hidePlayerESP(player)
-                continue  -- Está detrás de una pared, no dibujamos su ESP
+                continue
             end
         end
-        -- ─────────────────────────────────────────────────────────────────
 
         local headPos, onHead = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.3, 0))
         local rootPos, onRoot = Camera:WorldToViewportPoint(hrp.Position  - Vector3.new(0, 0.3, 0))
@@ -428,11 +415,12 @@ local function UpdateESP(dt)
             continue
         end
 
-        local color  = getESPColor(player)
-        local height = math.abs(headPos.Y - rootPos.Y)
-        local width  = height * sizing
+        local color   = getESPColor(player)
+        local height  = math.abs(headPos.Y - rootPos.Y)
+        local width   = height * sizing
         local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
 
+        -- Cajas ESP
         if ESPEnabled then
             e.Outline.Position = topLeft - Vector2.new(1, 1)
             e.Outline.Size     = Vector2.new(width + 2, height + 2)
@@ -447,29 +435,33 @@ local function UpdateESP(dt)
             e.Box.Visible     = false
         end
 
+        -- Tracers
+        -- FIX #1: eliminado goto/::label:: → reemplazado con variable booleana
         if TraceEnabled then
-            -- ── WALL CHECK para Tracers (NUEVO) ──────────────────────────
-            -- Toggle independiente: si está activo y hay pared, oculta solo
-            -- el tracer de ese jugador sin afectar cajas, nombres ni aimbot.
+            local showTracer = true
+
             if WallCheckTracers then
                 local checkPart = player.Character:FindFirstChild(TargetPart)
                                or player.Character:FindFirstChild("Head")
                                or hrp
                 if not HasLineOfSight(checkPart) then
-                    e.Tracer.Visible = false
-                    goto continueTracer  -- salta solo el bloque del tracer
+                    showTracer = false
                 end
             end
-            -- ─────────────────────────────────────────────────────────────
-            e.Tracer.From    = screenCenter
-            e.Tracer.To      = Vector2.new(rootPos.X, rootPos.Y)
-            e.Tracer.Color   = color
-            e.Tracer.Visible = true
-            ::continueTracer::
+
+            if showTracer then
+                e.Tracer.From    = screenCenter
+                e.Tracer.To      = Vector2.new(rootPos.X, rootPos.Y)
+                e.Tracer.Color   = color
+                e.Tracer.Visible = true
+            else
+                e.Tracer.Visible = false
+            end
         else
             e.Tracer.Visible = false
         end
 
+        -- Nombres
         if NameESPEnabled then
             e.NameLabel.Text     = player.DisplayName
             e.NameLabel.Position = Vector2.new(rootPos.X, headPos.Y - 16)
@@ -479,6 +471,7 @@ local function UpdateESP(dt)
             e.NameLabel.Visible = false
         end
 
+        -- Barra de vida
         if HealthBarEnabled then
             local hp, maxHp = getHealth(player)
             local ratio = math.clamp(hp / maxHp, 0, 1)
@@ -502,6 +495,7 @@ local function UpdateESP(dt)
             e.HealthBar.Visible = false
         end
 
+        -- Distancia
         if DistanceESPEnabled then
             local dist = math.floor(getDistance(player))
             e.DistLabel.Text     = dist .. "m"
@@ -531,7 +525,8 @@ local function PredictPosition(part)
     if not PredictionEnabled or not part or not part.Parent then return part.Position end
     local root = part.Parent:FindFirstChild("HumanoidRootPart")
     if not root then return part.Position end
-    local vel = root.AssemblyLinearVelocity or root.Velocity
+    -- FIX #3: fallback a Vector3.zero si AssemblyLinearVelocity es nil
+    local vel = root.AssemblyLinearVelocity or Vector3.zero
     return part.Position + vel * PredictionStrength
 end
 
@@ -555,8 +550,8 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
 
-    local closest     = nil
-    local shortest    = math.huge
+    local closest      = nil
+    local shortest     = math.huge
     local validTargets = {}
 
     for _, plr in pairs(Players:GetPlayers()) do
@@ -574,16 +569,12 @@ RunService.RenderStepped:Connect(function(dt)
             if dist > MaxDistance then continue end
         end
 
-        -- ── WALL CHECK para Aimbot (NUEVO) ────────────────────────────────
-        -- Solo se ejecuta si el toggle está activo. Si el objetivo está
-        -- detrás de una pared, se salta este jugador. El resto del aimbot
-        -- (smoothness, prediction, FOV, sticky lock) no se toca en absoluto.
+        -- Wall Check para Aimbot
         if WallCheckEnabled then
             if not HasLineOfSight(part) then
-                continue  -- Detrás de pared, ignoramos este objetivo
+                continue
             end
         end
-        -- ─────────────────────────────────────────────────────────────────
 
         local screenPos = Vector2.new(pos.X, pos.Y)
         local dist      = (screenPos - mousePos).Magnitude
@@ -600,7 +591,10 @@ RunService.RenderStepped:Connect(function(dt)
     if stickyLock and currentTarget and currentTarget.Parent then
         local stillValid = false
         for _, t in pairs(validTargets) do
-            if t.part == currentTarget then stillValid = true break end
+            if t.part == currentTarget then
+                stillValid = true
+                break
+            end
         end
         if stillValid then
             closest = currentTarget
