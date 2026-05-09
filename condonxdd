@@ -297,11 +297,7 @@ if cameraUnlocked then
 end
 
 -- Reaplicar si reaparece el personaje
-LocalPlayer.CharacterAdded:Connect(function()
-	if cameraUnlocked then
-		enableCameraControl()
-	end
-end)
+
 
 
 
@@ -411,12 +407,22 @@ local function onChar(char)
     end)
 end
 
---- Conectar eventos de personaje (original)
-if lp.Character then onChar(lp.Character) end
-lp.CharacterAdded:Connect(function(char)
-    onChar(char)
-    if God2018Active then task.wait(0.5) apply2018GodMode() end
-end)
+-- Conectar onChar solo cuando alguna protección lo necesite
+local onCharConnected = false
+
+local function ensureOnChar()
+    if onCharConnected then return end
+    onCharConnected = true
+
+    if lp.Character then onChar(lp.Character) end
+    lp.CharacterAdded:Connect(function(char)
+        onChar(char)
+        if God2018Active then
+            task.wait(0.5)
+            apply2018GodMode()
+        end
+    end)
+end
 
 
 
@@ -428,6 +434,7 @@ ProteTab:CreateToggle({
     Callback = function(state)
         FakePosEnabled = state
         if state then
+ensureOnChar()
             JmodsLib:Notify({
                 Title = "Fake Position Activado",
                 Content = "❌ Fling | ✅ Wins | Anti-Fall & Anti-Fling integrado",
@@ -457,6 +464,7 @@ ProteTab:CreateToggle({
         end
         FallBreakerEnabled = state
         if state then
+ensureOnChar()
             JmodsLib:Notify({
                 Title = "Fall Damage Breaker Activado",
                 Content = "❌ Fling | ✅ Wins | Velocity Nullification",
@@ -479,6 +487,7 @@ ProteTab:CreateToggle({
     Callback = function(state)
         HealthMultEnabled = state
         if state then
+ensureOnChar()
             JmodsLib:Notify({
                 Title = "Health Multiplier Activado",
                 Content = "✅ Fling | ❌ Wins",
