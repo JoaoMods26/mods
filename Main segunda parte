@@ -55,7 +55,7 @@ function createMobileGui()
 
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "GhostMobileControls"
-	screenGui.Parent = CoreGui
+screenGui.Parent = (gethui and gethui()) or CoreGui
 	screenGui.Enabled = false
 
 	-- Solo botones de subir/bajar (el stick nativo maneja WASD)
@@ -439,7 +439,7 @@ function UI.create()
     screenGui.Name = "NewShiftlockUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = Services.CoreGui
+screenGui.Parent = (gethui and gethui()) or Services.CoreGui
     
     State.uiElements.screenGui = screenGui
     
@@ -852,7 +852,7 @@ function CreateMobileControls()
     MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "MobileFlyControls"
     MobileGui.ResetOnSpawn = false
-    MobileGui.Parent = CoreGui
+MobileGui.Parent = (gethui and gethui()) or CoreGui
 
     local ButtonSize = UDim2.new(0, 80, 0, 80)
 
