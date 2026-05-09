@@ -156,7 +156,8 @@ TelekinesisTab:CreateButton({
         })
 
    
-        local MobileControlsGui = Instance.new("ScreenGui", CoreGui)
+        local MobileControlsGui = Instance.new("ScreenGui")
+MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         MobileControlsGui.Name = "JMMobileControls"
         MobileControlsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         MobileControlsGui.Enabled = false
