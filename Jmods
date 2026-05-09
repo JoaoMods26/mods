@@ -376,7 +376,7 @@ function createJumpButton()
 		touchGui.ResetOnSpawn = false
 		
 		local success = pcall(function()
-			touchGui.Parent = CoreGui
+			touchGui.Parent = (gethui and gethui()) or CoreGui
 		end)
 		
 		if not success then
@@ -1137,7 +1137,7 @@ local function CreateMobileControls()
     MobileGui.ResetOnSpawn = false
     
     local success = pcall(function()
-        MobileGui.Parent = CoreGui
+MobileGui.Parent = (gethui and gethui()) or CoreGui
     end)
     
     if not success then
@@ -1493,7 +1493,7 @@ Toggle = MainTab:CreateToggle({
             fpsGui.Name = "FPSGui"
             fpsGui.ResetOnSpawn = false
             fpsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-            fpsGui.Parent = game.CoreGui
+fpsGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
             FpsLabel.Name = "FpsLabel"
             FpsLabel.Parent = fpsGui
@@ -1738,7 +1738,7 @@ function createMobileTouchGui()
     end)
     
     local success = pcall(function()
-        touchGui.Parent = CoreGui
+        touchGui.Parent = (gethui and gethui()) or CoreGui
     end)
     
     if not success then
@@ -2033,7 +2033,7 @@ end
 	guiFrames = Instance.new("ScreenGui")
 	guiFrames.Name = "FreecamMobileGui"
 	guiFrames.ResetOnSpawn = false
-	guiFrames.Parent = CoreGui
+guiFrames.Parent = (gethui and gethui()) or CoreGui
 
 	 function CreateButton(name, pos, keycode, text)
 		local btn = Instance.new("TextButton")
