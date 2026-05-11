@@ -1294,54 +1294,88 @@ end)
 
 
 -- Mutear sonidos excepto voz
+local VoiceChatService = game:GetService("VoiceChatService")
+
 local mutedSounds = {}
+local hookedSounds = {}
 local toggleActive = false
 
- function isVoiceSound(sound)
-	if sound:IsDescendantOf(VoiceChatService) then return true end
-	local name = sound.Name:lower()
-	return name:find("voice") or name:find("vc")
+local function isVoiceSound(sound)
+    if sound:IsDescendantOf(VoiceChatService) then return true end
+    local name = sound.Name:lower()
+    return name:find("voice") or name:find("vc")
 end
 
- function muteAllExceptVoice()
-	for _, sound in ipairs(game:GetDescendants()) do
-		if sound:IsA("Sound") and not isVoiceSound(sound) then
-			if sound.Playing and sound.Volume > 0 then
-				mutedSounds[sound] = sound.Volume
-				sound.Volume = 0
-			end
-		end
-	end
+local function hookSound(sound)
+    if hookedSounds[sound] then return end
+    hookedSounds[sound] = sound:GetPropertyChangedSignal("Volume"):Connect(function()
+        if toggleActive and sound.Parent and not isVoiceSound(sound) then
+            if sound.Volume > 0 then
+                mutedSounds[sound] = sound.Volume
+                sound.Volume = 0
+            end
+        end
+    end)
 end
 
- function unmuteAll()
-	for sound, vol in pairs(mutedSounds) do
-		if sound and sound.Parent then
-			sound.Volume = vol
-		end
-	end
-	mutedSounds = {}
+local function muteSound(sound)
+    if not mutedSounds[sound] then
+        mutedSounds[sound] = sound.Volume > 0 and sound.Volume or 0.5
+    end
+    sound.Volume = 0
+    hookSound(sound)
 end
 
-game.DescendantAdded:Connect(function(sound)
-	if toggleActive and sound:IsA("Sound") and not isVoiceSound(sound) then
-		mutedSounds[sound] = sound.Volume
-		sound.Volume = 0
-	end
+local function muteAllExceptVoice()
+    for _, sound in ipairs(game:GetDescendants()) do
+        if sound:IsA("Sound") and not isVoiceSound(sound) then
+            muteSound(sound)
+        end
+    end
+end
+
+local function unmuteAll()
+    for sound, vol in pairs(mutedSounds) do
+        if sound and sound.Parent then
+            sound.Volume = vol
+        end
+    end
+    mutedSounds = {}
+    for sound, conn in pairs(hookedSounds) do
+        conn:Disconnect()
+    end
+    hookedSounds = {}
+end
+
+game.DescendantAdded:Connect(function(instance)
+    if not toggleActive then return end
+    if not instance:IsA("Sound") then return end
+    if isVoiceSound(instance) then return end
+    task.wait(0)
+    muteSound(instance)
+end)
+
+game.DescendantRemoving:Connect(function(instance)
+    if not instance:IsA("Sound") then return end
+    if hookedSounds[instance] then
+        hookedSounds[instance]:Disconnect()
+        hookedSounds[instance] = nil
+    end
+    mutedSounds[instance] = nil
 end)
 
 MainTab:CreateToggle({
-	Name = "Mutear sonidos (voz no)",
-	CurrentValue = false,
-	Flag = "MuteAudios",
-	Callback = function(Value)
-		toggleActive = Value
-		if Value then
-			muteAllExceptVoice()
-		else
-			unmuteAll()
-		end
-	end
+    Name = "Mutear sonidos (voz no)",
+    CurrentValue = false,
+    Flag = "MuteAudios",
+    Callback = function(Value)
+        toggleActive = Value
+        if Value then
+            muteAllExceptVoice()
+        else
+            unmuteAll()
+        end
+    end
 })
 
 
