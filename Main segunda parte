@@ -1802,127 +1802,141 @@ MainTab:CreateToggle({
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
+local VirtualUser = game:GetService("VirtualUser")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local character, humanoid, hrp
-
 
 local AntiAfkEnabled = false
 local AntiAfkThread = nil
 local mode = "Walk"
 local interval = 20
 
+local rng = Random.new(tick())
+
+
+
+-- ══════════════════════════════════════
 local function bindCharacter(char)
-	character = char
-	humanoid = char:WaitForChild("Humanoid")
-	hrp = char:WaitForChild("HumanoidRootPart")
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
+    hrp = char:WaitForChild("HumanoidRootPart")
 end
 
--- Solo vincular personaje cuando ya existe
 if player.Character then
-	bindCharacter(player.Character)
+    bindCharacter(player.Character)
 end
+
 player.CharacterAdded:Connect(function(char)
-	task.wait(0.5)
-	bindCharacter(char)
+    task.wait(0.5)
+    bindCharacter(char)
 end)
 
-
+-- ══════════════════════════════════════
 local function SimulateInput()
-	if not AntiAfkEnabled then return end
+    if not AntiAfkEnabled then return end
 
-	local actionId = "AAF_" .. tostring(math.random(100000, 999999))
-	local keys = {
-		Enum.KeyCode.L,
-		Enum.KeyCode.K,
-		Enum.KeyCode.Semicolon,
-		Enum.KeyCode.Quote,
-	}
-	local randomKey = keys[math.random(1, #keys)]
+    local actionId = "AAF_" .. tostring(math.random(100000, 999999))
+    local keys = {
+        Enum.KeyCode.L,
+        Enum.KeyCode.K,
+        Enum.KeyCode.Semicolon,
+        Enum.KeyCode.Quote,
+    }
 
-	ContextActionService:BindAction(
-		actionId,
-		function(_, _, _)
-			return Enum.ContextActionResult.Sink
-		end,
-		false,
-		randomKey
-	)
-	task.wait(0)
-	ContextActionService:UnbindAction(actionId)
+    local randomKey = keys[math.random(1, #keys)]
+
+    ContextActionService:BindAction(
+        actionId,
+        function(_, _, _)
+            return Enum.ContextActionResult.Sink
+        end,
+        false,
+        randomKey
+    )
+    task.wait(0)
+    ContextActionService:UnbindAction(actionId)
 end
 
-
-local function ResetIdleTime()
-	if not AntiAfkEnabled then return end
-	pcall(function()
-		player.IdleTime = 0
-	end)
+-- ══════════════════════════════════════
+local function VirtualUserPing()
+    if not AntiAfkEnabled then return end
+    local cam = workspace.CurrentCamera
+    if cam then
+        VirtualUser:Button2Down(Vector2.new(0, 0), cam.CFrame)
+        task.wait(0.1)
+        VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
+    end
 end
 
 
 local function PhysicsMovement()
-	if not AntiAfkEnabled then return end
-	if not humanoid or not hrp then return end
-	if humanoid.Health <= 0 then return end
+    if not AntiAfkEnabled then return end
+    if not humanoid or not hrp then return end
+    if humanoid.Health <= 0 then return end
 
-	if mode == "Walk" then
-		-- Movimiento pequeño aleatorio, NO modifica WalkSpeed
-		local offsetX = math.random(-3, 3) + math.random()
-		local offsetZ = math.random(-3, 3) + math.random()
-		local targetPos = hrp.Position + Vector3.new(offsetX, 0, offsetZ)
-		humanoid:MoveTo(targetPos)
+    if mode == "Walk" then
+        -- RNG mejorado con seed dinámico
+        local offsetX = rng:NextNumber(-3, 3)
+        local offsetZ = rng:NextNumber(-3, 3)
+        local targetPos = hrp.Position + Vector3.new(offsetX, 0, offsetZ)
+        humanoid:MoveTo(targetPos)
 
-	elseif mode == "Jump" then
-		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-	end
+    elseif mode == "Jump" then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
 
-	-- Rotación de cámara mínima
-	if workspace.CurrentCamera then
-		local rot = math.rad(math.random(-1, 1))
-		workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.Angles(0, rot, 0)
-	end
+    -- Rotación mínima de cámara
+    if workspace.CurrentCamera then
+        local rot = math.rad(rng:NextNumber(-1, 1))
+        workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.Angles(0, rot, 0)
+    end
 end
 
 
 local function RunAntiAfk()
-	while AntiAfkEnabled do
-		local randomInterval = interval + math.random(-5, 5)
-		task.wait(randomInterval)
+    while AntiAfkEnabled do
+        local randomInterval = interval + rng:NextNumber(-5, 5)
+        task.wait(randomInterval)
 
-		if not AntiAfkEnabled then break end
+        if not AntiAfkEnabled then break end
 
-		pcall(function()
-			ResetIdleTime()
-			SimulateInput()
-			PhysicsMovement()
-		end)
-	end
+        pcall(function()
+            VirtualUserPing()  
+            SimulateInput()     
+            PhysicsMovement()  
+        end)
+    end
 end
 
 
 MainTab:CreateToggle({
-	Name = "Anti-AFK ",
-	CurrentValue = false,         -- SIEMPRE inicia en false
-	Flag = "AntiAfkUltimateToggle",
-	Callback = function(Value)
-		AntiAfkEnabled = Value
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAfkUltimateToggle",
+    Callback = function(Value)
+        AntiAfkEnabled = Value
 
-		if Value then
-			-- Arrancar solo si no hay thread activo
-			if not AntiAfkThread then
-				AntiAfkThread = task.spawn(RunAntiAfk)
-			end
-		else
-			-- Parar el thread limpiamente
-			if AntiAfkThread then
-				task.cancel(AntiAfkThread)
-				AntiAfkThread = nil
-			end
-		end
-	end,
+        if Value then
+            if not AntiAfkThread then
+                AntiAfkThread = task.spawn(RunAntiAfk)
+            end
+        else
+            if AntiAfkThread then
+                task.cancel(AntiAfkThread)
+                AntiAfkThread = nil
+            end
+        end
+    end,
 })
+
+-- Evento Idled como red de seguridad extra
+player.Idled:Connect(function()
+    if AntiAfkEnabled then
+        VirtualUserPing()
+    end
+end)
 
 
 
