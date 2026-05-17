@@ -1827,15 +1827,9 @@ MainTab:CreateToggle({
 
 
 -----Anti AFK
-
-
-
--- ANTI-AFK
-
-
 local Players = game:GetService("Players")
 local ContextActionService = game:GetService("ContextActionService")
-local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local character, humanoid, hrp
@@ -1887,21 +1881,6 @@ local function SimulateInput()
     ContextActionService:UnbindAction(actionId)
 end
 
-local function VirtualUserPing()
-    if not AntiAfkEnabled then return end
-
-    local cam = workspace.CurrentCamera
-    if cam then
-        VirtualUser:Button2Down(Vector2.new(0, 0), cam.CFrame)
-        task.wait(0.1)
-        if not AntiAfkEnabled then
-            VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
-            return
-        end
-        VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
-    end
-end
-
 local function PhysicsMovement()
     if not AntiAfkEnabled then return end
     if not humanoid or not hrp then return end
@@ -1936,7 +1915,6 @@ local function RunAntiAfk()
         if not AntiAfkEnabled then return end
 
         pcall(function()
-            VirtualUserPing()
             SimulateInput()
             PhysicsMovement()
         end)
@@ -1962,11 +1940,6 @@ MainTab:CreateToggle({
         end
     end,
 })
-
-player.Idled:Connect(function()
-    if not AntiAfkEnabled then return end
-    VirtualUserPing()
-end)
 
 
 
