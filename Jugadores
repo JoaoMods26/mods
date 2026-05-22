@@ -718,7 +718,7 @@ local function miniFling(playerToFling)
 end
 
 JugadoresTab:CreateButton({
-    Name = "Fling Seleccionado",
+    Name = "Fling",
     Callback = function()
         if not selectedPlayer then
             Rayfield:Notify({Title="Fling",Content="Selecciona un jugador primero.",Duration=3,Image=4483362458})
