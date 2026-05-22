@@ -508,6 +508,14 @@ boton= Juegostab:CreateButton({
    end,
 })
 
+boton= Juegostab:CreateButton({
+   Name = "JMurderMods (Murder Mystery 2)",
+   Callback = function()
+       loadstring(game:HttpGet(' https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/JMurder'))()
+   end,
+})
+
+
 
 boton= Juegostab:CreateButton({
    Name = "DA HOOD UWU (Da hood)",
