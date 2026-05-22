@@ -1,14 +1,23 @@
 -- ══════════════════════════════════════════════════════════════
---  JMODS Notifier v2  |  UI Profesional + Fix Posiciones
+--  JMODS Notifier v2.1  |  UI Profesional + Móvil + Fix Layout
 -- ══════════════════════════════════════════════════════════════
 
-local HttpService   = game:GetService("HttpService")
-local Players       = game:GetService("Players")
-local TweenService  = game:GetService("TweenService")
-local UserInput     = game:GetService("UserInputService")
-local player        = Players.LocalPlayer
-local CoreGui       = game:GetService("CoreGui")
-local guiParent     = CoreGui
+local HttpService  = game:GetService("HttpService")
+local Players      = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInput    = game:GetService("UserInputService")
+local CoreGui      = game:GetService("CoreGui")
+local guiParent    = CoreGui
+
+-- ── Esperar LocalPlayer (fix executor early injection) ────────
+local player = Players.LocalPlayer
+if not player then
+	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	player = Players.LocalPlayer
+end
+if not player then
+	repeat task.wait(0.1) player = Players.LocalPlayer until player
+end
 
 -- ── URLs & config ─────────────────────────────────────────────
 local duenosURL       = "https://pastebin.com/raw/S2X3j15A"
@@ -17,56 +26,60 @@ local claveSeguridad  = "JMODS2024"
 local ultimoTimestamp = 0
 local duenos          = {}
 
--- ── Clave de posición normalizada (evita errores de capitalización) ──────────
--- FIX PRINCIPAL: Usar claves únicas y cortas para evitar mismatch
-local POSICIONES = {
-	{ id = "top_right",    label = "↗  Arriba derecha"  },
-	{ id = "top_left",     label = "↖  Arriba izquierda" },
-	{ id = "bottom_right", label = "↘  Abajo derecha"   },
-	{ id = "bottom_left",  label = "↙  Abajo izquierda" },
-	{ id = "center",       label = "⊕  Centro"          },
-}
+-- ── Detectar móvil ────────────────────────────────────────────
+local esMobil = UserInput.TouchEnabled
 
-local posicionSeleccionada = "top_right"  -- default
+-- ── Posiciones normalizadas ───────────────────────────────────
+local POSICIONES = {
+	{ id = "top_right",    label = "↗  Arriba derecha"   },
+	{ id = "top_left",     label = "↖  Arriba izquierda" },
+	{ id = "bottom_right", label = "↘  Abajo derecha"    },
+	{ id = "bottom_left",  label = "↙  Abajo izquierda"  },
+	{ id = "center",       label = "⊕  Centro"           },
+}
+local posicionSeleccionada = "top_right"
 
 local function getPosUDim2(posId, frameW, frameH)
-	frameW = frameW or 320
+	frameW = frameW or 340
 	frameH = frameH or 80
 	local pad = 12
 	if     posId == "top_right"    then return UDim2.new(1, -(frameW + pad), 0, pad)
 	elseif posId == "top_left"     then return UDim2.new(0, pad, 0, pad)
 	elseif posId == "bottom_right" then return UDim2.new(1, -(frameW + pad), 1, -(frameH + pad))
 	elseif posId == "bottom_left"  then return UDim2.new(0, pad, 1, -(frameH + pad))
-	elseif posId == "center"       then return UDim2.new(0.5, -(frameW / 2), 0.5, -(frameH / 2))
+	elseif posId == "center"       then return UDim2.new(0.5, -(frameW/2), 0.5, -(frameH/2))
 	else                                return UDim2.new(1, -(frameW + pad), 0, pad)
 	end
 end
 
--- ── Helpers visuales ──────────────────────────────────────────
-local function addCorner(parent, radius)
-	local c = Instance.new("UICorner", parent)
-	c.CornerRadius = UDim.new(0, radius or 8)
+-- ── Helpers UI ────────────────────────────────────────────────
+local function addCorner(p, r)
+	local c = Instance.new("UICorner", p)
+	c.CornerRadius = UDim.new(0, r or 8)
 	return c
 end
 
-local function addStroke(parent, color, thickness, transparency)
-	local s = Instance.new("UIStroke", parent)
-	s.Color        = color or Color3.fromRGB(80, 80, 80)
-	s.Thickness    = thickness or 1
-	s.Transparency = transparency or 0
+local function addStroke(p, col, thick, trans)
+	local s = Instance.new("UIStroke", p)
+	s.Color        = col   or Color3.fromRGB(80,80,80)
+	s.Thickness    = thick or 1
+	s.Transparency = trans or 0
 	return s
 end
 
-local function addGradient(parent, colorA, colorB)
-	local g = Instance.new("UIGradient", parent)
-	g.Color    = ColorSequence.new(colorA, colorB)
-	g.Rotation = 90
+local function addGradient(p, cA, cB, rot)
+	local g = Instance.new("UIGradient", p)
+	g.Color    = ColorSequence.new(cA, cB)
+	g.Rotation = rot or 90
 	return g
 end
 
-local function tween(obj, props, t, style)
-	local info = TweenInfo.new(t or 0.25, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-	TweenService:Create(obj, info, props):Play()
+local function tw(obj, props, t, style)
+	TweenService:Create(obj, TweenInfo.new(
+		t or 0.22,
+		style or Enum.EasingStyle.Quart,
+		Enum.EasingDirection.Out
+	), props):Play()
 end
 
 -- ── Cargar dueños ─────────────────────────────────────────────
@@ -77,7 +90,7 @@ local function actualizarDuenos()
 		local res = req({ Url = duenosURL, Method = "GET" })
 		if res and res.Body then
 			table.clear(duenos)
-			for nombre in string.gmatch(res.Body, "[^\r\n]+") do
+			for nombre in res.Body:gmatch("[^\r\n]+") do
 				duenos[nombre] = true
 			end
 		end
@@ -94,15 +107,14 @@ if getgenv then
 	if getgenv().__JMODS_RUNNING then return end
 	getgenv().__JMODS_RUNNING = true
 end
-
-for _, gui in ipairs(guiParent:GetChildren()) do
-	if gui.Name == "JmodsNotifierUI" or gui.Name == "JmodsNotificacionVisual" then
-		gui:Destroy()
+for _, g in ipairs(guiParent:GetChildren()) do
+	if g.Name == "JmodsNotifierUI" or g.Name == "JmodsNotificacionVisual" then
+		g:Destroy()
 	end
 end
 
 -- ════════════════════════════════════════════════════════════════
---  PANEL DE CONTROL (solo dueños)
+--  PANEL DE CONTROL — solo dueños
 -- ════════════════════════════════════════════════════════════════
 if duenos[player.Name] then
 
@@ -111,344 +123,395 @@ if duenos[player.Name] then
 	screenGui.ResetOnSpawn   = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
-	-- ── Fondo principal ─────────────────────────────────────────
+	-- Tamaños responsivos
+	local PANEL_W  = esMobil and 320 or 380
+	local PANEL_H  = esMobil and 370 or 355
+	local FONT_LBL = esMobil and 11  or 10
+	local FONT_INP = esMobil and 14  or 13
+	local INP_H    = esMobil and 36  or 32
+	local BTN_H    = esMobil and 40  or 34
+	local PAD      = esMobil and 14  or 12
+
+	-- ── Frame principal ───────────────────────────────────────
 	local frame = Instance.new("Frame", screenGui)
-	frame.Size             = UDim2.new(0, 420, 0, 310)
-	frame.Position         = UDim2.new(0, 60, 0.35, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+	frame.Size             = UDim2.new(0, PANEL_W, 0, PANEL_H)
+	frame.Position         = UDim2.new(0, 20, 0, esMobil and 60 or 80)
+	frame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
 	frame.BorderSizePixel  = 0
 	frame.Active           = true
 	frame.Draggable        = true
 	frame.Visible          = false
 	addCorner(frame, 12)
-	addStroke(frame, Color3.fromRGB(70, 70, 90), 1, 0.3)
+	addStroke(frame, Color3.fromRGB(55, 55, 80), 1, 0.1)
 
-	-- Borde superior decorativo (accent line)
+	-- Accent top bar
 	local accentBar = Instance.new("Frame", frame)
 	accentBar.Size             = UDim2.new(1, 0, 0, 3)
-	accentBar.Position         = UDim2.new(0, 0, 0, 0)
-	accentBar.BackgroundColor3 = Color3.fromRGB(100, 140, 255)
+	accentBar.BackgroundColor3 = Color3.fromRGB(90, 130, 255)
 	accentBar.BorderSizePixel  = 0
 	addCorner(accentBar, 12)
-	addGradient(accentBar, Color3.fromRGB(100, 140, 255), Color3.fromRGB(180, 100, 255))
+	addGradient(accentBar, Color3.fromRGB(90, 130, 255), Color3.fromRGB(180, 90, 255))
 
-	-- ── Header bar ───────────────────────────────────────────────
+	-- ── Header ────────────────────────────────────────────────
 	local header = Instance.new("Frame", frame)
-	header.Size             = UDim2.new(1, 0, 0, 42)
+	header.Size             = UDim2.new(1, 0, 0, 40)
 	header.Position         = UDim2.new(0, 0, 0, 3)
-	header.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+	header.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 	header.BorderSizePixel  = 0
-	addCorner(header, 0)
 
-	local titulo = Instance.new("TextLabel", header)
-	titulo.Size                  = UDim2.new(1, -20, 1, 0)
-	titulo.Position              = UDim2.new(0, 16, 0, 0)
-	titulo.BackgroundTransparency = 1
-	titulo.Text                  = "◈  JMODS  —  Notificaciones"
-	titulo.TextColor3            = Color3.fromRGB(220, 220, 235)
-	titulo.Font                  = Enum.Font.GothamBold
-	titulo.TextSize              = 14
-	titulo.TextXAlignment        = Enum.TextXAlignment.Left
+	local titleLbl = Instance.new("TextLabel", header)
+	titleLbl.Size                 = UDim2.new(1, -70, 1, 0)
+	titleLbl.Position             = UDim2.new(0, PAD, 0, 0)
+	titleLbl.BackgroundTransparency = 1
+	titleLbl.Text                 = "◈  JMODS — Notificaciones"
+	titleLbl.TextColor3           = Color3.fromRGB(220, 220, 235)
+	titleLbl.Font                 = Enum.Font.GothamBold
+	titleLbl.TextSize             = esMobil and 15 or 14
+	titleLbl.TextXAlignment       = Enum.TextXAlignment.Left
 
-	local versionLabel = Instance.new("TextLabel", header)
-	versionLabel.Size                 = UDim2.new(0, 60, 1, 0)
-	versionLabel.Position             = UDim2.new(1, -70, 0, 0)
-	versionLabel.BackgroundTransparency = 1
-	versionLabel.Text                 = "v2.0"
-	versionLabel.TextColor3           = Color3.fromRGB(100, 100, 130)
-	versionLabel.Font                 = Enum.Font.Gotham
-	versionLabel.TextSize             = 12
-	versionLabel.TextXAlignment       = Enum.TextXAlignment.Right
+	local verLbl = Instance.new("TextLabel", header)
+	verLbl.Size                 = UDim2.new(0, 55, 1, 0)
+	verLbl.Position             = UDim2.new(1, -60, 0, 0)
+	verLbl.BackgroundTransparency = 1
+	verLbl.Text                 = "v2.1"
+	verLbl.TextColor3           = Color3.fromRGB(80, 80, 110)
+	verLbl.Font                 = Enum.Font.Gotham
+	verLbl.TextSize             = 12
+	verLbl.TextXAlignment       = Enum.TextXAlignment.Right
 
-	-- ── Área de contenido ────────────────────────────────────────
-	local content = Instance.new("Frame", frame)
-	content.Size             = UDim2.new(1, -24, 1, -60)
-	content.Position         = UDim2.new(0, 12, 0, 50)
+	-- ── Área de contenido ─────────────────────────────────────
+	-- Usamos ScrollingFrame para que NUNCA se corte nada en móvil
+	local scroll = Instance.new("ScrollingFrame", frame)
+	scroll.Size                  = UDim2.new(1, 0, 1, -46)
+	scroll.Position              = UDim2.new(0, 0, 0, 46)
+	scroll.BackgroundTransparency = 1
+	scroll.BorderSizePixel       = 0
+	scroll.ScrollBarThickness    = esMobil and 3 or 2
+	scroll.ScrollBarImageColor3  = Color3.fromRGB(80, 80, 120)
+	scroll.CanvasSize            = UDim2.new(0, 0, 0, 0) -- se ajusta abajo
+	scroll.ElasticBehavior       = Enum.ElasticBehavior.Never
+
+	local content = Instance.new("Frame", scroll)
+	content.Size             = UDim2.new(1, 0, 0, 0) -- altura auto
 	content.BackgroundTransparency = 1
 	content.BorderSizePixel  = 0
 
-	-- Función genérica para crear TextBox estilizado
-	local function crearInput(parent, placeholder, defaultText, posX, posY, w, h)
+	-- Layout automático vertical
+	local layout = Instance.new("UIListLayout", content)
+	layout.FillDirection       = Enum.FillDirection.Vertical
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.SortOrder           = Enum.SortOrder.LayoutOrder
+	layout.Padding             = UDim.new(0, 8)
+
+	local padding = Instance.new("UIPadding", content)
+	padding.PaddingLeft   = UDim.new(0, PAD)
+	padding.PaddingRight  = UDim.new(0, PAD)
+	padding.PaddingTop    = UDim.new(0, 10)
+	padding.PaddingBottom = UDim.new(0, 10)
+
+	-- Ajustar canvas al contenido
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		local h = layout.AbsoluteContentSize.Y + 24
+		content.Size     = UDim2.new(1, 0, 0, h)
+		scroll.CanvasSize = UDim2.new(0, 0, 0, h)
+	end)
+
+	-- ── Helper: sección con label + input ─────────────────────
+	local function crearSeccion(labelText, order)
+		local sec = Instance.new("Frame", content)
+		sec.Size             = UDim2.new(1, 0, 0, INP_H + 18)
+		sec.BackgroundTransparency = 1
+		sec.LayoutOrder      = order
+
+		local lbl = Instance.new("TextLabel", sec)
+		lbl.Size                 = UDim2.new(1, 0, 0, 14)
+		lbl.BackgroundTransparency = 1
+		lbl.Text                 = labelText
+		lbl.TextColor3           = Color3.fromRGB(90, 130, 255)
+		lbl.Font                 = Enum.Font.GothamBold
+		lbl.TextSize             = FONT_LBL
+		lbl.TextXAlignment       = Enum.TextXAlignment.Left
+
+		return sec, lbl
+	end
+
+	local function crearInputBox(parent, placeholder, default, yPos, w, h)
 		local bg = Instance.new("Frame", parent)
-		bg.Size             = UDim2.new(0, w, 0, h or 32)
-		bg.Position         = UDim2.new(0, posX, 0, posY)
-		bg.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+		bg.Size             = UDim2.new(0, w or (PANEL_W - PAD*2), 0, h or INP_H)
+		bg.Position         = UDim2.new(0, 0, 0, yPos or 16)
+		bg.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
 		bg.BorderSizePixel  = 0
-		addCorner(bg, 6)
-		addStroke(bg, Color3.fromRGB(60, 60, 80), 1, 0.2)
+		addCorner(bg, 7)
+		addStroke(bg, Color3.fromRGB(55, 55, 78), 1, 0.1)
 
 		local box = Instance.new("TextBox", bg)
 		box.Size              = UDim2.new(1, -12, 1, 0)
-		box.Position          = UDim2.new(0, 6, 0, 0)
+		box.Position          = UDim2.new(0, 7, 0, 0)
 		box.BackgroundTransparency = 1
-		box.PlaceholderText   = placeholder
-		box.PlaceholderColor3 = Color3.fromRGB(80, 80, 100)
-		box.Text              = defaultText or ""
-		box.TextColor3        = Color3.fromRGB(210, 210, 225)
+		box.PlaceholderText   = placeholder or ""
+		box.PlaceholderColor3 = Color3.fromRGB(70, 70, 95)
+		box.Text              = default or ""
+		box.TextColor3        = Color3.fromRGB(210, 210, 228)
 		box.Font              = Enum.Font.Gotham
-		box.TextSize          = 13
+		box.TextSize          = FONT_INP
 		box.TextXAlignment    = Enum.TextXAlignment.Left
 		box.TextWrapped       = true
 		box.ClearTextOnFocus  = false
 
-		-- Highlight al enfocar
 		box.Focused:Connect(function()
-			tween(bg, { BackgroundColor3 = Color3.fromRGB(33, 33, 46) })
-			local stroke = bg:FindFirstChildOfClass("UIStroke")
-			if stroke then tween(stroke, { Color = Color3.fromRGB(100, 140, 255) }) end
+			tw(bg, { BackgroundColor3 = Color3.fromRGB(30, 30, 46) })
+			local s = bg:FindFirstChildOfClass("UIStroke")
+			if s then tw(s, { Color = Color3.fromRGB(90, 130, 255) }) end
 		end)
 		box.FocusLost:Connect(function()
-			tween(bg, { BackgroundColor3 = Color3.fromRGB(28, 28, 36) })
-			local stroke = bg:FindFirstChildOfClass("UIStroke")
-			if stroke then tween(stroke, { Color = Color3.fromRGB(60, 60, 80) }) end
+			tw(bg, { BackgroundColor3 = Color3.fromRGB(26, 26, 36) })
+			local s = bg:FindFirstChildOfClass("UIStroke")
+			if s then tw(s, { Color = Color3.fromRGB(55, 55, 78) }) end
 		end)
-
 		return box, bg
 	end
 
-	-- ── Fila 1: Encabezado + Duración ───────────────────────────
-	local lblEncabezado = Instance.new("TextLabel", content)
-	lblEncabezado.Size = UDim2.new(0, 180, 0, 14)
-	lblEncabezado.Position = UDim2.new(0, 0, 0, 0)
-	lblEncabezado.BackgroundTransparency = 1
-	lblEncabezado.Text = "ENCABEZADO"
-	lblEncabezado.TextColor3 = Color3.fromRGB(100, 140, 255)
-	lblEncabezado.Font = Enum.Font.GothamBold
-	lblEncabezado.TextSize = 10
-	lblEncabezado.TextXAlignment = Enum.TextXAlignment.Left
+	-- ── Sección: Encabezado ───────────────────────────────────
+	local secEnc, _ = crearSeccion("ENCABEZADO", 1)
+	local encabezadoBox = crearInputBox(secEnc, "Título de la notificación", "", 16)
 
-	local encabezadoBox = crearInput(content, "Título de la notificación", "", 0, 16, 240, 32)
+	-- ── Sección: Mensaje ──────────────────────────────────────
+	local MSG_H = esMobil and 56 or 50
+	local secMsg, _ = crearSeccion("MENSAJE", 2)
+	secMsg.Size = UDim2.new(1, 0, 0, MSG_H + 18)
+	local cajaMensaje, _ = crearInputBox(secMsg, "Escribe el mensaje... (soporta https://links)", "", 16, nil, MSG_H)
 
-	local lblDur = Instance.new("TextLabel", content)
-	lblDur.Size = UDim2.new(0, 100, 0, 14)
-	lblDur.Position = UDim2.new(0, 252, 0, 0)
-	lblDur.BackgroundTransparency = 1
-	lblDur.Text = "DURACIÓN (s)"
-	lblDur.TextColor3 = Color3.fromRGB(100, 140, 255)
-	lblDur.Font = Enum.Font.GothamBold
-	lblDur.TextSize = 10
-	lblDur.TextXAlignment = Enum.TextXAlignment.Left
+	-- ── Sección: Duración ─────────────────────────────────────
+	local secDur, _ = crearSeccion("DURACIÓN (segundos)", 3)
+	local duracionBox = crearInputBox(secDur, "6", "6", 16)
 
-	local duracionBox = crearInput(content, "6", "6", 252, 16, 140, 32)
+	-- ── Sección: Posición ─────────────────────────────────────
+	local secPos, _ = crearSeccion("POSICIÓN", 4)
 
-	-- ── Fila 2: Mensaje ──────────────────────────────────────────
-	local lblMsg = Instance.new("TextLabel", content)
-	lblMsg.Size = UDim2.new(0, 100, 0, 14)
-	lblMsg.Position = UDim2.new(0, 0, 0, 58)
-	lblMsg.BackgroundTransparency = 1
-	lblMsg.Text = "MENSAJE"
-	lblMsg.TextColor3 = Color3.fromRGB(100, 140, 255)
-	lblMsg.Font = Enum.Font.GothamBold
-	lblMsg.TextSize = 10
-	lblMsg.TextXAlignment = Enum.TextXAlignment.Left
-
-	local cajaMensaje, cajaMensajeBg = crearInput(content, "Escribe el mensaje aquí... (soporta https://links)", "", 0, 74, 392, 48)
-	cajaMensajeBg.Size = UDim2.new(0, 392, 0, 48)
-
-	-- ── Fila 3: Posición + Color RGB ─────────────────────────────
-	local lblPos = Instance.new("TextLabel", content)
-	lblPos.Size = UDim2.new(0, 100, 0, 14)
-	lblPos.Position = UDim2.new(0, 0, 0, 134)
-	lblPos.BackgroundTransparency = 1
-	lblPos.Text = "POSICIÓN"
-	lblPos.TextColor3 = Color3.fromRGB(100, 140, 255)
-	lblPos.Font = Enum.Font.GothamBold
-	lblPos.TextSize = 10
-	lblPos.TextXAlignment = Enum.TextXAlignment.Left
-
-	-- Dropdown de posición
-	local dropBtn = Instance.new("TextButton", content)
-	dropBtn.Size             = UDim2.new(0, 180, 0, 32)
-	dropBtn.Position         = UDim2.new(0, 0, 0, 150)
-	dropBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-	dropBtn.TextColor3       = Color3.fromRGB(210, 210, 225)
+	local dropBtn = Instance.new("TextButton", secPos)
+	dropBtn.Size             = UDim2.new(1, 0, 0, INP_H)
+	dropBtn.Position         = UDim2.new(0, 0, 0, 16)
+	dropBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
+	dropBtn.TextColor3       = Color3.fromRGB(210, 210, 228)
 	dropBtn.Font             = Enum.Font.Gotham
-	dropBtn.TextSize         = 12
+	dropBtn.TextSize         = FONT_INP
 	dropBtn.Text             = "↗  Arriba derecha"
 	dropBtn.BorderSizePixel  = 0
-	addCorner(dropBtn, 6)
-	addStroke(dropBtn, Color3.fromRGB(60, 60, 80), 1, 0.2)
+	dropBtn.TextXAlignment   = Enum.TextXAlignment.Left
+	dropBtn.AutoButtonColor  = false
+	addCorner(dropBtn, 7)
+	addStroke(dropBtn, Color3.fromRGB(55, 55, 78), 1, 0.1)
+
+	-- padding izquierdo del texto del dropdown
+	local dpPad = Instance.new("UIPadding", dropBtn)
+	dpPad.PaddingLeft = UDim.new(0, 8)
 
 	local chevron = Instance.new("TextLabel", dropBtn)
-	chevron.Size = UDim2.new(0, 20, 1, 0)
-	chevron.Position = UDim2.new(1, -22, 0, 0)
+	chevron.Size                 = UDim2.new(0, 24, 1, 0)
+	chevron.Position             = UDim2.new(1, -26, 0, 0)
 	chevron.BackgroundTransparency = 1
-	chevron.Text = "⌄"
-	chevron.TextColor3 = Color3.fromRGB(100, 100, 130)
-	chevron.Font = Enum.Font.GothamBold
-	chevron.TextSize = 14
+	chevron.Text                 = "⌄"
+	chevron.TextColor3           = Color3.fromRGB(90, 90, 120)
+	chevron.Font                 = Enum.Font.GothamBold
+	chevron.TextSize             = 16
 
-	-- Lista desplegable
-	local dropList = Instance.new("Frame", content)
-	dropList.Size             = UDim2.new(0, 180, 0, #POSICIONES * 34)
-	dropList.Position         = UDim2.new(0, 0, 0, 184)
-	dropList.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-	dropList.BorderSizePixel  = 0
-	dropList.Visible          = false
-	dropList.ZIndex           = 20
-	addCorner(dropList, 8)
-	addStroke(dropList, Color3.fromRGB(70, 70, 100), 1, 0.2)
+	-- Lista del dropdown (flota sobre el contenido usando screenGui)
+	local dropOverlay = Instance.new("Frame", screenGui)
+	dropOverlay.Size             = UDim2.new(0, PANEL_W - PAD*2, 0, #POSICIONES * (INP_H + 2))
+	dropOverlay.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+	dropOverlay.BorderSizePixel  = 0
+	dropOverlay.Visible          = false
+	dropOverlay.ZIndex           = 50
+	addCorner(dropOverlay, 8)
+	addStroke(dropOverlay, Color3.fromRGB(70, 70, 100), 1, 0.1)
 
 	for i, pos in ipairs(POSICIONES) do
-		local opt = Instance.new("TextButton", dropList)
-		opt.Size             = UDim2.new(1, -4, 0, 30)
-		opt.Position         = UDim2.new(0, 2, 0, (i - 1) * 32 + 2)
-		opt.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-		opt.TextColor3       = Color3.fromRGB(200, 200, 215)
+		local opt = Instance.new("TextButton", dropOverlay)
+		opt.Size             = UDim2.new(1, -4, 0, INP_H)
+		opt.Position         = UDim2.new(0, 2, 0, (i-1) * (INP_H + 2) + 2)
+		opt.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+		opt.TextColor3       = Color3.fromRGB(200, 200, 218)
 		opt.Font             = Enum.Font.Gotham
-		opt.TextSize         = 12
+		opt.TextSize         = FONT_INP
 		opt.Text             = pos.label
 		opt.BorderSizePixel  = 0
-		opt.ZIndex           = 21
-		addCorner(opt, 5)
+		opt.ZIndex           = 51
+		opt.AutoButtonColor  = false
+		opt.TextXAlignment   = Enum.TextXAlignment.Left
+		addCorner(opt, 6)
+		local oPad = Instance.new("UIPadding", opt)
+		oPad.PaddingLeft = UDim.new(0, 10)
 
-		opt.MouseEnter:Connect(function()
-			tween(opt, { BackgroundColor3 = Color3.fromRGB(40, 50, 75) })
-		end)
-		opt.MouseLeave:Connect(function()
-			tween(opt, { BackgroundColor3 = Color3.fromRGB(30, 30, 42) })
-		end)
-
+		opt.MouseEnter:Connect(function() tw(opt, { BackgroundColor3 = Color3.fromRGB(40, 48, 78) }) end)
+		opt.MouseLeave:Connect(function() tw(opt, { BackgroundColor3 = Color3.fromRGB(28, 28, 42) }) end)
 		opt.MouseButton1Click:Connect(function()
-			-- FIX: guardamos el id normalizado, no el label con emojis
-			posicionSeleccionada  = pos.id
-			dropBtn.Text          = pos.label
-			dropList.Visible      = false
-			chevron.Text          = "⌄"
+			posicionSeleccionada = pos.id
+			dropBtn.Text         = pos.label
+			dropOverlay.Visible  = false
+			chevron.Text         = "⌄"
 		end)
 	end
 
+	-- Posicionar el overlay justo debajo del botón dropdown
+	local function actualizarPosDropdown()
+		local abs = dropBtn.AbsolutePosition
+		local absS = dropBtn.AbsoluteSize
+		dropOverlay.Position = UDim2.new(0, abs.X, 0, abs.Y + absS.Y + 4)
+	end
+
 	dropBtn.MouseButton1Click:Connect(function()
-		dropList.Visible = not dropList.Visible
-		chevron.Text = dropList.Visible and "⌃" or "⌄"
+		actualizarPosDropdown()
+		dropOverlay.Visible = not dropOverlay.Visible
+		chevron.Text = dropOverlay.Visible and "⌃" or "⌄"
 	end)
 
-	-- ── Color RGB ────────────────────────────────────────────────
-	local lblColor = Instance.new("TextLabel", content)
-	lblColor.Size = UDim2.new(0, 100, 0, 14)
-	lblColor.Position = UDim2.new(0, 196, 0, 134)
-	lblColor.BackgroundTransparency = 1
-	lblColor.Text = "COLOR (R / G / B)"
-	lblColor.TextColor3 = Color3.fromRGB(100, 140, 255)
-	lblColor.Font = Enum.Font.GothamBold
-	lblColor.TextSize = 10
-	lblColor.TextXAlignment = Enum.TextXAlignment.Left
+	-- Cerrar dropdown si se toca fuera
+	UserInput.InputBegan:Connect(function(input)
+		if dropOverlay.Visible then
+			if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+				-- pequeño delay para que el click en opción se registre primero
+				task.wait(0.05)
+				dropOverlay.Visible = false
+				chevron.Text = "⌄"
+			end
+		end
+	end)
 
-	local colorR = crearInput(content, "R", "100", 196, 150, 60, 32)
-	local colorG = crearInput(content, "G", "140", 264, 150, 60, 32)
-	local colorB = crearInput(content, "B", "255", 332, 150, 60, 32)
+	-- ── Sección: Color RGB ────────────────────────────────────
+	local COL_W = math.floor((PANEL_W - PAD*2 - 44) / 3)
+	local secColor, _ = crearSeccion("COLOR  (R / G / B)", 5)
+	secColor.Size = UDim2.new(1, 0, 0, INP_H + 18)
 
-	-- Preview del color
-	local colorPreview = Instance.new("Frame", content)
-	colorPreview.Size             = UDim2.new(0, 30, 0, 32)
-	colorPreview.Position         = UDim2.new(0, 398, 0, 150)  -- lo ajustamos si no cabe
-	-- (frame es 392px de ancho, así que lo ponemos a 394)
+	local colorR, bgR = crearInputBox(secColor, "R",   "100", 16, COL_W)
+	local colorG, bgG = crearInputBox(secColor, "G",   "140", 16, COL_W)
+	local colorB, bgB = crearInputBox(secColor, "B",   "255", 16, COL_W)
+
+	bgG.Position = UDim2.new(0, COL_W + 6,  0, 16)
+	bgB.Position = UDim2.new(0, (COL_W+6)*2, 0, 16)
+
+	-- Preview color
+	local colorPreview = Instance.new("Frame", secColor)
+	colorPreview.Size             = UDim2.new(0, 32, 0, INP_H)
+	colorPreview.Position         = UDim2.new(1, -32, 0, 16)
 	colorPreview.BackgroundColor3 = Color3.fromRGB(100, 140, 255)
 	colorPreview.BorderSizePixel  = 0
-	addCorner(colorPreview, 6)
-	addStroke(colorPreview, Color3.fromRGB(60, 60, 80), 1, 0.2)
+	addCorner(colorPreview, 7)
+	addStroke(colorPreview, Color3.fromRGB(55, 55, 78), 1, 0.1)
 
-	-- Actualizar preview al cambiar valores
 	local function actualizarPreview()
 		local r = math.clamp(tonumber(colorR.Text) or 100, 0, 255)
 		local g = math.clamp(tonumber(colorG.Text) or 140, 0, 255)
 		local b = math.clamp(tonumber(colorB.Text) or 255, 0, 255)
-		colorPreview.BackgroundColor3 = Color3.fromRGB(r, g, b)
+		tw(colorPreview, { BackgroundColor3 = Color3.fromRGB(r, g, b) })
 	end
-	colorR.Changed:Connect(actualizarPreview)
-	colorG.Changed:Connect(actualizarPreview)
-	colorB.Changed:Connect(actualizarPreview)
+	colorR:GetPropertyChangedSignal("Text"):Connect(actualizarPreview)
+	colorG:GetPropertyChangedSignal("Text"):Connect(actualizarPreview)
+	colorB:GetPropertyChangedSignal("Text"):Connect(actualizarPreview)
 
-	-- ── Toggle Fijar ──────────────────────────────────────────────
+	-- ── Toggle: Fijar ─────────────────────────────────────────
 	local fijarNotificacion = false
+	local secFijar = Instance.new("Frame", content)
+	secFijar.Size             = UDim2.new(1, 0, 0, INP_H)
+	secFijar.BackgroundTransparency = 1
+	secFijar.LayoutOrder      = 6
 
-	local fijarBtn = Instance.new("TextButton", content)
-	fijarBtn.Size             = UDim2.new(0, 392, 0, 28)
-	fijarBtn.Position         = UDim2.new(0, 0, 0, 193)
-	fijarBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-	fijarBtn.TextColor3       = Color3.fromRGB(180, 180, 200)
+	local fijarBtn = Instance.new("TextButton", secFijar)
+	fijarBtn.Size             = UDim2.new(1, 0, 1, 0)
+	fijarBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
+	fijarBtn.TextColor3       = Color3.fromRGB(180, 180, 205)
 	fijarBtn.Font             = Enum.Font.Gotham
-	fijarBtn.TextSize         = 12
+	fijarBtn.TextSize         = esMobil and 13 or 12
 	fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
 	fijarBtn.BorderSizePixel  = 0
-	addCorner(fijarBtn, 6)
-	addStroke(fijarBtn, Color3.fromRGB(60, 60, 80), 1, 0.4)
+	fijarBtn.AutoButtonColor  = false
+	addCorner(fijarBtn, 8)
+	addStroke(fijarBtn, Color3.fromRGB(55, 55, 78), 1, 0.3)
 
 	fijarBtn.MouseButton1Click:Connect(function()
 		fijarNotificacion = not fijarNotificacion
 		if fijarNotificacion then
 			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  ON"
-			fijarBtn.BackgroundColor3 = Color3.fromRGB(30, 50, 30)
-			addStroke(fijarBtn, Color3.fromRGB(60, 160, 80), 1, 0)
+			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(22, 48, 28) })
+			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
+			if s then s.Color = Color3.fromRGB(50, 160, 70); s.Transparency = 0 end
 		else
 			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
-			fijarBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-			addStroke(fijarBtn, Color3.fromRGB(60, 60, 80), 1, 0.4)
+			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(26, 26, 36) })
+			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
+			if s then s.Color = Color3.fromRGB(55, 55, 78); s.Transparency = 0.3 end
 		end
 	end)
 
-	-- ── Botón Enviar ──────────────────────────────────────────────
-	local sendBtn = Instance.new("TextButton", content)
-	sendBtn.Size             = UDim2.new(0, 392, 0, 34)
-	sendBtn.Position         = UDim2.new(0, 0, 0, 230)
-	sendBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+	-- ── Botón Enviar ──────────────────────────────────────────
+	local secEnviar = Instance.new("Frame", content)
+	secEnviar.Size             = UDim2.new(1, 0, 0, BTN_H)
+	secEnviar.BackgroundTransparency = 1
+	secEnviar.LayoutOrder      = 7
+
+	local sendBtn = Instance.new("TextButton", secEnviar)
+	sendBtn.Size             = UDim2.new(1, 0, 1, 0)
+	sendBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
 	sendBtn.TextColor3       = Color3.new(1, 1, 1)
 	sendBtn.Font             = Enum.Font.GothamBold
-	sendBtn.TextSize         = 14
+	sendBtn.TextSize         = esMobil and 15 or 14
 	sendBtn.Text             = "⬆  ENVIAR A TODOS"
 	sendBtn.BorderSizePixel  = 0
-	addCorner(sendBtn, 8)
-	addGradient(sendBtn, Color3.fromRGB(70, 140, 255), Color3.fromRGB(100, 80, 220))
+	sendBtn.AutoButtonColor  = false
+	addCorner(sendBtn, 9)
+	addGradient(sendBtn, Color3.fromRGB(70, 130, 255), Color3.fromRGB(110, 70, 230))
 
 	sendBtn.MouseEnter:Connect(function()
-		tween(sendBtn, { BackgroundColor3 = Color3.fromRGB(80, 150, 255) })
+		tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(80, 145, 255) })
 	end)
 	sendBtn.MouseLeave:Connect(function()
-		tween(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 130, 255) })
+		tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 120, 255) })
 	end)
 
-	-- Estado de feedback del botón
-	local function feedbackEnviar(exito)
-		if exito then
+	local enviandoLock = false
+	local function feedbackEnviar(ok)
+		if ok then
 			sendBtn.Text             = "✔  ¡ENVIADO!"
-			sendBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(40, 175, 80) })
 		else
 			sendBtn.Text             = "✖  ENCABEZADO REQUERIDO"
-			sendBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(200, 55, 55) })
 		end
-		task.delay(2, function()
-			sendBtn.Text             = "⬆  ENVIAR A TODOS"
-			sendBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+		task.delay(2.2, function()
+			sendBtn.Text = "⬆  ENVIAR A TODOS"
+			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 120, 255) })
+			enviandoLock = false
 		end)
 	end
 
 	sendBtn.MouseButton1Click:Connect(function()
-		local encabezado = encabezadoBox.Text
-		if encabezado == "" then feedbackEnviar(false) return end
+		if enviandoLock then return end
+		local enc = encabezadoBox.Text
+		if enc == "" then feedbackEnviar(false) return end
+		enviandoLock = true
 
 		local r = math.clamp(tonumber(colorR.Text) or 100, 0, 255)
 		local g = math.clamp(tonumber(colorG.Text) or 140, 0, 255)
 		local b = math.clamp(tonumber(colorB.Text) or 255, 0, 255)
 
 		local data = {
-			encabezado = encabezado,
+			encabezado = enc,
 			mensaje    = cajaMensaje.Text,
 			duracion   = tonumber(duracionBox.Text) or 6,
-			posicion   = posicionSeleccionada,  -- FIX: enviamos el id normalizado
+			posicion   = posicionSeleccionada,
 			color      = { r, g, b },
 			timestamp  = os.time(),
 			key        = claveSeguridad,
 			fijar      = fijarNotificacion
 		}
 
-		local jsonData = HttpService:JSONEncode(data)
 		local req = (syn and syn.request) or (http and http.request) or request
 		if req then
 			req({
 				Url     = firebaseURL,
 				Method  = "PUT",
 				Headers = { ["Content-Type"] = "application/json" },
-				Body    = jsonData
+				Body    = HttpService:JSONEncode(data)
 			})
 			if not fijarNotificacion then
 				task.delay(tonumber(duracionBox.Text) or 6, function()
@@ -456,35 +519,37 @@ if duenos[player.Name] then
 				end)
 			end
 			feedbackEnviar(true)
+		else
+			enviandoLock = false
 		end
 	end)
 
-	-- ── Toggle PC (tecla L) y Móvil ──────────────────────────────
-	UserInput.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
+	-- ── Toggle panel ──────────────────────────────────────────
+	-- PC: tecla L
+	UserInput.InputBegan:Connect(function(input, gp)
+		if gp then return end
 		if input.KeyCode == Enum.KeyCode.L then
 			frame.Visible = not frame.Visible
-			if frame.Visible then
-				frame.Position = UDim2.new(0, 60, 0.35, 0)
-				tween(frame, { Position = UDim2.new(0, 60, 0.32, 0) })
-			end
 		end
 	end)
 
-	if UserInput.TouchEnabled then
-		local toggleButton = Instance.new("TextButton", screenGui)
-		toggleButton.Size             = UDim2.new(0, 46, 0, 46)
-		toggleButton.Position         = UDim2.new(0, 10, 0, 10)
-		toggleButton.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
-		toggleButton.Text             = "≡"
-		toggleButton.TextScaled       = true
-		toggleButton.TextColor3       = Color3.new(1, 1, 1)
-		toggleButton.Active           = true
-		toggleButton.Draggable        = true
-		toggleButton.Name             = "ToggleButton"
-		addCorner(toggleButton, 10)
+	-- Móvil: botón flotante arrastrable
+	if esMobil then
+		local toggleBtn = Instance.new("TextButton", screenGui)
+		toggleBtn.Size             = UDim2.new(0, 50, 0, 50)
+		toggleBtn.Position         = UDim2.new(0, 10, 0, 10)
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
+		toggleBtn.Text             = "≡"
+		toggleBtn.TextScaled       = true
+		toggleBtn.TextColor3       = Color3.new(1, 1, 1)
+		toggleBtn.Active           = true
+		toggleBtn.Draggable        = true
+		toggleBtn.ZIndex           = 10
+		addCorner(toggleBtn, 12)
+		addStroke(toggleBtn, Color3.fromRGB(80, 140, 255), 2, 0.2)
+		addGradient(toggleBtn, Color3.fromRGB(70, 130, 255), Color3.fromRGB(110, 70, 230))
 
-		toggleButton.MouseButton1Click:Connect(function()
+		toggleBtn.MouseButton1Click:Connect(function()
 			frame.Visible = not frame.Visible
 		end)
 	end
@@ -493,7 +558,7 @@ end -- fin bloque dueños
 
 
 -- ════════════════════════════════════════════════════════════════
---  RECEPTOR DE NOTIFICACIONES (todos los jugadores)
+--  RECEPTOR DE NOTIFICACIONES — todos los jugadores
 -- ════════════════════════════════════════════════════════════════
 task.spawn(function()
 	local req = (syn and syn.request) or (http and http.request) or request
@@ -502,153 +567,148 @@ task.spawn(function()
 	while true do
 		task.wait(2.5)
 		pcall(function()
-			local response = req({ Url = firebaseURL, Method = "GET" })
+			local res = req({ Url = firebaseURL, Method = "GET" })
+			if not res or res.StatusCode ~= 200 then return end
+			if not res.Body or res.Body == "null" or res.Body == "" then return end
 
-			if not response then return end
-			if response.StatusCode ~= 200 then return end
-			if not response.Body or response.Body == "null" or response.Body == "" then return end
-
-			local ok, data = pcall(function()
-				return HttpService:JSONDecode(response.Body)
-			end)
+			local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
 			if not ok or type(data) ~= "table" then return end
 			if not data.encabezado or data.encabezado == "" then return end
-			if not data.timestamp or data.timestamp == ultimoTimestamp then return end
-
+			if not data.timestamp  or data.timestamp == ultimoTimestamp then return end
 			ultimoTimestamp = data.timestamp
 
-			-- Limpiar notificaciones anteriores
-			for _, gui in ipairs(guiParent:GetChildren()) do
-				if gui.Name == "JmodsNotificacionVisual" then
-					gui:Destroy()
-				end
+			-- Limpiar anteriores
+			for _, g in ipairs(guiParent:GetChildren()) do
+				if g.Name == "JmodsNotificacionVisual" then g:Destroy() end
 			end
 
-			-- ── Construir GUI de notificación ─────────────────────────
-			local notifGui = Instance.new("ScreenGui", guiParent)
-			notifGui.Name          = "JmodsNotificacionVisual"
+			-- Calcular altura
+			local msg        = data.mensaje or ""
+			local lineas     = 1
+			for _ in msg:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineas += 1 end
+			local altH       = math.max(72, 52 + lineas * 20)
+
+			local notifGui   = Instance.new("ScreenGui", guiParent)
+			notifGui.Name    = "JmodsNotificacionVisual"
 			notifGui.ResetOnSpawn  = false
 			notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
-			-- Calcular altura dinámica según mensaje
-			local mensajeOriginal = data.mensaje or ""
-			local lineaCount = 1
-			for _ in mensajeOriginal:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineaCount = lineaCount + 1 end
-			for _ in mensajeOriginal:gmatch("\n") do lineaCount = lineaCount + 1 end
-			local alturaFrame = math.max(70, 50 + lineaCount * 20)
+			local nFrame = Instance.new("Frame", notifGui)
+			nFrame.Size                = UDim2.new(0, 340, 0, altH)
+			nFrame.BackgroundTransparency = 0.1
+			nFrame.BorderSizePixel     = 0
+			nFrame.ClipsDescendants    = true
+			addCorner(nFrame, 10)
 
-			local notifFrame = Instance.new("Frame", notifGui)
-			notifFrame.Size               = UDim2.new(0, 340, 0, alturaFrame)
-			notifFrame.BackgroundTransparency = 0.12
-			notifFrame.BorderSizePixel    = 0
-			notifFrame.ClipsDescendants   = true
-			addCorner(notifFrame, 10)
-
-			-- FIX: Usar el id normalizado para la posición
+			-- Posición
 			local posId = data.posicion or "top_right"
-			notifFrame.Position = getPosUDim2(posId, 340, alturaFrame)
+			nFrame.Position = getPosUDim2(posId, 340, altH)
+			local posInicial = nFrame.Position
 
-			-- Animación de entrada
-			local posInicial = notifFrame.Position
+			-- Animación entrada
 			if posId == "top_right" or posId == "bottom_right" then
-				notifFrame.Position = posInicial + UDim2.new(0, 360, 0, 0)
+				nFrame.Position = posInicial + UDim2.new(0, 370, 0, 0)
 			elseif posId == "top_left" or posId == "bottom_left" then
-				notifFrame.Position = posInicial + UDim2.new(0, -360, 0, 0)
+				nFrame.Position = posInicial + UDim2.new(0, -370, 0, 0)
+			else
+				nFrame.BackgroundTransparency = 1
+				TweenService:Create(nFrame, TweenInfo.new(0.35), { BackgroundTransparency = 0.1 }):Play()
 			end
-			tween(notifFrame, { Position = posInicial }, 0.4, Enum.EasingStyle.Back)
+			if posId ~= "center" then
+				TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = posInicial }):Play()
+			end
 
-			-- Línea de acento lateral
-			local accentSide = Instance.new("Frame", notifFrame)
-			accentSide.Size             = UDim2.new(0, 4, 1, 0)
-			accentSide.Position         = UDim2.new(0, 0, 0, 0)
-			accentSide.BorderSizePixel  = 0
-			addCorner(accentSide, 4)
+			-- Accent lateral
+			local accent = Instance.new("Frame", nFrame)
+			accent.Size            = UDim2.new(0, 4, 1, 0)
+			accent.BorderSizePixel = 0
+			addCorner(accent, 4)
 
-			-- Color del fondo
+			-- Color
+			local cr = (data.color and data.color[1]) or 100
+			local cg = (data.color and data.color[2]) or 140
+			local cb = (data.color and data.color[3]) or 255
+
 			if data.rainbow then
 				task.spawn(function()
 					local h = 0
-					while notifFrame.Parent do
+					while nFrame.Parent do
 						h = (h + 0.01) % 1
-						notifFrame.BackgroundColor3 = Color3.fromHSV(h, 0.7, 0.9)
-						accentSide.BackgroundColor3 = Color3.fromHSV((h + 0.5) % 1, 1, 1)
+						nFrame.BackgroundColor3 = Color3.fromHSV(h, 0.65, 0.85)
+						accent.BackgroundColor3 = Color3.fromHSV((h+0.5)%1, 1, 1)
 						task.wait(0.05)
 					end
 				end)
 			else
-				local r = (data.color and data.color[1]) or 100
-				local g = (data.color and data.color[2]) or 140
-				local b = (data.color and data.color[3]) or 255
-				notifFrame.BackgroundColor3 = Color3.fromRGB(
-					math.clamp(r - 20, 0, 255),
-					math.clamp(g - 20, 0, 255),
-					math.clamp(b - 20, 0, 255)
+				nFrame.BackgroundColor3 = Color3.fromRGB(
+					math.clamp(cr - 25, 0, 255),
+					math.clamp(cg - 25, 0, 255),
+					math.clamp(cb - 25, 0, 255)
 				)
-				accentSide.BackgroundColor3 = Color3.fromRGB(r, g, b)
+				accent.BackgroundColor3 = Color3.fromRGB(cr, cg, cb)
 			end
 
-			addStroke(notifFrame, Color3.fromRGB(80, 80, 110), 1, 0.3)
+			addStroke(nFrame, Color3.fromRGB(80, 80, 115), 1, 0.25)
 
 			-- Ícono
-			local icon = Instance.new("TextLabel", notifFrame)
-			icon.Size                  = UDim2.new(0, 28, 0, 28)
+			local icon = Instance.new("TextLabel", nFrame)
+			icon.Size                  = UDim2.new(0, 26, 0, 26)
 			icon.Position              = UDim2.new(0, 12, 0, 12)
 			icon.BackgroundTransparency = 1
 			icon.Text                  = "✦"
 			icon.TextSize              = 18
 			icon.Font                  = Enum.Font.GothamBold
-			icon.TextColor3            = Color3.new(1, 1, 1)
+			icon.TextColor3            = Color3.fromRGB(255, 255, 255)
 
 			-- Encabezado
-			local encabezadoLabel = Instance.new("TextLabel", notifFrame)
-			encabezadoLabel.Size                  = UDim2.new(1, -50, 0, 20)
-			encabezadoLabel.Position              = UDim2.new(0, 48, 0, 10)
-			encabezadoLabel.Text                  = data.encabezado
-			encabezadoLabel.TextColor3            = Color3.fromRGB(255, 255, 255)
-			encabezadoLabel.Font                  = Enum.Font.GothamBold
-			encabezadoLabel.TextSize              = 14
-			encabezadoLabel.BackgroundTransparency = 1
-			encabezadoLabel.TextXAlignment        = Enum.TextXAlignment.Left
+			local encLbl = Instance.new("TextLabel", nFrame)
+			encLbl.Size                  = UDim2.new(1, -52, 0, 20)
+			encLbl.Position              = UDim2.new(0, 46, 0, 10)
+			encLbl.Text                  = data.encabezado
+			encLbl.TextColor3            = Color3.fromRGB(255, 255, 255)
+			encLbl.Font                  = Enum.Font.GothamBold
+			encLbl.TextSize              = 14
+			encLbl.BackgroundTransparency = 1
+			encLbl.TextXAlignment        = Enum.TextXAlignment.Left
+			encLbl.TextTruncate          = Enum.TextTruncate.AtEnd
 
-			-- ── Mensaje con soporte de links ──────────────────────────
-			local yOffset = 32
-
-			local function crearLabel(texto, clickableUrl)
-				local label
-				if clickableUrl then
-					label      = Instance.new("TextButton", notifFrame)
-					label.Text = "🔗 " .. texto
-					label.TextColor3 = Color3.fromRGB(130, 190, 255)
-					local function abrirLink()
-						if setclipboard then setclipboard(clickableUrl) end
-						if syn and syn.open_url then syn.open_url(clickableUrl)
-						elseif getgenv and getgenv().openurl then getgenv().openurl(clickableUrl) end
+			-- Mensaje con links
+			local yOff = 32
+			local function crearLinea(texto, url)
+				local lbl
+				if url then
+					lbl = Instance.new("TextButton", nFrame)
+					lbl.Text      = "🔗 " .. texto
+					lbl.TextColor3 = Color3.fromRGB(120, 185, 255)
+					lbl.BackgroundTransparency = 1
+					lbl.AutoButtonColor = false
+					local function open()
+						if setclipboard then setclipboard(url) end
+						if syn and syn.open_url then syn.open_url(url)
+						elseif getgenv and getgenv().openurl then getgenv().openurl(url) end
 					end
-					label.MouseButton1Click:Connect(abrirLink)
-					label.TouchTap:Connect(abrirLink)
-					label.BackgroundTransparency = 1
+					lbl.MouseButton1Click:Connect(open)
+					lbl.TouchTap:Connect(open)
 				else
-					label            = Instance.new("TextLabel", notifFrame)
-					label.Text       = texto
-					label.TextColor3 = Color3.fromRGB(215, 215, 225)
-					label.BackgroundTransparency = 1
+					lbl = Instance.new("TextLabel", nFrame)
+					lbl.Text      = texto
+					lbl.TextColor3 = Color3.fromRGB(210, 210, 225)
+					lbl.BackgroundTransparency = 1
 				end
-
-				label.Size             = UDim2.new(1, -55, 0, 18)
-				label.Position         = UDim2.new(0, 48, 0, yOffset)
-				label.Font             = Enum.Font.Gotham
-				label.TextSize         = 13
-				label.TextXAlignment   = Enum.TextXAlignment.Left
-				label.TextTruncate     = Enum.TextTruncate.AtEnd
-
-				yOffset = yOffset + 20
+				lbl.Size           = UDim2.new(1, -52, 0, 18)
+				lbl.Position       = UDim2.new(0, 46, 0, yOff)
+				lbl.Font           = Enum.Font.Gotham
+				lbl.TextSize       = 13
+				lbl.TextXAlignment = Enum.TextXAlignment.Left
+				lbl.TextTruncate   = Enum.TextTruncate.AtEnd
+				yOff += 20
 			end
 
 			local function nombreAmigable(url)
 				if url:find("youtube") or url:find("youtu%.be") then return "YouTube"
 				elseif url:find("roblox%.com")    then return "Roblox"
 				elseif url:find("discord%.gg")    then return "Discord"
-				elseif url:find("twitter%.com")   then return "Twitter"
+				elseif url:find("twitter%.com")   then return "Twitter / X"
 				elseif url:find("tiktok%.com")    then return "TikTok"
 				elseif url:find("github%.com")    then return "GitHub"
 				elseif url:find("instagram%.com") then return "Instagram"
@@ -657,57 +717,57 @@ task.spawn(function()
 				end
 			end
 
-			local function procesarMensaje(msg)
-				local lastEnd = 1
-				for inicio, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
-					local textoPrevio = msg:sub(lastEnd, inicio - 1)
-					if textoPrevio ~= "" then crearLabel(textoPrevio, nil) end
-					crearLabel(nombreAmigable(link), link)
-					lastEnd = fin
-				end
-				local textoFinal = msg:sub(lastEnd)
-				if textoFinal ~= "" then crearLabel(textoFinal, nil) end
+			local lastE = 1
+			for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
+				local prev = msg:sub(lastE, ini - 1)
+				if prev ~= "" then crearLinea(prev, nil) end
+				crearLinea(nombreAmigable(link), link)
+				lastE = fin
 			end
+			local resto = msg:sub(lastE)
+			if resto ~= "" then crearLinea(resto, nil) end
 
-			procesarMensaje(mensajeOriginal)
-
-			-- Barra de progreso (solo si no está fijada)
+			-- Barra de progreso
 			if not data.fijar then
-				local duracion = data.duracion or 6
+				local dur = data.duracion or 6
 
-				local progressBg = Instance.new("Frame", notifFrame)
-				progressBg.Size             = UDim2.new(1, -10, 0, 3)
-				progressBg.Position         = UDim2.new(0, 5, 1, -5)
-				progressBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-				progressBg.BorderSizePixel  = 0
-				addCorner(progressBg, 2)
+				local pBg = Instance.new("Frame", nFrame)
+				pBg.Size             = UDim2.new(1, -10, 0, 3)
+				pBg.Position         = UDim2.new(0, 5, 1, -5)
+				pBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+				pBg.BorderSizePixel  = 0
+				addCorner(pBg, 2)
 
-				local progressFill = Instance.new("Frame", progressBg)
-				progressFill.Size             = UDim2.new(1, 0, 1, 0)
-				progressFill.BackgroundColor3 = accentSide.BackgroundColor3
-				progressFill.BorderSizePixel  = 0
-				addCorner(progressFill, 2)
+				local pFill = Instance.new("Frame", pBg)
+				pFill.Size             = UDim2.new(1, 0, 1, 0)
+				pFill.BackgroundColor3 = accent.BackgroundColor3
+				pFill.BorderSizePixel  = 0
+				addCorner(pFill, 2)
 
-				-- Animar barra de progreso
-				tween(progressFill, { Size = UDim2.new(0, 0, 1, 0) }, duracion, Enum.EasingStyle.Linear)
+				TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
+					Size = UDim2.new(0, 0, 1, 0)
+				}):Play()
 
 				-- Salida animada
-				task.delay(duracion - 0.35, function()
-					if notifFrame and notifFrame.Parent then
-						if posId == "top_right" or posId == "bottom_right" then
-							tween(notifFrame, { Position = posInicial + UDim2.new(0, 380, 0, 0) }, 0.3)
-						elseif posId == "top_left" or posId == "bottom_left" then
-							tween(notifFrame, { Position = posInicial + UDim2.new(0, -380, 0, 0) }, 0.3)
-						else
-							tween(notifFrame, { BackgroundTransparency = 1 }, 0.3)
-						end
+				task.delay(dur - 0.3, function()
+					if not nFrame or not nFrame.Parent then return end
+					if posId == "top_right" or posId == "bottom_right" then
+						TweenService:Create(nFrame, TweenInfo.new(0.28), {
+							Position = posInicial + UDim2.new(0, 380, 0, 0)
+						}):Play()
+					elseif posId == "top_left" or posId == "bottom_left" then
+						TweenService:Create(nFrame, TweenInfo.new(0.28), {
+							Position = posInicial + UDim2.new(0, -380, 0, 0)
+						}):Play()
+					else
+						TweenService:Create(nFrame, TweenInfo.new(0.28), {
+							BackgroundTransparency = 1
+						}):Play()
 					end
 				end)
 
-				task.delay(duracion, function()
-					if notifGui and notifGui.Parent then
-						notifGui:Destroy()
-					end
+				task.delay(dur, function()
+					if notifGui and notifGui.Parent then notifGui:Destroy() end
 				end)
 			end
 		end)
