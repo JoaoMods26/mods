@@ -19,6 +19,7 @@ task.spawn(function()
         FOVColor           = Color3.fromRGB(255, 165, 0),
         FOVVisible         = true,
         ESPEnabled         = false,
+        ESPMaxDistance     = 500,
         UseAltESP          = false,
         ESPColor           = Color3.fromRGB(255, 165, 0),
         ESPSize            = 10,
@@ -479,14 +480,24 @@ task.spawn(function()
         lastESPFrame = now
 
         PruneDeadESP(liveSet)
-
-        if drawingSupported and S.ESPEnabled and not S.UseAltESP then
+if drawingSupported and S.ESPEnabled and not S.UseAltESP then
             HideAllESP()
             for _, entry in ipairs(liveNPCs) do
                 local hrp   = entry.hrp
                 local model = entry.model
+
+                -- Filtro de distancia para ESP
+                if LocalPlayer.Character then
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if myHRP then
+                        local dist = (hrp.Position - myHRP.Position).Magnitude
+                        if dist > S.ESPMaxDistance then continue end
+                    end
+                end
+
                 local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                 if not onScreen or sp.Z <= 0 then continue end
+
 
                 local scale = 1000 / (sp.Z * 10)
                 local h     = math.clamp(scale * S.ESPSize, 20, 400)
@@ -699,6 +710,14 @@ task.spawn(function()
             S.ESPEnabled = v
             if not v then HideAllESP() end
         end
+    })
+
+    AimbotTab:CreateSlider({
+        Name = "Distancia ESP",
+        Range = {10, 2000},
+        Increment = 10,
+        CurrentValue = 500,
+        Callback = function(v) S.ESPMaxDistance = v end
     })
 
     AimbotTab:CreateToggle({
