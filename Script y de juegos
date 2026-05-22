@@ -501,17 +501,12 @@ boton= Juegostab:CreateButton({
    end,
 })
 
-boton= Juegostab:CreateButton({
-   Name = "Xhub(Murder Mystery 2)",
-   Callback = function()
-       loadstring(game:HttpGet('https://raw.githubusercontent.com/zdkjaime/Xhub/refs/heads/main/MainHub'))()
-   end,
-})
+
 
 boton= Juegostab:CreateButton({
    Name = "JMurderMods (Murder Mystery 2)",
    Callback = function()
-       loadstring(game:HttpGet(' https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/JMurder'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/JMurder'))()
    end,
 })
 
