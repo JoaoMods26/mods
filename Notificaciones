@@ -1,15 +1,24 @@
--- ══════════════════════════════════════════════════════════════
+-- =============================================================
 --  JMODS Notifier v2.1  |  UI Profesional + Móvil + Fix Layout
--- ══════════════════════════════════════════════════════════════
+-- =============================================================
 
 local HttpService  = game:GetService("HttpService")
 local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInput    = game:GetService("UserInputService")
 local CoreGui      = game:GetService("CoreGui")
-local guiParent    = CoreGui
 
--- ── Esperar LocalPlayer (fix executor early injection) ────────
+local guiParent
+pcall(function()
+	if gethui then
+		guiParent = gethui()
+	end
+end)
+if not guiParent then
+	guiParent = CoreGui
+end
+
+--  Esperar LocalPlayer (fix executor early injection)
 local player = Players.LocalPlayer
 if not player then
 	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
@@ -19,23 +28,23 @@ if not player then
 	repeat task.wait(0.1) player = Players.LocalPlayer until player
 end
 
--- ── URLs & config ─────────────────────────────────────────────
+--  URLs & config
 local duenosURL       = "https://pastebin.com/raw/S2X3j15A"
 local firebaseURL     = "https://notificaciones-aa833-default-rtdb.firebaseio.com/Notificacion.json"
 local claveSeguridad  = "JMODS2024"
 local ultimoTimestamp = 0
 local duenos          = {}
 
--- ── Detectar móvil ────────────────────────────────────────────
+--  Detectar móvil
 local esMobil = UserInput.TouchEnabled
 
--- ── Posiciones normalizadas ───────────────────────────────────
+--  Posiciones normalizadas
 local POSICIONES = {
-	{ id = "top_right",    label = "↗  Arriba derecha"   },
-	{ id = "top_left",     label = "↖  Arriba izquierda" },
-	{ id = "bottom_right", label = "↘  Abajo derecha"    },
-	{ id = "bottom_left",  label = "↙  Abajo izquierda"  },
-	{ id = "center",       label = "⊕  Centro"           },
+	{ id = "top_right",    label = ">> Arriba derecha"   },
+	{ id = "top_left",     label = "<< Arriba izquierda" },
+	{ id = "bottom_right", label = ">> Abajo derecha"    },
+	{ id = "bottom_left",  label = "<< Abajo izquierda"  },
+	{ id = "center",       label = "-- Centro"           },
 }
 local posicionSeleccionada = "top_right"
 
@@ -52,7 +61,7 @@ local function getPosUDim2(posId, frameW, frameH)
 	end
 end
 
--- ── Helpers UI ────────────────────────────────────────────────
+--  Helpers UI
 local function addCorner(p, r)
 	local c = Instance.new("UICorner", p)
 	c.CornerRadius = UDim.new(0, r or 8)
@@ -82,7 +91,7 @@ local function tw(obj, props, t, style)
 	), props):Play()
 end
 
--- ── Cargar dueños ─────────────────────────────────────────────
+--  Cargar dueños
 local function actualizarDuenos()
 	pcall(function()
 		local req = (syn and syn.request) or (http and http.request) or request
@@ -102,7 +111,7 @@ task.spawn(function()
 	while true do task.wait(400) actualizarDuenos() end
 end)
 
--- ── Anti-duplicado ────────────────────────────────────────────
+--  Anti-duplicado
 if getgenv then
 	if getgenv().__JMODS_RUNNING then return end
 	getgenv().__JMODS_RUNNING = true
@@ -113,9 +122,9 @@ for _, g in ipairs(guiParent:GetChildren()) do
 	end
 end
 
--- ════════════════════════════════════════════════════════════════
---  PANEL DE CONTROL — solo dueños
--- ════════════════════════════════════════════════════════════════
+-- =============================================================
+--  PANEL DE CONTROL - solo dueños
+-- =============================================================
 if duenos[player.Name] then
 
 	local screenGui = Instance.new("ScreenGui", guiParent)
@@ -132,7 +141,7 @@ if duenos[player.Name] then
 	local BTN_H    = esMobil and 40  or 34
 	local PAD      = esMobil and 14  or 12
 
-	-- ── Frame principal ───────────────────────────────────────
+	--  Frame principal 
 	local frame = Instance.new("Frame", screenGui)
 	frame.Size             = UDim2.new(0, PANEL_W, 0, PANEL_H)
 	frame.Position         = UDim2.new(0, 20, 0, esMobil and 60 or 80)
@@ -152,7 +161,7 @@ if duenos[player.Name] then
 	addCorner(accentBar, 12)
 	addGradient(accentBar, Color3.fromRGB(90, 130, 255), Color3.fromRGB(180, 90, 255))
 
-	-- ── Header ────────────────────────────────────────────────
+	--  Header 
 	local header = Instance.new("Frame", frame)
 	header.Size             = UDim2.new(1, 0, 0, 40)
 	header.Position         = UDim2.new(0, 0, 0, 3)
@@ -163,7 +172,7 @@ if duenos[player.Name] then
 	titleLbl.Size                 = UDim2.new(1, -70, 1, 0)
 	titleLbl.Position             = UDim2.new(0, PAD, 0, 0)
 	titleLbl.BackgroundTransparency = 1
-	titleLbl.Text                 = "◈  JMODS — Notificaciones"
+	titleLbl.Text                 = "[ JMODS ] Notificaciones"
 	titleLbl.TextColor3           = Color3.fromRGB(220, 220, 235)
 	titleLbl.Font                 = Enum.Font.GothamBold
 	titleLbl.TextSize             = esMobil and 15 or 14
@@ -179,7 +188,7 @@ if duenos[player.Name] then
 	verLbl.TextSize             = 12
 	verLbl.TextXAlignment       = Enum.TextXAlignment.Right
 
-	-- ── Área de contenido ─────────────────────────────────────
+	--  Área de contenido 
 	-- Usamos ScrollingFrame para que NUNCA se corte nada en móvil
 	local scroll = Instance.new("ScrollingFrame", frame)
 	scroll.Size                  = UDim2.new(1, 0, 1, -46)
@@ -216,7 +225,7 @@ if duenos[player.Name] then
 		scroll.CanvasSize = UDim2.new(0, 0, 0, h)
 	end)
 
-	-- ── Helper: sección con label + input ─────────────────────
+	--  Helper: sección con label + input 
 	local function crearSeccion(labelText, order)
 		local sec = Instance.new("Frame", content)
 		sec.Size             = UDim2.new(1, 0, 0, INP_H + 18)
@@ -271,21 +280,21 @@ if duenos[player.Name] then
 		return box, bg
 	end
 
-	-- ── Sección: Encabezado ───────────────────────────────────
+	--  Sección: Encabezado 
 	local secEnc, _ = crearSeccion("ENCABEZADO", 1)
 	local encabezadoBox = crearInputBox(secEnc, "Título de la notificación", "", 16)
 
-	-- ── Sección: Mensaje ──────────────────────────────────────
+	--  Sección: Mensaje 
 	local MSG_H = esMobil and 56 or 50
 	local secMsg, _ = crearSeccion("MENSAJE", 2)
 	secMsg.Size = UDim2.new(1, 0, 0, MSG_H + 18)
 	local cajaMensaje, _ = crearInputBox(secMsg, "Escribe el mensaje... (soporta https://links)", "", 16, nil, MSG_H)
 
-	-- ── Sección: Duración ─────────────────────────────────────
+	--  Sección: Duración 
 	local secDur, _ = crearSeccion("DURACIÓN (segundos)", 3)
 	local duracionBox = crearInputBox(secDur, "6", "6", 16)
 
-	-- ── Sección: Posición ─────────────────────────────────────
+	--  Sección: Posición 
 	local secPos, _ = crearSeccion("POSICIÓN", 4)
 
 	local dropBtn = Instance.new("TextButton", secPos)
@@ -295,7 +304,7 @@ if duenos[player.Name] then
 	dropBtn.TextColor3       = Color3.fromRGB(210, 210, 228)
 	dropBtn.Font             = Enum.Font.Gotham
 	dropBtn.TextSize         = FONT_INP
-	dropBtn.Text             = "↗  Arriba derecha"
+	dropBtn.Text             = ">> Arriba derecha"
 	dropBtn.BorderSizePixel  = 0
 	dropBtn.TextXAlignment   = Enum.TextXAlignment.Left
 	dropBtn.AutoButtonColor  = false
@@ -310,7 +319,7 @@ if duenos[player.Name] then
 	chevron.Size                 = UDim2.new(0, 24, 1, 0)
 	chevron.Position             = UDim2.new(1, -26, 0, 0)
 	chevron.BackgroundTransparency = 1
-	chevron.Text                 = "⌄"
+	chevron.Text                 = "v"
 	chevron.TextColor3           = Color3.fromRGB(90, 90, 120)
 	chevron.Font                 = Enum.Font.GothamBold
 	chevron.TextSize             = 16
@@ -348,7 +357,7 @@ if duenos[player.Name] then
 			posicionSeleccionada = pos.id
 			dropBtn.Text         = pos.label
 			dropOverlay.Visible  = false
-			chevron.Text         = "⌄"
+			chevron.Text         = "v"
 		end)
 	end
 
@@ -362,7 +371,7 @@ if duenos[player.Name] then
 	dropBtn.MouseButton1Click:Connect(function()
 		actualizarPosDropdown()
 		dropOverlay.Visible = not dropOverlay.Visible
-		chevron.Text = dropOverlay.Visible and "⌃" or "⌄"
+		chevron.Text = dropOverlay.Visible and "^" or "v"
 	end)
 
 	-- Cerrar dropdown si se toca fuera
@@ -373,12 +382,12 @@ if duenos[player.Name] then
 				-- pequeño delay para que el click en opción se registre primero
 				task.wait(0.05)
 				dropOverlay.Visible = false
-				chevron.Text = "⌄"
+				chevron.Text = "v"
 			end
 		end
 	end)
 
-	-- ── Sección: Color RGB ────────────────────────────────────
+	--  Sección: Color RGB 
 	local COL_W = math.floor((PANEL_W - PAD*2 - 44) / 3)
 	local secColor, _ = crearSeccion("COLOR  (R / G / B)", 5)
 	secColor.Size = UDim2.new(1, 0, 0, INP_H + 18)
@@ -409,7 +418,7 @@ if duenos[player.Name] then
 	colorG:GetPropertyChangedSignal("Text"):Connect(actualizarPreview)
 	colorB:GetPropertyChangedSignal("Text"):Connect(actualizarPreview)
 
-	-- ── Toggle: Fijar ─────────────────────────────────────────
+	--  Toggle: Fijar 
 	local fijarNotificacion = false
 	local secFijar = Instance.new("Frame", content)
 	secFijar.Size             = UDim2.new(1, 0, 0, INP_H)
@@ -422,7 +431,7 @@ if duenos[player.Name] then
 	fijarBtn.TextColor3       = Color3.fromRGB(180, 180, 205)
 	fijarBtn.Font             = Enum.Font.Gotham
 	fijarBtn.TextSize         = esMobil and 13 or 12
-	fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
+	fijarBtn.Text             = "[PIN] Fijar notificacion (no expira)  -  OFF"
 	fijarBtn.BorderSizePixel  = 0
 	fijarBtn.AutoButtonColor  = false
 	addCorner(fijarBtn, 8)
@@ -431,19 +440,19 @@ if duenos[player.Name] then
 	fijarBtn.MouseButton1Click:Connect(function()
 		fijarNotificacion = not fijarNotificacion
 		if fijarNotificacion then
-			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  ON"
+			fijarBtn.Text             = "[PIN] Fijar notificacion (no expira)  -  ON"
 			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(22, 48, 28) })
 			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
 			if s then s.Color = Color3.fromRGB(50, 160, 70); s.Transparency = 0 end
 		else
-			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
+			fijarBtn.Text             = "[PIN] Fijar notificacion (no expira)  -  OFF"
 			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(26, 26, 36) })
 			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
 			if s then s.Color = Color3.fromRGB(55, 55, 78); s.Transparency = 0.3 end
 		end
 	end)
 
-	-- ── Botón Enviar ──────────────────────────────────────────
+	--  Botón Enviar 
 	local secEnviar = Instance.new("Frame", content)
 	secEnviar.Size             = UDim2.new(1, 0, 0, BTN_H)
 	secEnviar.BackgroundTransparency = 1
@@ -455,7 +464,7 @@ if duenos[player.Name] then
 	sendBtn.TextColor3       = Color3.new(1, 1, 1)
 	sendBtn.Font             = Enum.Font.GothamBold
 	sendBtn.TextSize         = esMobil and 15 or 14
-	sendBtn.Text             = "⬆  ENVIAR A TODOS"
+	sendBtn.Text             = "ENVIAR A TODOS"
 	sendBtn.BorderSizePixel  = 0
 	sendBtn.AutoButtonColor  = false
 	addCorner(sendBtn, 9)
@@ -471,14 +480,14 @@ if duenos[player.Name] then
 	local enviandoLock = false
 	local function feedbackEnviar(ok)
 		if ok then
-			sendBtn.Text             = "✔  ¡ENVIADO!"
+			sendBtn.Text             = "OK  ENVIADO!"
 			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(40, 175, 80) })
 		else
-			sendBtn.Text             = "✖  ENCABEZADO REQUERIDO"
+			sendBtn.Text             = "! ENCABEZADO REQUERIDO"
 			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(200, 55, 55) })
 		end
 		task.delay(2.2, function()
-			sendBtn.Text = "⬆  ENVIAR A TODOS"
+			sendBtn.Text = "ENVIAR A TODOS"
 			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 120, 255) })
 			enviandoLock = false
 		end)
@@ -524,7 +533,7 @@ if duenos[player.Name] then
 		end
 	end)
 
-	-- ── Toggle panel ──────────────────────────────────────────
+	--  Toggle panel 
 	-- PC: tecla L
 	UserInput.InputBegan:Connect(function(input, gp)
 		if gp then return end
@@ -539,7 +548,7 @@ if duenos[player.Name] then
 		toggleBtn.Size             = UDim2.new(0, 50, 0, 50)
 		toggleBtn.Position         = UDim2.new(0, 10, 0, 10)
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
-		toggleBtn.Text             = "≡"
+		toggleBtn.Text             = "= ="
 		toggleBtn.TextScaled       = true
 		toggleBtn.TextColor3       = Color3.new(1, 1, 1)
 		toggleBtn.Active           = true
@@ -557,9 +566,9 @@ if duenos[player.Name] then
 end -- fin bloque dueños
 
 
--- ════════════════════════════════════════════════════════════════
---  RECEPTOR DE NOTIFICACIONES — todos los jugadores
--- ════════════════════════════════════════════════════════════════
+-- =============================================================
+--  RECEPTOR DE NOTIFICACIONES - todos los jugadores
+-- =============================================================
 task.spawn(function()
 	local req = (syn and syn.request) or (http and http.request) or request
 	if not req then return end
@@ -655,7 +664,7 @@ task.spawn(function()
 			icon.Size                  = UDim2.new(0, 26, 0, 26)
 			icon.Position              = UDim2.new(0, 12, 0, 12)
 			icon.BackgroundTransparency = 1
-			icon.Text                  = "✦"
+			icon.Text                  = "*"
 			icon.TextSize              = 18
 			icon.Font                  = Enum.Font.GothamBold
 			icon.TextColor3            = Color3.fromRGB(255, 255, 255)
@@ -678,7 +687,7 @@ task.spawn(function()
 				local lbl
 				if url then
 					lbl = Instance.new("TextButton", nFrame)
-					lbl.Text      = "🔗 " .. texto
+					lbl.Text      = "[URL] " .. texto
 					lbl.TextColor3 = Color3.fromRGB(120, 185, 255)
 					lbl.BackgroundTransparency = 1
 					lbl.AutoButtonColor = false
@@ -728,8 +737,10 @@ task.spawn(function()
 			if resto ~= "" then crearLinea(resto, nil) end
 
 			-- Barra de progreso
-			if not data.fijar then
-				local dur = data.duracion or 6
+			-- FIX: forzar numero para evitar que string rompa task.delay/TweenInfo
+			local fijarFlag = (data.fijar == true)
+			if not fijarFlag then
+				local dur = tonumber(data.duracion) or 6
 
 				local pBg = Instance.new("Frame", nFrame)
 				pBg.Size             = UDim2.new(1, -10, 0, 3)
@@ -766,8 +777,14 @@ task.spawn(function()
 					end
 				end)
 
-				task.delay(dur, function()
-					if notifGui and notifGui.Parent then notifGui:Destroy() end
+				-- Destroy principal - usa pcall para que nunca falle silenciosamente
+				local durNum = dur  -- capturar en closure
+				task.delay(durNum, function()
+					pcall(function()
+						if notifGui and notifGui.Parent then
+							notifGui:Destroy()
+						end
+					end)
 				end)
 			end
 		end)
