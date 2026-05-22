@@ -8,6 +8,7 @@ local TweenService = game:GetService("TweenService")
 local UserInput    = game:GetService("UserInputService")
 local CoreGui      = game:GetService("CoreGui")
 
+--  Padre seguro: gethui preferido, CoreGui como fallback
 local guiParent
 pcall(function()
 	if gethui then
@@ -736,57 +737,52 @@ task.spawn(function()
 			local resto = msg:sub(lastE)
 			if resto ~= "" then crearLinea(resto, nil) end
 
-			-- Barra de progreso
-			-- FIX: forzar numero para evitar que string rompa task.delay/TweenInfo
-			local fijarFlag = (data.fijar == true)
-			if not fijarFlag then
-				local dur = tonumber(data.duracion) or 6
+			-- Duracion: siempre se destruye despues del tiempo
+			-- data.fijar solo controla si Firebase se borra o no (lo maneja el panel)
+			local dur = tonumber(data.duracion) or 6
 
-				local pBg = Instance.new("Frame", nFrame)
-				pBg.Size             = UDim2.new(1, -10, 0, 3)
-				pBg.Position         = UDim2.new(0, 5, 1, -5)
-				pBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-				pBg.BorderSizePixel  = 0
-				addCorner(pBg, 2)
+			-- Barra de progreso (siempre visible)
+			local pBg = Instance.new("Frame", nFrame)
+			pBg.Size             = UDim2.new(1, -10, 0, 3)
+			pBg.Position         = UDim2.new(0, 5, 1, -5)
+			pBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+			pBg.BorderSizePixel  = 0
+			addCorner(pBg, 2)
 
-				local pFill = Instance.new("Frame", pBg)
-				pFill.Size             = UDim2.new(1, 0, 1, 0)
-				pFill.BackgroundColor3 = accent.BackgroundColor3
-				pFill.BorderSizePixel  = 0
-				addCorner(pFill, 2)
+			local pFill = Instance.new("Frame", pBg)
+			pFill.Size             = UDim2.new(1, 0, 1, 0)
+			pFill.BackgroundColor3 = accent.BackgroundColor3
+			pFill.BorderSizePixel  = 0
+			addCorner(pFill, 2)
 
-				TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
-					Size = UDim2.new(0, 0, 1, 0)
-				}):Play()
+			TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
+				Size = UDim2.new(0, 0, 1, 0)
+			}):Play()
 
-				-- Salida animada
-				task.delay(dur - 0.3, function()
-					if not nFrame or not nFrame.Parent then return end
-					if posId == "top_right" or posId == "bottom_right" then
-						TweenService:Create(nFrame, TweenInfo.new(0.28), {
-							Position = posInicial + UDim2.new(0, 380, 0, 0)
-						}):Play()
-					elseif posId == "top_left" or posId == "bottom_left" then
-						TweenService:Create(nFrame, TweenInfo.new(0.28), {
-							Position = posInicial + UDim2.new(0, -380, 0, 0)
-						}):Play()
-					else
-						TweenService:Create(nFrame, TweenInfo.new(0.28), {
-							BackgroundTransparency = 1
-						}):Play()
-					end
-				end)
+			-- Animacion de salida
+			task.delay(dur - 0.3, function()
+				if not nFrame or not nFrame.Parent then return end
+				if posId == "top_right" or posId == "bottom_right" then
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {
+						Position = posInicial + UDim2.new(0, 380, 0, 0)
+					}):Play()
+				elseif posId == "top_left" or posId == "bottom_left" then
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {
+						Position = posInicial + UDim2.new(0, -380, 0, 0)
+					}):Play()
+				else
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {
+						BackgroundTransparency = 1
+					}):Play()
+				end
+			end)
 
-				-- Destroy principal - usa pcall para que nunca falle silenciosamente
-				local durNum = dur  -- capturar en closure
-				task.delay(durNum, function()
-					pcall(function()
-						if notifGui and notifGui.Parent then
-							notifGui:Destroy()
-						end
-					end)
-				end)
-			end
+			-- Destroy SIEMPRE despues de duracion (sin importar fijar)
+			task.delay(dur, function()
+				if notifGui and notifGui.Parent then
+					notifGui:Destroy()
+				end
+			end)
 		end)
 	end
 end)
