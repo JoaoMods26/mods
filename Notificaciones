@@ -1,63 +1,109 @@
+-- ══════════════════════════════════════════════════════════════
+--  JMODS Notifier v2  |  UI Profesional + Fix Posiciones
+-- ══════════════════════════════════════════════════════════════
 
+local HttpService   = game:GetService("HttpService")
+local Players       = game:GetService("Players")
+local TweenService  = game:GetService("TweenService")
+local UserInput     = game:GetService("UserInputService")
+local player        = Players.LocalPlayer
+local CoreGui       = game:GetService("CoreGui")
+local guiParent     = CoreGui
 
-local HttpService  = game:GetService("HttpService")
-local Players      = game:GetService("Players")
-local player       = Players.LocalPlayer
-local CoreGui      = game:GetService("CoreGui")
+-- ── URLs & config ─────────────────────────────────────────────
+local duenosURL       = "https://pastebin.com/raw/S2X3j15A"
+local firebaseURL     = "https://notificaciones-aa833-default-rtdb.firebaseio.com/Notificacion.json"
+local claveSeguridad  = "JMODS2024"
+local ultimoTimestamp = 0
+local duenos          = {}
 
--- Usa CoreGui como padre seguro para las GUIs
-local guiParent = CoreGui
+-- ── Clave de posición normalizada (evita errores de capitalización) ──────────
+-- FIX PRINCIPAL: Usar claves únicas y cortas para evitar mismatch
+local POSICIONES = {
+	{ id = "top_right",    label = "↗  Arriba derecha"  },
+	{ id = "top_left",     label = "↖  Arriba izquierda" },
+	{ id = "bottom_right", label = "↘  Abajo derecha"   },
+	{ id = "bottom_left",  label = "↙  Abajo izquierda" },
+	{ id = "center",       label = "⊕  Centro"          },
+}
 
-local duenosURL = "https://pastebin.com/raw/S2X3j15A"
-local duenos    = {}
+local posicionSeleccionada = "top_right"  -- default
 
+local function getPosUDim2(posId, frameW, frameH)
+	frameW = frameW or 320
+	frameH = frameH or 80
+	local pad = 12
+	if     posId == "top_right"    then return UDim2.new(1, -(frameW + pad), 0, pad)
+	elseif posId == "top_left"     then return UDim2.new(0, pad, 0, pad)
+	elseif posId == "bottom_right" then return UDim2.new(1, -(frameW + pad), 1, -(frameH + pad))
+	elseif posId == "bottom_left"  then return UDim2.new(0, pad, 1, -(frameH + pad))
+	elseif posId == "center"       then return UDim2.new(0.5, -(frameW / 2), 0.5, -(frameH / 2))
+	else                                return UDim2.new(1, -(frameW + pad), 0, pad)
+	end
+end
+
+-- ── Helpers visuales ──────────────────────────────────────────
+local function addCorner(parent, radius)
+	local c = Instance.new("UICorner", parent)
+	c.CornerRadius = UDim.new(0, radius or 8)
+	return c
+end
+
+local function addStroke(parent, color, thickness, transparency)
+	local s = Instance.new("UIStroke", parent)
+	s.Color        = color or Color3.fromRGB(80, 80, 80)
+	s.Thickness    = thickness or 1
+	s.Transparency = transparency or 0
+	return s
+end
+
+local function addGradient(parent, colorA, colorB)
+	local g = Instance.new("UIGradient", parent)
+	g.Color    = ColorSequence.new(colorA, colorB)
+	g.Rotation = 90
+	return g
+end
+
+local function tween(obj, props, t, style)
+	local info = TweenInfo.new(t or 0.25, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	TweenService:Create(obj, info, props):Play()
+end
+
+-- ── Cargar dueños ─────────────────────────────────────────────
 local function actualizarDuenos()
 	pcall(function()
-		local request = (syn and syn.request) or (http and http.request) or request
-		if request then
-			local res = request({ Url = duenosURL, Method = "GET" })
-			if res and res.Body then
-				table.clear(duenos)
-				for nombre in string.gmatch(res.Body, "[^\r\n]+") do
-					duenos[nombre] = true
-				end
+		local req = (syn and syn.request) or (http and http.request) or request
+		if not req then return end
+		local res = req({ Url = duenosURL, Method = "GET" })
+		if res and res.Body then
+			table.clear(duenos)
+			for nombre in string.gmatch(res.Body, "[^\r\n]+") do
+				duenos[nombre] = true
 			end
 		end
 	end)
 end
 
 actualizarDuenos()
-
 task.spawn(function()
-	while true do
-		task.wait(400)
-		actualizarDuenos()
-	end
+	while true do task.wait(400) actualizarDuenos() end
 end)
+
+-- ── Anti-duplicado ────────────────────────────────────────────
 if getgenv then
 	if getgenv().__JMODS_RUNNING then return end
 	getgenv().__JMODS_RUNNING = true
 end
 
--- Limpiar GUIs anteriores del mismo script
 for _, gui in ipairs(guiParent:GetChildren()) do
 	if gui.Name == "JmodsNotifierUI" or gui.Name == "JmodsNotificacionVisual" then
 		gui:Destroy()
 	end
 end
 
-local firebaseURL         = "https://notificaciones-aa833-default-rtdb.firebaseio.com/Notificacion.json"
-local claveSeguridad      = "JMODS2024"
-local ultimoTimestamp     = 0
-local posicionesDisponibles = {
-	"Arriba izquierda",
-	"Arriba Derecha",
-	"Abajo izquierda",
-	"Abajo derecha",
-	"En medio"
-}
-
-
+-- ════════════════════════════════════════════════════════════════
+--  PANEL DE CONTROL (solo dueños)
+-- ════════════════════════════════════════════════════════════════
 if duenos[player.Name] then
 
 	local screenGui = Instance.new("ScreenGui", guiParent)
@@ -65,21 +111,369 @@ if duenos[player.Name] then
 	screenGui.ResetOnSpawn   = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
-	-- Frame principal (oculto al iniciar)
+	-- ── Fondo principal ─────────────────────────────────────────
 	local frame = Instance.new("Frame", screenGui)
-	frame.Size                = UDim2.new(0, 400, 0, 260)
-	frame.Position            = UDim2.new(0, 50, 0.4, 0)
-	frame.BackgroundColor3    = Color3.fromRGB(25, 25, 25)
-	frame.BorderSizePixel     = 0
-	frame.Active              = true
-	frame.Draggable           = true
-	frame.Visible             = false
-	Instance.new("UICorner", frame)
+	frame.Size             = UDim2.new(0, 420, 0, 310)
+	frame.Position         = UDim2.new(0, 60, 0.35, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+	frame.BorderSizePixel  = 0
+	frame.Active           = true
+	frame.Draggable        = true
+	frame.Visible          = false
+	addCorner(frame, 12)
+	addStroke(frame, Color3.fromRGB(70, 70, 90), 1, 0.3)
 
-	-- Botón toggle para móvil (táctil)
-	if game:GetService("UserInputService").TouchEnabled then
+	-- Borde superior decorativo (accent line)
+	local accentBar = Instance.new("Frame", frame)
+	accentBar.Size             = UDim2.new(1, 0, 0, 3)
+	accentBar.Position         = UDim2.new(0, 0, 0, 0)
+	accentBar.BackgroundColor3 = Color3.fromRGB(100, 140, 255)
+	accentBar.BorderSizePixel  = 0
+	addCorner(accentBar, 12)
+	addGradient(accentBar, Color3.fromRGB(100, 140, 255), Color3.fromRGB(180, 100, 255))
+
+	-- ── Header bar ───────────────────────────────────────────────
+	local header = Instance.new("Frame", frame)
+	header.Size             = UDim2.new(1, 0, 0, 42)
+	header.Position         = UDim2.new(0, 0, 0, 3)
+	header.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+	header.BorderSizePixel  = 0
+	addCorner(header, 0)
+
+	local titulo = Instance.new("TextLabel", header)
+	titulo.Size                  = UDim2.new(1, -20, 1, 0)
+	titulo.Position              = UDim2.new(0, 16, 0, 0)
+	titulo.BackgroundTransparency = 1
+	titulo.Text                  = "◈  JMODS  —  Notificaciones"
+	titulo.TextColor3            = Color3.fromRGB(220, 220, 235)
+	titulo.Font                  = Enum.Font.GothamBold
+	titulo.TextSize              = 14
+	titulo.TextXAlignment        = Enum.TextXAlignment.Left
+
+	local versionLabel = Instance.new("TextLabel", header)
+	versionLabel.Size                 = UDim2.new(0, 60, 1, 0)
+	versionLabel.Position             = UDim2.new(1, -70, 0, 0)
+	versionLabel.BackgroundTransparency = 1
+	versionLabel.Text                 = "v2.0"
+	versionLabel.TextColor3           = Color3.fromRGB(100, 100, 130)
+	versionLabel.Font                 = Enum.Font.Gotham
+	versionLabel.TextSize             = 12
+	versionLabel.TextXAlignment       = Enum.TextXAlignment.Right
+
+	-- ── Área de contenido ────────────────────────────────────────
+	local content = Instance.new("Frame", frame)
+	content.Size             = UDim2.new(1, -24, 1, -60)
+	content.Position         = UDim2.new(0, 12, 0, 50)
+	content.BackgroundTransparency = 1
+	content.BorderSizePixel  = 0
+
+	-- Función genérica para crear TextBox estilizado
+	local function crearInput(parent, placeholder, defaultText, posX, posY, w, h)
+		local bg = Instance.new("Frame", parent)
+		bg.Size             = UDim2.new(0, w, 0, h or 32)
+		bg.Position         = UDim2.new(0, posX, 0, posY)
+		bg.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+		bg.BorderSizePixel  = 0
+		addCorner(bg, 6)
+		addStroke(bg, Color3.fromRGB(60, 60, 80), 1, 0.2)
+
+		local box = Instance.new("TextBox", bg)
+		box.Size              = UDim2.new(1, -12, 1, 0)
+		box.Position          = UDim2.new(0, 6, 0, 0)
+		box.BackgroundTransparency = 1
+		box.PlaceholderText   = placeholder
+		box.PlaceholderColor3 = Color3.fromRGB(80, 80, 100)
+		box.Text              = defaultText or ""
+		box.TextColor3        = Color3.fromRGB(210, 210, 225)
+		box.Font              = Enum.Font.Gotham
+		box.TextSize          = 13
+		box.TextXAlignment    = Enum.TextXAlignment.Left
+		box.TextWrapped       = true
+		box.ClearTextOnFocus  = false
+
+		-- Highlight al enfocar
+		box.Focused:Connect(function()
+			tween(bg, { BackgroundColor3 = Color3.fromRGB(33, 33, 46) })
+			local stroke = bg:FindFirstChildOfClass("UIStroke")
+			if stroke then tween(stroke, { Color = Color3.fromRGB(100, 140, 255) }) end
+		end)
+		box.FocusLost:Connect(function()
+			tween(bg, { BackgroundColor3 = Color3.fromRGB(28, 28, 36) })
+			local stroke = bg:FindFirstChildOfClass("UIStroke")
+			if stroke then tween(stroke, { Color = Color3.fromRGB(60, 60, 80) }) end
+		end)
+
+		return box, bg
+	end
+
+	-- ── Fila 1: Encabezado + Duración ───────────────────────────
+	local lblEncabezado = Instance.new("TextLabel", content)
+	lblEncabezado.Size = UDim2.new(0, 180, 0, 14)
+	lblEncabezado.Position = UDim2.new(0, 0, 0, 0)
+	lblEncabezado.BackgroundTransparency = 1
+	lblEncabezado.Text = "ENCABEZADO"
+	lblEncabezado.TextColor3 = Color3.fromRGB(100, 140, 255)
+	lblEncabezado.Font = Enum.Font.GothamBold
+	lblEncabezado.TextSize = 10
+	lblEncabezado.TextXAlignment = Enum.TextXAlignment.Left
+
+	local encabezadoBox = crearInput(content, "Título de la notificación", "", 0, 16, 240, 32)
+
+	local lblDur = Instance.new("TextLabel", content)
+	lblDur.Size = UDim2.new(0, 100, 0, 14)
+	lblDur.Position = UDim2.new(0, 252, 0, 0)
+	lblDur.BackgroundTransparency = 1
+	lblDur.Text = "DURACIÓN (s)"
+	lblDur.TextColor3 = Color3.fromRGB(100, 140, 255)
+	lblDur.Font = Enum.Font.GothamBold
+	lblDur.TextSize = 10
+	lblDur.TextXAlignment = Enum.TextXAlignment.Left
+
+	local duracionBox = crearInput(content, "6", "6", 252, 16, 140, 32)
+
+	-- ── Fila 2: Mensaje ──────────────────────────────────────────
+	local lblMsg = Instance.new("TextLabel", content)
+	lblMsg.Size = UDim2.new(0, 100, 0, 14)
+	lblMsg.Position = UDim2.new(0, 0, 0, 58)
+	lblMsg.BackgroundTransparency = 1
+	lblMsg.Text = "MENSAJE"
+	lblMsg.TextColor3 = Color3.fromRGB(100, 140, 255)
+	lblMsg.Font = Enum.Font.GothamBold
+	lblMsg.TextSize = 10
+	lblMsg.TextXAlignment = Enum.TextXAlignment.Left
+
+	local cajaMensaje, cajaMensajeBg = crearInput(content, "Escribe el mensaje aquí... (soporta https://links)", "", 0, 74, 392, 48)
+	cajaMensajeBg.Size = UDim2.new(0, 392, 0, 48)
+
+	-- ── Fila 3: Posición + Color RGB ─────────────────────────────
+	local lblPos = Instance.new("TextLabel", content)
+	lblPos.Size = UDim2.new(0, 100, 0, 14)
+	lblPos.Position = UDim2.new(0, 0, 0, 134)
+	lblPos.BackgroundTransparency = 1
+	lblPos.Text = "POSICIÓN"
+	lblPos.TextColor3 = Color3.fromRGB(100, 140, 255)
+	lblPos.Font = Enum.Font.GothamBold
+	lblPos.TextSize = 10
+	lblPos.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- Dropdown de posición
+	local dropBtn = Instance.new("TextButton", content)
+	dropBtn.Size             = UDim2.new(0, 180, 0, 32)
+	dropBtn.Position         = UDim2.new(0, 0, 0, 150)
+	dropBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+	dropBtn.TextColor3       = Color3.fromRGB(210, 210, 225)
+	dropBtn.Font             = Enum.Font.Gotham
+	dropBtn.TextSize         = 12
+	dropBtn.Text             = "↗  Arriba derecha"
+	dropBtn.BorderSizePixel  = 0
+	addCorner(dropBtn, 6)
+	addStroke(dropBtn, Color3.fromRGB(60, 60, 80), 1, 0.2)
+
+	local chevron = Instance.new("TextLabel", dropBtn)
+	chevron.Size = UDim2.new(0, 20, 1, 0)
+	chevron.Position = UDim2.new(1, -22, 0, 0)
+	chevron.BackgroundTransparency = 1
+	chevron.Text = "⌄"
+	chevron.TextColor3 = Color3.fromRGB(100, 100, 130)
+	chevron.Font = Enum.Font.GothamBold
+	chevron.TextSize = 14
+
+	-- Lista desplegable
+	local dropList = Instance.new("Frame", content)
+	dropList.Size             = UDim2.new(0, 180, 0, #POSICIONES * 34)
+	dropList.Position         = UDim2.new(0, 0, 0, 184)
+	dropList.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+	dropList.BorderSizePixel  = 0
+	dropList.Visible          = false
+	dropList.ZIndex           = 20
+	addCorner(dropList, 8)
+	addStroke(dropList, Color3.fromRGB(70, 70, 100), 1, 0.2)
+
+	for i, pos in ipairs(POSICIONES) do
+		local opt = Instance.new("TextButton", dropList)
+		opt.Size             = UDim2.new(1, -4, 0, 30)
+		opt.Position         = UDim2.new(0, 2, 0, (i - 1) * 32 + 2)
+		opt.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+		opt.TextColor3       = Color3.fromRGB(200, 200, 215)
+		opt.Font             = Enum.Font.Gotham
+		opt.TextSize         = 12
+		opt.Text             = pos.label
+		opt.BorderSizePixel  = 0
+		opt.ZIndex           = 21
+		addCorner(opt, 5)
+
+		opt.MouseEnter:Connect(function()
+			tween(opt, { BackgroundColor3 = Color3.fromRGB(40, 50, 75) })
+		end)
+		opt.MouseLeave:Connect(function()
+			tween(opt, { BackgroundColor3 = Color3.fromRGB(30, 30, 42) })
+		end)
+
+		opt.MouseButton1Click:Connect(function()
+			-- FIX: guardamos el id normalizado, no el label con emojis
+			posicionSeleccionada  = pos.id
+			dropBtn.Text          = pos.label
+			dropList.Visible      = false
+			chevron.Text          = "⌄"
+		end)
+	end
+
+	dropBtn.MouseButton1Click:Connect(function()
+		dropList.Visible = not dropList.Visible
+		chevron.Text = dropList.Visible and "⌃" or "⌄"
+	end)
+
+	-- ── Color RGB ────────────────────────────────────────────────
+	local lblColor = Instance.new("TextLabel", content)
+	lblColor.Size = UDim2.new(0, 100, 0, 14)
+	lblColor.Position = UDim2.new(0, 196, 0, 134)
+	lblColor.BackgroundTransparency = 1
+	lblColor.Text = "COLOR (R / G / B)"
+	lblColor.TextColor3 = Color3.fromRGB(100, 140, 255)
+	lblColor.Font = Enum.Font.GothamBold
+	lblColor.TextSize = 10
+	lblColor.TextXAlignment = Enum.TextXAlignment.Left
+
+	local colorR = crearInput(content, "R", "100", 196, 150, 60, 32)
+	local colorG = crearInput(content, "G", "140", 264, 150, 60, 32)
+	local colorB = crearInput(content, "B", "255", 332, 150, 60, 32)
+
+	-- Preview del color
+	local colorPreview = Instance.new("Frame", content)
+	colorPreview.Size             = UDim2.new(0, 30, 0, 32)
+	colorPreview.Position         = UDim2.new(0, 398, 0, 150)  -- lo ajustamos si no cabe
+	-- (frame es 392px de ancho, así que lo ponemos a 394)
+	colorPreview.BackgroundColor3 = Color3.fromRGB(100, 140, 255)
+	colorPreview.BorderSizePixel  = 0
+	addCorner(colorPreview, 6)
+	addStroke(colorPreview, Color3.fromRGB(60, 60, 80), 1, 0.2)
+
+	-- Actualizar preview al cambiar valores
+	local function actualizarPreview()
+		local r = math.clamp(tonumber(colorR.Text) or 100, 0, 255)
+		local g = math.clamp(tonumber(colorG.Text) or 140, 0, 255)
+		local b = math.clamp(tonumber(colorB.Text) or 255, 0, 255)
+		colorPreview.BackgroundColor3 = Color3.fromRGB(r, g, b)
+	end
+	colorR.Changed:Connect(actualizarPreview)
+	colorG.Changed:Connect(actualizarPreview)
+	colorB.Changed:Connect(actualizarPreview)
+
+	-- ── Toggle Fijar ──────────────────────────────────────────────
+	local fijarNotificacion = false
+
+	local fijarBtn = Instance.new("TextButton", content)
+	fijarBtn.Size             = UDim2.new(0, 392, 0, 28)
+	fijarBtn.Position         = UDim2.new(0, 0, 0, 193)
+	fijarBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+	fijarBtn.TextColor3       = Color3.fromRGB(180, 180, 200)
+	fijarBtn.Font             = Enum.Font.Gotham
+	fijarBtn.TextSize         = 12
+	fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
+	fijarBtn.BorderSizePixel  = 0
+	addCorner(fijarBtn, 6)
+	addStroke(fijarBtn, Color3.fromRGB(60, 60, 80), 1, 0.4)
+
+	fijarBtn.MouseButton1Click:Connect(function()
+		fijarNotificacion = not fijarNotificacion
+		if fijarNotificacion then
+			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  ON"
+			fijarBtn.BackgroundColor3 = Color3.fromRGB(30, 50, 30)
+			addStroke(fijarBtn, Color3.fromRGB(60, 160, 80), 1, 0)
+		else
+			fijarBtn.Text             = "📌  Fijar notificación (no expira)  —  OFF"
+			fijarBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+			addStroke(fijarBtn, Color3.fromRGB(60, 60, 80), 1, 0.4)
+		end
+	end)
+
+	-- ── Botón Enviar ──────────────────────────────────────────────
+	local sendBtn = Instance.new("TextButton", content)
+	sendBtn.Size             = UDim2.new(0, 392, 0, 34)
+	sendBtn.Position         = UDim2.new(0, 0, 0, 230)
+	sendBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+	sendBtn.TextColor3       = Color3.new(1, 1, 1)
+	sendBtn.Font             = Enum.Font.GothamBold
+	sendBtn.TextSize         = 14
+	sendBtn.Text             = "⬆  ENVIAR A TODOS"
+	sendBtn.BorderSizePixel  = 0
+	addCorner(sendBtn, 8)
+	addGradient(sendBtn, Color3.fromRGB(70, 140, 255), Color3.fromRGB(100, 80, 220))
+
+	sendBtn.MouseEnter:Connect(function()
+		tween(sendBtn, { BackgroundColor3 = Color3.fromRGB(80, 150, 255) })
+	end)
+	sendBtn.MouseLeave:Connect(function()
+		tween(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 130, 255) })
+	end)
+
+	-- Estado de feedback del botón
+	local function feedbackEnviar(exito)
+		if exito then
+			sendBtn.Text             = "✔  ¡ENVIADO!"
+			sendBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+		else
+			sendBtn.Text             = "✖  ENCABEZADO REQUERIDO"
+			sendBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		end
+		task.delay(2, function()
+			sendBtn.Text             = "⬆  ENVIAR A TODOS"
+			sendBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+		end)
+	end
+
+	sendBtn.MouseButton1Click:Connect(function()
+		local encabezado = encabezadoBox.Text
+		if encabezado == "" then feedbackEnviar(false) return end
+
+		local r = math.clamp(tonumber(colorR.Text) or 100, 0, 255)
+		local g = math.clamp(tonumber(colorG.Text) or 140, 0, 255)
+		local b = math.clamp(tonumber(colorB.Text) or 255, 0, 255)
+
+		local data = {
+			encabezado = encabezado,
+			mensaje    = cajaMensaje.Text,
+			duracion   = tonumber(duracionBox.Text) or 6,
+			posicion   = posicionSeleccionada,  -- FIX: enviamos el id normalizado
+			color      = { r, g, b },
+			timestamp  = os.time(),
+			key        = claveSeguridad,
+			fijar      = fijarNotificacion
+		}
+
+		local jsonData = HttpService:JSONEncode(data)
+		local req = (syn and syn.request) or (http and http.request) or request
+		if req then
+			req({
+				Url     = firebaseURL,
+				Method  = "PUT",
+				Headers = { ["Content-Type"] = "application/json" },
+				Body    = jsonData
+			})
+			if not fijarNotificacion then
+				task.delay(tonumber(duracionBox.Text) or 6, function()
+					req({ Url = firebaseURL, Method = "DELETE" })
+				end)
+			end
+			feedbackEnviar(true)
+		end
+	end)
+
+	-- ── Toggle PC (tecla L) y Móvil ──────────────────────────────
+	UserInput.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == Enum.KeyCode.L then
+			frame.Visible = not frame.Visible
+			if frame.Visible then
+				frame.Position = UDim2.new(0, 60, 0.35, 0)
+				tween(frame, { Position = UDim2.new(0, 60, 0.32, 0) })
+			end
+		end
+	end)
+
+	if UserInput.TouchEnabled then
 		local toggleButton = Instance.new("TextButton", screenGui)
-		toggleButton.Size             = UDim2.new(0, 50, 0, 50)
+		toggleButton.Size             = UDim2.new(0, 46, 0, 46)
 		toggleButton.Position         = UDim2.new(0, 10, 0, 10)
 		toggleButton.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 		toggleButton.Text             = "≡"
@@ -88,214 +482,39 @@ if duenos[player.Name] then
 		toggleButton.Active           = true
 		toggleButton.Draggable        = true
 		toggleButton.Name             = "ToggleButton"
-		Instance.new("UICorner", toggleButton)
+		addCorner(toggleButton, 10)
 
 		toggleButton.MouseButton1Click:Connect(function()
 			frame.Visible = not frame.Visible
 		end)
 	end
 
-	-- Título del panel
-	local titulo = Instance.new("TextLabel", frame)
-	titulo.Size               = UDim2.new(1, 0, 0, 25)
-	titulo.BackgroundTransparency = 1
-	titulo.Text               = " Enviar Notificación"
-	titulo.TextColor3         = Color3.fromRGB(255, 255, 255)
-	titulo.Font               = Enum.Font.GothamBold
-	titulo.TextSize           = 16
+end -- fin bloque dueños
 
-	-- Campo: Encabezado
-	local encabezadoBox = Instance.new("TextBox", frame)
-	encabezadoBox.Size            = UDim2.new(0.6, -20, 0, 30)
-	encabezadoBox.Position        = UDim2.new(0, 10, 0, 30)
-	encabezadoBox.PlaceholderText = "Encabezado"
-	encabezadoBox.Text            = ""
-	encabezadoBox.TextScaled      = true
 
-	-- Campo: Mensaje
-	local cajaMensaje = Instance.new("TextBox", frame)
-	cajaMensaje.Size              = UDim2.new(0.6, -20, 0, 40)
-	cajaMensaje.Position          = UDim2.new(0, 10, 0, 65)
-	cajaMensaje.PlaceholderText   = "Escribe el mensaje"
-	cajaMensaje.Text              = ""
-	cajaMensaje.TextWrapped       = true
-	cajaMensaje.TextScaled        = true
-	cajaMensaje.ClearTextOnFocus  = false
-
-	-- Campo: Duración
-	local duracionBox = Instance.new("TextBox", frame)
-	duracionBox.Size              = UDim2.new(0.6, -20, 0, 30)
-	duracionBox.Position          = UDim2.new(0, 10, 0, 110)
-	duracionBox.PlaceholderText   = "Duración (s)"
-	duracionBox.Text              = "6"
-	duracionBox.TextScaled        = true
-
-	-- Dropdown de posición
-	local posicionDropdown = Instance.new("TextButton", frame)
-	posicionDropdown.Size             = UDim2.new(0.35, -10, 0, 30)
-	posicionDropdown.Position         = UDim2.new(0.65, 5, 0, 30)
-	posicionDropdown.Text             = "Elegir Posición"
-	posicionDropdown.TextScaled       = true
-	posicionDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	posicionDropdown.TextColor3       = Color3.new(1, 1, 1)
-	Instance.new("UICorner", posicionDropdown)
-
-	local dropdownFrame = Instance.new("Frame", frame)
-	dropdownFrame.Size             = UDim2.new(0.35, -10, 0, #posicionesDisponibles * 25)
-	dropdownFrame.Position         = UDim2.new(0.65, 5, 0, 65)
-	dropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	dropdownFrame.Visible          = false
-	dropdownFrame.ZIndex           = 10
-	Instance.new("UICorner", dropdownFrame)
-
-	for i, pos in ipairs(posicionesDisponibles) do
-		local option = Instance.new("TextButton", dropdownFrame)
-		option.Size             = UDim2.new(1, 0, 0, 25)
-		option.Position         = UDim2.new(0, 0, 0, (i - 1) * 25)
-		option.Text             = pos
-		option.TextScaled       = true
-		option.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-		option.TextColor3       = Color3.new(1, 1, 1)
-		option.ZIndex           = 11
-		option.MouseButton1Click:Connect(function()
-			posicionDropdown.Text  = pos
-			dropdownFrame.Visible  = false
-		end)
-	end
-
-	posicionDropdown.MouseButton1Click:Connect(function()
-		dropdownFrame.Visible = not dropdownFrame.Visible
-	end)
-
-	-- Toggle: Fijar notificación
-	local fijarToggle = Instance.new("TextButton", frame)
-	fijarToggle.Size             = UDim2.new(0.35, -10, 0, 25)
-	fijarToggle.Position         = UDim2.new(0.65, 5, 0, 140)
-	fijarToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	fijarToggle.TextColor3       = Color3.new(1, 1, 1)
-	fijarToggle.Text             = "📌 Fijar: OFF"
-	fijarToggle.TextScaled       = true
-	Instance.new("UICorner", fijarToggle)
-
-	local fijarNotificacion = false
-	fijarToggle.MouseButton1Click:Connect(function()
-		fijarNotificacion  = not fijarNotificacion
-		fijarToggle.Text   = fijarNotificacion and "📌 Fijar: ON" or "📌 Fijar: OFF"
-	end)
-
-	-- Campos de color RGB
-	local colorR = Instance.new("TextBox", frame)
-	colorR.Size            = UDim2.new(0.2, -10, 0, 25)
-	colorR.Position        = UDim2.new(0, 10, 0, 155)
-	colorR.PlaceholderText = "R"
-	colorR.Text            = "0"
-	colorR.TextScaled      = true
-
-	local colorG = Instance.new("TextBox", frame)
-	colorG.Size            = UDim2.new(0.2, -10, 0, 25)
-	colorG.Position        = UDim2.new(0.2, 5, 0, 155)
-	colorG.PlaceholderText = "G"
-	colorG.Text            = "0"
-	colorG.TextScaled      = true
-
-	local colorB = Instance.new("TextBox", frame)
-	colorB.Size            = UDim2.new(0.2, -10, 0, 25)
-	colorB.Position        = UDim2.new(0.4, 0, 0, 155)
-	colorB.PlaceholderText = "B"
-	colorB.Text            = "0"
-	colorB.TextScaled      = true
-
-	-- Botón enviar
-	local boton = Instance.new("TextButton", frame)
-	boton.Size             = UDim2.new(1, -20, 0, 30)
-	boton.Position         = UDim2.new(0, 10, 0, 195)
-	boton.Text             = " Enviar a todos"
-	boton.TextScaled       = true
-	boton.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
-	boton.TextColor3       = Color3.new(1, 1, 1)
-	Instance.new("UICorner", boton)
-
-	boton.MouseButton1Click:Connect(function()
-		local encabezado = encabezadoBox.Text
-		if encabezado == "" then return end  -- No enviar sin encabezado
-
-		local mensaje  = cajaMensaje.Text
-		local duracion = tonumber(duracionBox.Text) or 6
-		local posicion = posicionDropdown.Text
-		local r        = tonumber(colorR.Text) or 109
-		local g        = tonumber(colorG.Text) or 89
-		local b        = tonumber(colorB.Text) or 122
-
-		local data = {
-			encabezado = encabezado,
-			mensaje    = mensaje,
-			duracion   = duracion,
-			posicion   = posicion,
-			color      = { r, g, b },
-			timestamp  = os.time(),
-			key        = claveSeguridad,
-			fijar      = fijarNotificacion
-		}
-
-		local jsonData = HttpService:JSONEncode(data)
-		local request  = (syn and syn.request) or (http and http.request) or request
-		if request then
-			request({
-				Url     = firebaseURL,
-				Method  = "PUT",
-				Headers = { ["Content-Type"] = "application/json" },
-				Body    = jsonData
-			})
-			-- Auto-borrar de Firebase si no está fijada
-			if not fijarNotificacion then
-				task.delay(duracion, function()
-					request({ Url = firebaseURL, Method = "DELETE" })
-				end)
-			end
-		end
-	end)
-
-	-- Tecla L para mostrar/ocultar panel (PC)
-	game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.L then
-			frame.Visible = not frame.Visible
-		end
-	end)
-end
-
+-- ════════════════════════════════════════════════════════════════
+--  RECEPTOR DE NOTIFICACIONES (todos los jugadores)
+-- ════════════════════════════════════════════════════════════════
 task.spawn(function()
-	local request = (syn and syn.request) or (http and http.request) or request
-	if not request then return end
+	local req = (syn and syn.request) or (http and http.request) or request
+	if not req then return end
 
 	while true do
 		task.wait(2.5)
-
 		pcall(function()
-			local response = request({ Url = firebaseURL, Method = "GET" })
+			local response = req({ Url = firebaseURL, Method = "GET" })
 
-			-- ✅ FIX: Validaciones estrictas antes de hacer cualquier cosa
 			if not response then return end
 			if response.StatusCode ~= 200 then return end
-			if not response.Body then return end
-			if response.Body == "null" then return end   -- Firebase vacío/borrado
-			if response.Body == "" then return end       -- Respuesta vacía
+			if not response.Body or response.Body == "null" or response.Body == "" then return end
 
-			-- ✅ FIX: Parseo seguro del JSON
 			local ok, data = pcall(function()
 				return HttpService:JSONDecode(response.Body)
 			end)
-			if not ok then return end                        -- JSON inválido
-			if type(data) ~= "table" then return end         -- No es objeto
-
-			-- ✅ FIX: Sin encabezado = no mostrar nada
+			if not ok or type(data) ~= "table" then return end
 			if not data.encabezado or data.encabezado == "" then return end
+			if not data.timestamp or data.timestamp == ultimoTimestamp then return end
 
-			-- ✅ FIX: Sin timestamp nuevo = ya fue mostrada
-			if not data.timestamp then return end
-			if data.timestamp == ultimoTimestamp then return end
-
-			-- Llegamos aquí solo si hay datos válidos y nuevos
 			ultimoTimestamp = data.timestamp
 
 			-- Limpiar notificaciones anteriores
@@ -305,140 +524,187 @@ task.spawn(function()
 				end
 			end
 
-			-- Crear GUI de notificación
-			local notifGui   = Instance.new("ScreenGui", guiParent)
-			notifGui.Name    = "JmodsNotificacionVisual"
+			-- ── Construir GUI de notificación ─────────────────────────
+			local notifGui = Instance.new("ScreenGui", guiParent)
+			notifGui.Name          = "JmodsNotificacionVisual"
+			notifGui.ResetOnSpawn  = false
+			notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+			-- Calcular altura dinámica según mensaje
+			local mensajeOriginal = data.mensaje or ""
+			local lineaCount = 1
+			for _ in mensajeOriginal:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineaCount = lineaCount + 1 end
+			for _ in mensajeOriginal:gmatch("\n") do lineaCount = lineaCount + 1 end
+			local alturaFrame = math.max(70, 50 + lineaCount * 20)
 
 			local notifFrame = Instance.new("Frame", notifGui)
-			notifFrame.Size                = UDim2.new(0, 320, 0, 60)
-			notifFrame.BackgroundTransparency = 0.45
-			notifFrame.BorderSizePixel     = 0
-			notifFrame.ClipsDescendants    = true
-			Instance.new("UICorner", notifFrame)
+			notifFrame.Size               = UDim2.new(0, 340, 0, alturaFrame)
+			notifFrame.BackgroundTransparency = 0.12
+			notifFrame.BorderSizePixel    = 0
+			notifFrame.ClipsDescendants   = true
+			addCorner(notifFrame, 10)
 
-			-- Posición de la notificación
-			local pos = data.posicion or "Arriba Derecha"
-			if pos == "Arriba Derecha" then
-				notifFrame.Position = UDim2.new(1, -340, 0, 10)
-			elseif pos == "Arriba izquierda" then
-				notifFrame.Position = UDim2.new(0, 10, 0, 10)
-			elseif pos == "Abajo derecha" then
-				notifFrame.Position = UDim2.new(1, -340, 1, -70)
-			elseif pos == "Abajo izquierda" then
-				notifFrame.Position = UDim2.new(0, 10, 1, -70)
-			elseif pos == "En medio" then
-				notifFrame.Position = UDim2.new(0.5, -160, 0.5, -30)
+			-- FIX: Usar el id normalizado para la posición
+			local posId = data.posicion or "top_right"
+			notifFrame.Position = getPosUDim2(posId, 340, alturaFrame)
+
+			-- Animación de entrada
+			local posInicial = notifFrame.Position
+			if posId == "top_right" or posId == "bottom_right" then
+				notifFrame.Position = posInicial + UDim2.new(0, 360, 0, 0)
+			elseif posId == "top_left" or posId == "bottom_left" then
+				notifFrame.Position = posInicial + UDim2.new(0, -360, 0, 0)
 			end
+			tween(notifFrame, { Position = posInicial }, 0.4, Enum.EasingStyle.Back)
 
-			-- Color del fondo (rainbow o RGB)
+			-- Línea de acento lateral
+			local accentSide = Instance.new("Frame", notifFrame)
+			accentSide.Size             = UDim2.new(0, 4, 1, 0)
+			accentSide.Position         = UDim2.new(0, 0, 0, 0)
+			accentSide.BorderSizePixel  = 0
+			addCorner(accentSide, 4)
+
+			-- Color del fondo
 			if data.rainbow then
 				task.spawn(function()
 					local h = 0
 					while notifFrame.Parent do
 						h = (h + 0.01) % 1
-						notifFrame.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+						notifFrame.BackgroundColor3 = Color3.fromHSV(h, 0.7, 0.9)
+						accentSide.BackgroundColor3 = Color3.fromHSV((h + 0.5) % 1, 1, 1)
 						task.wait(0.05)
 					end
 				end)
 			else
+				local r = (data.color and data.color[1]) or 100
+				local g = (data.color and data.color[2]) or 140
+				local b = (data.color and data.color[3]) or 255
 				notifFrame.BackgroundColor3 = Color3.fromRGB(
-					table.unpack(data.color or { 109, 89, 122 })
+					math.clamp(r - 20, 0, 255),
+					math.clamp(g - 20, 0, 255),
+					math.clamp(b - 20, 0, 255)
 				)
+				accentSide.BackgroundColor3 = Color3.fromRGB(r, g, b)
 			end
 
-			-- Ícono decorativo
+			addStroke(notifFrame, Color3.fromRGB(80, 80, 110), 1, 0.3)
+
+			-- Ícono
 			local icon = Instance.new("TextLabel", notifFrame)
-			icon.Size                 = UDim2.new(0, 30, 0, 30)
-			icon.Position             = UDim2.new(0, 10, 0, 15)
+			icon.Size                  = UDim2.new(0, 28, 0, 28)
+			icon.Position              = UDim2.new(0, 12, 0, 12)
 			icon.BackgroundTransparency = 1
-			icon.Text                 = "✨"
-			icon.TextSize             = 20
-			icon.Font                 = Enum.Font.GothamBold
-			icon.TextColor3           = Color3.new(1, 1, 1)
+			icon.Text                  = "✦"
+			icon.TextSize              = 18
+			icon.Font                  = Enum.Font.GothamBold
+			icon.TextColor3            = Color3.new(1, 1, 1)
 
-			-- Encabezado de la notificación
+			-- Encabezado
 			local encabezadoLabel = Instance.new("TextLabel", notifFrame)
-			encabezadoLabel.Size                 = UDim2.new(1, -50, 0, 20)
-			encabezadoLabel.Position             = UDim2.new(0, 50, 0, 10)
-			encabezadoLabel.Text                 = data.encabezado
-			encabezadoLabel.TextColor3           = Color3.fromRGB(255, 255, 255)
-			encabezadoLabel.Font                 = Enum.Font.GothamBold
-			encabezadoLabel.TextSize             = 16
+			encabezadoLabel.Size                  = UDim2.new(1, -50, 0, 20)
+			encabezadoLabel.Position              = UDim2.new(0, 48, 0, 10)
+			encabezadoLabel.Text                  = data.encabezado
+			encabezadoLabel.TextColor3            = Color3.fromRGB(255, 255, 255)
+			encabezadoLabel.Font                  = Enum.Font.GothamBold
+			encabezadoLabel.TextSize              = 14
 			encabezadoLabel.BackgroundTransparency = 1
-			encabezadoLabel.TextXAlignment       = Enum.TextXAlignment.Left
+			encabezadoLabel.TextXAlignment        = Enum.TextXAlignment.Left
 
-			-- ── Procesado de mensaje con soporte de links ────────────────
-			local mensajeOriginal = data.mensaje or ""
-			local yOffset         = 30
+			-- ── Mensaje con soporte de links ──────────────────────────
+			local yOffset = 32
 
 			local function crearLabel(texto, clickableUrl)
 				local label
 				if clickableUrl then
-					label      = Instance.new("TextButton")
+					label      = Instance.new("TextButton", notifFrame)
 					label.Text = "🔗 " .. texto
-					label.TextColor3 = Color3.fromRGB(0, 170, 255)
+					label.TextColor3 = Color3.fromRGB(130, 190, 255)
 					local function abrirLink()
 						if setclipboard then setclipboard(clickableUrl) end
-						if syn and syn.open_url then
-							syn.open_url(clickableUrl)
-						elseif getgenv and getgenv().openurl then
-							getgenv().openurl(clickableUrl)
-						end
+						if syn and syn.open_url then syn.open_url(clickableUrl)
+						elseif getgenv and getgenv().openurl then getgenv().openurl(clickableUrl) end
 					end
 					label.MouseButton1Click:Connect(abrirLink)
 					label.TouchTap:Connect(abrirLink)
+					label.BackgroundTransparency = 1
 				else
-					label            = Instance.new("TextLabel")
+					label            = Instance.new("TextLabel", notifFrame)
 					label.Text       = texto
-					label.TextColor3 = Color3.fromRGB(200, 200, 200)
+					label.TextColor3 = Color3.fromRGB(215, 215, 225)
+					label.BackgroundTransparency = 1
 				end
 
-				label.Size                 = UDim2.new(1, -50, 0, 20)
-				label.Position             = UDim2.new(0, 50, 0, yOffset)
-				label.BackgroundTransparency = 1
-				label.Font                 = Enum.Font.Gotham
-				label.TextSize             = 14
-				label.TextXAlignment       = Enum.TextXAlignment.Left
-				label.Parent               = notifFrame
+				label.Size             = UDim2.new(1, -55, 0, 18)
+				label.Position         = UDim2.new(0, 48, 0, yOffset)
+				label.Font             = Enum.Font.Gotham
+				label.TextSize         = 13
+				label.TextXAlignment   = Enum.TextXAlignment.Left
+				label.TextTruncate     = Enum.TextTruncate.AtEnd
 
 				yOffset = yOffset + 20
 			end
 
-			local function nombreAmigableDeURL(url)
+			local function nombreAmigable(url)
 				if url:find("youtube") or url:find("youtu%.be") then return "YouTube"
-				elseif url:find("roblox%.com")   then return "Roblox"
-				elseif url:find("discord%.gg")   then return "Discord"
-				elseif url:find("twitter%.com")  then return "Twitter"
-				elseif url:find("tiktok%.com")   then return "TikTok"
-				elseif url:find("github%.com")   then return "GitHub"
+				elseif url:find("roblox%.com")    then return "Roblox"
+				elseif url:find("discord%.gg")    then return "Discord"
+				elseif url:find("twitter%.com")   then return "Twitter"
+				elseif url:find("tiktok%.com")    then return "TikTok"
+				elseif url:find("github%.com")    then return "GitHub"
 				elseif url:find("instagram%.com") then return "Instagram"
-				elseif url:find("facebook%.com") then return "Facebook"
+				elseif url:find("facebook%.com")  then return "Facebook"
 				else return "Link"
 				end
 			end
 
-			-- Dividir el mensaje en texto plano y links clickeables
 			local function procesarMensaje(msg)
 				local lastEnd = 1
 				for inicio, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
 					local textoPrevio = msg:sub(lastEnd, inicio - 1)
-					if textoPrevio ~= "" then
-						crearLabel(textoPrevio, nil)
-					end
-					crearLabel(nombreAmigableDeURL(link), link)
+					if textoPrevio ~= "" then crearLabel(textoPrevio, nil) end
+					crearLabel(nombreAmigable(link), link)
 					lastEnd = fin
 				end
 				local textoFinal = msg:sub(lastEnd)
-				if textoFinal ~= "" then
-					crearLabel(textoFinal, nil)
-				end
+				if textoFinal ~= "" then crearLabel(textoFinal, nil) end
 			end
 
 			procesarMensaje(mensajeOriginal)
 
-			-- Auto-destruir después de la duración
+			-- Barra de progreso (solo si no está fijada)
 			if not data.fijar then
-				task.delay(data.duracion or 6, function()
+				local duracion = data.duracion or 6
+
+				local progressBg = Instance.new("Frame", notifFrame)
+				progressBg.Size             = UDim2.new(1, -10, 0, 3)
+				progressBg.Position         = UDim2.new(0, 5, 1, -5)
+				progressBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+				progressBg.BorderSizePixel  = 0
+				addCorner(progressBg, 2)
+
+				local progressFill = Instance.new("Frame", progressBg)
+				progressFill.Size             = UDim2.new(1, 0, 1, 0)
+				progressFill.BackgroundColor3 = accentSide.BackgroundColor3
+				progressFill.BorderSizePixel  = 0
+				addCorner(progressFill, 2)
+
+				-- Animar barra de progreso
+				tween(progressFill, { Size = UDim2.new(0, 0, 1, 0) }, duracion, Enum.EasingStyle.Linear)
+
+				-- Salida animada
+				task.delay(duracion - 0.35, function()
+					if notifFrame and notifFrame.Parent then
+						if posId == "top_right" or posId == "bottom_right" then
+							tween(notifFrame, { Position = posInicial + UDim2.new(0, 380, 0, 0) }, 0.3)
+						elseif posId == "top_left" or posId == "bottom_left" then
+							tween(notifFrame, { Position = posInicial + UDim2.new(0, -380, 0, 0) }, 0.3)
+						else
+							tween(notifFrame, { BackgroundTransparency = 1 }, 0.3)
+						end
+					end
+				end)
+
+				task.delay(duracion, function()
 					if notifGui and notifGui.Parent then
 						notifGui:Destroy()
 					end
