@@ -1,5 +1,5 @@
 -- =============================================================
---  JMODS Notifier v2.6  |  Posicion corregida + sin emojis
+--  JMODS Notifier v2.7  |  Texto largo sin corte + altura dinamica
 -- =============================================================
 
 local HttpService  = game:GetService("HttpService")
@@ -7,6 +7,7 @@ local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInput    = game:GetService("UserInputService")
 local CoreGui      = game:GetService("CoreGui")
+local TextService  = game:GetService("TextService")
 
 local guiParent
 pcall(function() if gethui then guiParent = gethui() end end)
@@ -103,6 +104,8 @@ end
 
 -- =============================================================
 --  FUNCION REUTILIZABLE: construir frame de notificacion
+--  v2.7: altura dinamica real usando TextService:GetTextSize
+--        TextWrapped = true, sin truncado.
 -- =============================================================
 local function construirNotifFrame(parent, data, zBase)
 	zBase = zBase or 1
@@ -114,10 +117,70 @@ local function construirNotifFrame(parent, data, zBase)
 	local cg    = (data.color and data.color[2]) or 140
 	local cb    = (data.color and data.color[3]) or 255
 
-	local lineas = 1
-	for _ in msg:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineas += 1 end
-	local altH = math.max(80, 54 + lineas * 20)
+	-- Ancho disponible para texto: frame(340) - margenIzq(46) - margenDer(10)
+	local LABEL_W  = 284
+	local FONT     = Enum.Font.Gotham
+	local FSIZE    = 13
+	local LINE_PAD = 3  -- separacion entre lineas de texto
 
+	local function nombreAmigable(url)
+		if     url:find("youtube")      or url:find("youtu%.be")  then return "YouTube"
+		elseif url:find("roblox%.com")                             then return "Roblox"
+		elseif url:find("discord%.gg")                             then return "Discord"
+		elseif url:find("twitter%.com")                            then return "Twitter / X"
+		elseif url:find("tiktok%.com")                             then return "TikTok"
+		elseif url:find("github%.com")                             then return "GitHub"
+		elseif url:find("instagram%.com")                          then return "Instagram"
+		elseif url:find("facebook%.com")                           then return "Facebook"
+		else return "Link" end
+	end
+
+	-- Calcula la altura real que necesita un texto al hacer wrap
+	local function textoAltura(texto, prefijo)
+		local t = (prefijo or "") .. texto
+		if t == "" then return FSIZE end
+		local ok, sz = pcall(function()
+			return TextService:GetTextSize(t, FSIZE, FONT, Vector2.new(LABEL_W, 9999))
+		end)
+		if ok and sz then return math.max(FSIZE, sz.Y) end
+		-- Fallback por si TextService no esta disponible
+		local charsPerLine = math.floor(LABEL_W / (FSIZE * 0.56))
+		return math.max(FSIZE, math.ceil(math.max(1, #t) / charsPerLine) * (FSIZE + 2))
+	end
+
+	-- Construir lista de segmentos antes de crear la UI para pre-calcular altura
+	local segmentos = {}  -- { texto, url, altura }
+	local lastE = 1
+	for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
+		local prev = msg:sub(lastE, ini-1)
+		if prev ~= "" then
+			table.insert(segmentos, { texto=prev,                 url=nil,  h=textoAltura(prev)         })
+		end
+		local nombre = nombreAmigable(link)
+		table.insert(segmentos,     { texto=nombre, urlReal=link, url=link, h=textoAltura(nombre,"[Link] ") })
+		lastE = fin
+	end
+	local resto = msg:sub(lastE)
+	if resto ~= "" then
+		table.insert(segmentos, { texto=resto, url=nil, h=textoAltura(resto) })
+	end
+	if #segmentos == 0 then
+		table.insert(segmentos, { texto="", url=nil, h=FSIZE })
+	end
+
+	-- Altura total del encabezado (puede ser largo tambien)
+	local encH = textoAltura(enc, nil)
+	encH = math.max(22, encH)
+
+	-- Sumar todo: margen superior + encabezado + separador + contenido + barra progreso
+	local yStart = 8 + encH + 6  -- posY inicial del primer segmento
+	local contentH = 0
+	for _, seg in ipairs(segmentos) do
+		contentH += seg.h + LINE_PAD
+	end
+	local altH = math.max(80, yStart + contentH + 14)  -- 14 = barra + padding
+
+	-- ── Crear el frame ───────────────────────────────────────
 	local nFrame = Instance.new("Frame", parent)
 	nFrame.Size = UDim2.new(0, 340, 0, altH)
 	nFrame.BackgroundTransparency = 0.08
@@ -125,7 +188,6 @@ local function construirNotifFrame(parent, data, zBase)
 	nFrame.ZIndex = zBase
 	addCorner(nFrame, 10)
 
-	-- Calcula posicion final correcta con pixeles absolutos
 	local posInicial = getPosUDim2(posId, 340, altH)
 	nFrame.Position  = posInicial
 
@@ -140,72 +202,62 @@ local function construirNotifFrame(parent, data, zBase)
 	accent.BorderSizePixel = 0; accent.ZIndex = zBase+1; addCorner(accent, 4)
 
 	local icon = Instance.new("TextLabel", nFrame)
-	icon.Size = UDim2.new(0,26,0,26); icon.Position = UDim2.new(0,12,0,10)
+	icon.Size = UDim2.new(0,26,0,26); icon.Position = UDim2.new(0,12,0,8)
 	icon.BackgroundTransparency = 1; icon.Text = "*"
 	icon.TextSize = 18; icon.Font = Enum.Font.GothamBold
 	icon.TextColor3 = Color3.fromRGB(cr,cg,cb); icon.ZIndex = zBase+2
 
+	-- Encabezado con wrap si es largo
 	local encLbl = Instance.new("TextLabel", nFrame)
-	encLbl.Size = UDim2.new(1,-52,0,22); encLbl.Position = UDim2.new(0,46,0,8)
-	encLbl.Text = enc; encLbl.TextColor3 = Color3.fromRGB(255,255,255)
+	encLbl.Size = UDim2.new(1,-52,0,encH)
+	encLbl.Position = UDim2.new(0,46,0,8)
+	encLbl.Text = enc
+	encLbl.TextColor3 = Color3.fromRGB(255,255,255)
 	encLbl.Font = Enum.Font.GothamBold; encLbl.TextSize = 14
 	encLbl.BackgroundTransparency = 1
 	encLbl.TextXAlignment = Enum.TextXAlignment.Left
-	encLbl.TextTruncate = Enum.TextTruncate.AtEnd; encLbl.ZIndex = zBase+2
+	encLbl.TextWrapped = true
+	encLbl.TextTruncate = Enum.TextTruncate.None
+	encLbl.ZIndex = zBase+2
 
 	local sep = Instance.new("Frame", nFrame)
-	sep.Size = UDim2.new(1,-52,0,1); sep.Position = UDim2.new(0,46,0,32)
+	sep.Size = UDim2.new(1,-52,0,1)
+	sep.Position = UDim2.new(0,46,0, 8 + encH + 2)
 	sep.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
 	sep.BackgroundTransparency = 0.7
 	sep.BorderSizePixel = 0; sep.ZIndex = zBase+1
 
-	local yOff = 36
-	local function nombreAmigable(url)
-		if     url:find("youtube")     or url:find("youtu%.be")   then return "YouTube"
-		elseif url:find("roblox%.com")                             then return "Roblox"
-		elseif url:find("discord%.gg")                             then return "Discord"
-		elseif url:find("twitter%.com")                            then return "Twitter / X"
-		elseif url:find("tiktok%.com")                             then return "TikTok"
-		elseif url:find("github%.com")                             then return "GitHub"
-		elseif url:find("instagram%.com")                          then return "Instagram"
-		elseif url:find("facebook%.com")                           then return "Facebook"
-		else return "Link" end
-	end
-
-	local function crearLinea(texto, url)
+	-- Crear labels para cada segmento con altura calculada
+	local yOff = yStart
+	for _, seg in ipairs(segmentos) do
 		local lbl
-		if url then
+		if seg.url then
 			lbl = Instance.new("TextButton", nFrame)
-			lbl.Text = "[Link] " .. texto
+			lbl.Text = "[Link] " .. seg.texto
 			lbl.TextColor3 = Color3.fromRGB(130,195,255)
 			lbl.BackgroundTransparency = 1; lbl.AutoButtonColor = false
+			local u = seg.urlReal or seg.url
 			local function open()
-				if setclipboard then setclipboard(url) end
-				if syn and syn.open_url then syn.open_url(url)
-				elseif getgenv and getgenv().openurl then getgenv().openurl(url) end
+				if setclipboard then setclipboard(u) end
+				if syn and syn.open_url then syn.open_url(u)
+				elseif getgenv and getgenv().openurl then getgenv().openurl(u) end
 			end
 			lbl.MouseButton1Click:Connect(open); lbl.TouchTap:Connect(open)
 		else
 			lbl = Instance.new("TextLabel", nFrame)
-			lbl.Text = texto
+			lbl.Text = seg.texto
 			lbl.TextColor3 = Color3.fromRGB(215,215,230)
 			lbl.BackgroundTransparency = 1
 		end
-		lbl.Size = UDim2.new(1,-56,0,18); lbl.Position = UDim2.new(0,46,0,yOff)
-		lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+		lbl.Size = UDim2.new(1,-56, 0, seg.h)
+		lbl.Position = UDim2.new(0,46,0,yOff)
+		lbl.Font = FONT; lbl.TextSize = FSIZE
 		lbl.TextXAlignment = Enum.TextXAlignment.Left
-		lbl.TextTruncate = Enum.TextTruncate.AtEnd
-		lbl.ZIndex = zBase+2; yOff += 20
+		lbl.TextWrapped = true                         -- texto con wrap
+		lbl.TextTruncate = Enum.TextTruncate.None      -- sin corte
+		lbl.ZIndex = zBase+2
+		yOff += seg.h + LINE_PAD
 	end
-
-	local lastE = 1
-	for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
-		local prev = msg:sub(lastE, ini-1)
-		if prev ~= "" then crearLinea(prev, nil) end
-		crearLinea(nombreAmigable(link), link); lastE = fin
-	end
-	local resto = msg:sub(lastE)
-	if resto ~= "" then crearLinea(resto, nil) end
 
 	local pBg = Instance.new("Frame", nFrame)
 	pBg.Size = UDim2.new(1,-10,0,3); pBg.Position = UDim2.new(0,5,1,-5)
@@ -217,8 +269,7 @@ local function construirNotifFrame(parent, data, zBase)
 	pFill.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
 	pFill.BorderSizePixel = 0; pFill.ZIndex = zBase+2; addCorner(pFill,2)
 
-	-- Animacion de entrada segun posicion
-	-- Con UDim2.fromOffset no hay componentes de escala, la suma es simple
+	-- Animacion de entrada
 	if posId == "top_right" or posId == "bottom_right" then
 		nFrame.Position = UDim2.fromOffset(posInicial.X.Offset + 380, posInicial.Y.Offset)
 		TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position=posInicial}):Play()
@@ -226,7 +277,6 @@ local function construirNotifFrame(parent, data, zBase)
 		nFrame.Position = UDim2.fromOffset(posInicial.X.Offset - 380, posInicial.Y.Offset)
 		TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position=posInicial}):Play()
 	else
-		-- Centro: fade in
 		nFrame.BackgroundTransparency = 1
 		TweenService:Create(nFrame, TweenInfo.new(0.35), {BackgroundTransparency=0.08}):Play()
 	end
@@ -280,7 +330,7 @@ if duenos[player.Name] then
 
 	local verLbl = Instance.new("TextLabel", header)
 	verLbl.Size = UDim2.new(0,55,1,0); verLbl.Position = UDim2.new(1,-58,0,0)
-	verLbl.BackgroundTransparency = 1; verLbl.Text = "v2.6"
+	verLbl.BackgroundTransparency = 1; verLbl.Text = "v2.7"
 	verLbl.TextColor3 = Color3.fromRGB(80,80,110); verLbl.Font = Enum.Font.Gotham
 	verLbl.TextSize = 11; verLbl.TextXAlignment = Enum.TextXAlignment.Right
 
