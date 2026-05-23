@@ -1,5 +1,5 @@
 -- =============================================================
---  JMODS Notifier v2.2  |  + Color Picker + Preview Live
+--  JMODS Notifier v2.6  |  Posicion corregida + sin emojis
 -- =============================================================
 
 local HttpService  = game:GetService("HttpService")
@@ -7,36 +7,26 @@ local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInput    = game:GetService("UserInputService")
 local CoreGui      = game:GetService("CoreGui")
-local RunService   = game:GetService("RunService")
 
---  Padre seguro
 local guiParent
-pcall(function()
-	if gethui then guiParent = gethui() end
-end)
+pcall(function() if gethui then guiParent = gethui() end end)
 if not guiParent then guiParent = CoreGui end
 
---  Esperar LocalPlayer
 local player = Players.LocalPlayer
 if not player then
 	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
 	player = Players.LocalPlayer
 end
-if not player then
-	repeat task.wait(0.1) player = Players.LocalPlayer until player
-end
+if not player then repeat task.wait(0.1) player = Players.LocalPlayer until player end
 
---  URLs & config
 local duenosURL       = "https://pastebin.com/raw/S2X3j15A"
 local firebaseURL     = "https://notificaciones-aa833-default-rtdb.firebaseio.com/Notificacion.json"
 local claveSeguridad  = "JMODS2024"
 local ultimoTimestamp = 0
 local duenos          = {}
 
---  Detectar móvil
 local esMobil = UserInput.TouchEnabled
 
---  Posiciones normalizadas
 local POSICIONES = {
 	{ id = "top_right",    label = ">> Arriba derecha"   },
 	{ id = "top_left",     label = "<< Arriba izquierda" },
@@ -46,50 +36,47 @@ local POSICIONES = {
 }
 local posicionSeleccionada = "top_right"
 
+-- ============================================================
+--  POSICION CORREGIDA: usa ViewportSize para pixeles exactos.
+--  El bug anterior usaba escala UDim2 (0-1) que varia segun
+--  pantalla y el inset del topbar causaba desplazamiento.
+-- ============================================================
 local function getPosUDim2(posId, frameW, frameH)
+	local cam = workspace.CurrentCamera
+	local vp  = cam and cam.ViewportSize or Vector2.new(1280, 720)
+	local SW, SH = vp.X, vp.Y
 	frameW = frameW or 340
 	frameH = frameH or 80
 	local pad = 12
-	if     posId == "top_right"    then return UDim2.new(1, -(frameW + pad), 0, pad)
-	elseif posId == "top_left"     then return UDim2.new(0, pad, 0, pad)
-	elseif posId == "bottom_right" then return UDim2.new(1, -(frameW + pad), 1, -(frameH + pad))
-	elseif posId == "bottom_left"  then return UDim2.new(0, pad, 1, -(frameH + pad))
-	elseif posId == "center"       then return UDim2.new(0.5, -(frameW/2), 0.5, -(frameH/2))
-	else                                return UDim2.new(1, -(frameW + pad), 0, pad)
+	if     posId == "top_right"    then return UDim2.fromOffset(SW - frameW - pad, pad)
+	elseif posId == "top_left"     then return UDim2.fromOffset(pad, pad)
+	elseif posId == "bottom_right" then return UDim2.fromOffset(SW - frameW - pad, SH - frameH - pad)
+	elseif posId == "bottom_left"  then return UDim2.fromOffset(pad, SH - frameH - pad)
+	elseif posId == "center"       then return UDim2.fromOffset((SW - frameW) / 2, (SH - frameH) / 2)
+	else                                return UDim2.fromOffset(SW - frameW - pad, pad)
 	end
 end
 
---  Helpers UI
 local function addCorner(p, r)
-	local c = Instance.new("UICorner", p)
-	c.CornerRadius = UDim.new(0, r or 8)
-	return c
+	local c = Instance.new("UICorner", p); c.CornerRadius = UDim.new(0, r or 8); return c
 end
-
 local function addStroke(p, col, thick, trans)
 	local s = Instance.new("UIStroke", p)
-	s.Color        = col   or Color3.fromRGB(80,80,80)
-	s.Thickness    = thick or 1
+	s.Color = col or Color3.fromRGB(80,80,80)
+	s.Thickness = thick or 1
 	s.Transparency = trans or 0
 	return s
 end
-
 local function addGradient(p, cA, cB, rot)
 	local g = Instance.new("UIGradient", p)
-	g.Color    = ColorSequence.new(cA, cB)
+	g.Color = ColorSequence.new(cA, cB)
 	g.Rotation = rot or 90
 	return g
 end
-
 local function tw(obj, props, t, style)
-	TweenService:Create(obj, TweenInfo.new(
-		t or 0.22,
-		style or Enum.EasingStyle.Quart,
-		Enum.EasingDirection.Out
-	), props):Play()
+	TweenService:Create(obj, TweenInfo.new(t or 0.22, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props):Play()
 end
 
---  Cargar dueños
 local function actualizarDuenos()
 	pcall(function()
 		local req = (syn and syn.request) or (http and http.request) or request
@@ -97,269 +84,319 @@ local function actualizarDuenos()
 		local res = req({ Url = duenosURL, Method = "GET" })
 		if res and res.Body then
 			table.clear(duenos)
-			for nombre in res.Body:gmatch("[^\r\n]+") do
-				duenos[nombre] = true
-			end
+			for nombre in res.Body:gmatch("[^\r\n]+") do duenos[nombre] = true end
 		end
 	end)
 end
-
 actualizarDuenos()
-task.spawn(function()
-	while true do task.wait(400) actualizarDuenos() end
-end)
+task.spawn(function() while true do task.wait(400); actualizarDuenos() end end)
 
---  Anti-duplicado
 if getgenv then
 	if getgenv().__JMODS_RUNNING then return end
 	getgenv().__JMODS_RUNNING = true
 end
 for _, g in ipairs(guiParent:GetChildren()) do
-	if g.Name == "JmodsNotifierUI" or g.Name == "JmodsNotificacionVisual" then
+	if g.Name == "JmodsNotifierUI" or g.Name == "JmodsNotificacionVisual" or g.Name == "JmodsColorPicker" then
 		g:Destroy()
 	end
 end
 
 -- =============================================================
---  PANEL DE CONTROL - solo dueños
+--  FUNCION REUTILIZABLE: construir frame de notificacion
+-- =============================================================
+local function construirNotifFrame(parent, data, zBase)
+	zBase = zBase or 1
+	local msg   = data.mensaje    or ""
+	local enc   = data.encabezado or ""
+	local posId = data.posicion   or "top_right"
+	local dur   = tonumber(data.duracion) or 6
+	local cr    = (data.color and data.color[1]) or 100
+	local cg    = (data.color and data.color[2]) or 140
+	local cb    = (data.color and data.color[3]) or 255
+
+	local lineas = 1
+	for _ in msg:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineas += 1 end
+	local altH = math.max(80, 54 + lineas * 20)
+
+	local nFrame = Instance.new("Frame", parent)
+	nFrame.Size = UDim2.new(0, 340, 0, altH)
+	nFrame.BackgroundTransparency = 0.08
+	nFrame.BorderSizePixel = 0
+	nFrame.ZIndex = zBase
+	addCorner(nFrame, 10)
+
+	-- Calcula posicion final correcta con pixeles absolutos
+	local posInicial = getPosUDim2(posId, 340, altH)
+	nFrame.Position  = posInicial
+
+	nFrame.BackgroundColor3 = Color3.fromRGB(
+		math.clamp(cr-25,0,255), math.clamp(cg-25,0,255), math.clamp(cb-25,0,255)
+	)
+	addStroke(nFrame, Color3.fromRGB(80,80,115), 1, 0.25)
+
+	local accent = Instance.new("Frame", nFrame)
+	accent.Size = UDim2.new(0,4,1,0)
+	accent.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
+	accent.BorderSizePixel = 0; accent.ZIndex = zBase+1; addCorner(accent, 4)
+
+	local icon = Instance.new("TextLabel", nFrame)
+	icon.Size = UDim2.new(0,26,0,26); icon.Position = UDim2.new(0,12,0,10)
+	icon.BackgroundTransparency = 1; icon.Text = "*"
+	icon.TextSize = 18; icon.Font = Enum.Font.GothamBold
+	icon.TextColor3 = Color3.fromRGB(cr,cg,cb); icon.ZIndex = zBase+2
+
+	local encLbl = Instance.new("TextLabel", nFrame)
+	encLbl.Size = UDim2.new(1,-52,0,22); encLbl.Position = UDim2.new(0,46,0,8)
+	encLbl.Text = enc; encLbl.TextColor3 = Color3.fromRGB(255,255,255)
+	encLbl.Font = Enum.Font.GothamBold; encLbl.TextSize = 14
+	encLbl.BackgroundTransparency = 1
+	encLbl.TextXAlignment = Enum.TextXAlignment.Left
+	encLbl.TextTruncate = Enum.TextTruncate.AtEnd; encLbl.ZIndex = zBase+2
+
+	local sep = Instance.new("Frame", nFrame)
+	sep.Size = UDim2.new(1,-52,0,1); sep.Position = UDim2.new(0,46,0,32)
+	sep.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
+	sep.BackgroundTransparency = 0.7
+	sep.BorderSizePixel = 0; sep.ZIndex = zBase+1
+
+	local yOff = 36
+	local function nombreAmigable(url)
+		if     url:find("youtube")     or url:find("youtu%.be")   then return "YouTube"
+		elseif url:find("roblox%.com")                             then return "Roblox"
+		elseif url:find("discord%.gg")                             then return "Discord"
+		elseif url:find("twitter%.com")                            then return "Twitter / X"
+		elseif url:find("tiktok%.com")                             then return "TikTok"
+		elseif url:find("github%.com")                             then return "GitHub"
+		elseif url:find("instagram%.com")                          then return "Instagram"
+		elseif url:find("facebook%.com")                           then return "Facebook"
+		else return "Link" end
+	end
+
+	local function crearLinea(texto, url)
+		local lbl
+		if url then
+			lbl = Instance.new("TextButton", nFrame)
+			lbl.Text = "[Link] " .. texto
+			lbl.TextColor3 = Color3.fromRGB(130,195,255)
+			lbl.BackgroundTransparency = 1; lbl.AutoButtonColor = false
+			local function open()
+				if setclipboard then setclipboard(url) end
+				if syn and syn.open_url then syn.open_url(url)
+				elseif getgenv and getgenv().openurl then getgenv().openurl(url) end
+			end
+			lbl.MouseButton1Click:Connect(open); lbl.TouchTap:Connect(open)
+		else
+			lbl = Instance.new("TextLabel", nFrame)
+			lbl.Text = texto
+			lbl.TextColor3 = Color3.fromRGB(215,215,230)
+			lbl.BackgroundTransparency = 1
+		end
+		lbl.Size = UDim2.new(1,-56,0,18); lbl.Position = UDim2.new(0,46,0,yOff)
+		lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+		lbl.TextXAlignment = Enum.TextXAlignment.Left
+		lbl.TextTruncate = Enum.TextTruncate.AtEnd
+		lbl.ZIndex = zBase+2; yOff += 20
+	end
+
+	local lastE = 1
+	for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
+		local prev = msg:sub(lastE, ini-1)
+		if prev ~= "" then crearLinea(prev, nil) end
+		crearLinea(nombreAmigable(link), link); lastE = fin
+	end
+	local resto = msg:sub(lastE)
+	if resto ~= "" then crearLinea(resto, nil) end
+
+	local pBg = Instance.new("Frame", nFrame)
+	pBg.Size = UDim2.new(1,-10,0,3); pBg.Position = UDim2.new(0,5,1,-5)
+	pBg.BackgroundColor3 = Color3.fromRGB(30,30,50)
+	pBg.BorderSizePixel = 0; pBg.ZIndex = zBase+1; addCorner(pBg,2)
+
+	local pFill = Instance.new("Frame", pBg)
+	pFill.Size = UDim2.new(1,0,1,0)
+	pFill.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
+	pFill.BorderSizePixel = 0; pFill.ZIndex = zBase+2; addCorner(pFill,2)
+
+	-- Animacion de entrada segun posicion
+	-- Con UDim2.fromOffset no hay componentes de escala, la suma es simple
+	if posId == "top_right" or posId == "bottom_right" then
+		nFrame.Position = UDim2.fromOffset(posInicial.X.Offset + 380, posInicial.Y.Offset)
+		TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position=posInicial}):Play()
+	elseif posId == "top_left" or posId == "bottom_left" then
+		nFrame.Position = UDim2.fromOffset(posInicial.X.Offset - 380, posInicial.Y.Offset)
+		TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position=posInicial}):Play()
+	else
+		-- Centro: fade in
+		nFrame.BackgroundTransparency = 1
+		TweenService:Create(nFrame, TweenInfo.new(0.35), {BackgroundTransparency=0.08}):Play()
+	end
+
+	return nFrame, pFill, posInicial, posId, dur
+end
+
+-- =============================================================
+--  PANEL DE CONTROL - solo duenos
 -- =============================================================
 if duenos[player.Name] then
 
 	local screenGui = Instance.new("ScreenGui", guiParent)
-	screenGui.Name           = "JmodsNotifierUI"
-	screenGui.ResetOnSpawn   = false
+	screenGui.Name = "JmodsNotifierUI"; screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
-	-- Tamaños responsivos
-	local PANEL_W  = esMobil and 320 or 380
-	local PANEL_H  = esMobil and 370 or 360
+	local PANEL_W  = esMobil and 310 or 360
+	local PANEL_H  = esMobil and 340 or 325
 	local FONT_LBL = esMobil and 11  or 10
-	local FONT_INP = esMobil and 14  or 13
-	local INP_H    = esMobil and 36  or 32
-	local BTN_H    = esMobil and 40  or 34
-	local PAD      = esMobil and 14  or 12
+	local FONT_INP = esMobil and 13  or 12
+	local INP_H    = esMobil and 32  or 28
+	local BTN_H    = esMobil and 36  or 30
+	local PAD      = esMobil and 12  or 10
 
-	-- Estado de color actual (compartido entre picker y rgb inputs)
 	local currentR, currentG, currentB = 100, 140, 255
+	local currentH, currentS, currentV = Color3.fromRGB(100,140,255):ToHSV()
 
-	-- =========================================================
-	--  FRAME PRINCIPAL
-	-- =========================================================
+	-- Frame principal
 	local frame = Instance.new("Frame", screenGui)
-	frame.Size             = UDim2.new(0, PANEL_W, 0, PANEL_H)
-	frame.Position         = UDim2.new(0, 20, 0, esMobil and 60 or 80)
+	frame.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
+	frame.Position = UDim2.new(0, 20, 0, esMobil and 60 or 80)
 	frame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-	frame.BorderSizePixel  = 0
-	frame.Active           = true
-	frame.Draggable        = true
-	frame.Visible          = false
-	addCorner(frame, 12)
-	addStroke(frame, Color3.fromRGB(55, 55, 80), 1, 0.1)
+	frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = false
+	addCorner(frame, 12); addStroke(frame, Color3.fromRGB(55,55,80), 1, 0.1)
 
-	-- Accent top bar
 	local accentBar = Instance.new("Frame", frame)
-	accentBar.Size             = UDim2.new(1, 0, 0, 3)
-	accentBar.BackgroundColor3 = Color3.fromRGB(90, 130, 255)
-	accentBar.BorderSizePixel  = 0
-	addCorner(accentBar, 12)
-	addGradient(accentBar, Color3.fromRGB(90, 130, 255), Color3.fromRGB(180, 90, 255))
+	accentBar.Size = UDim2.new(1,0,0,3)
+	accentBar.BackgroundColor3 = Color3.fromRGB(90,130,255)
+	accentBar.BorderSizePixel = 0; addCorner(accentBar,12)
+	addGradient(accentBar, Color3.fromRGB(90,130,255), Color3.fromRGB(180,90,255))
 
-	-- Header
 	local header = Instance.new("Frame", frame)
-	header.Size             = UDim2.new(1, 0, 0, 40)
-	header.Position         = UDim2.new(0, 0, 0, 3)
-	header.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-	header.BorderSizePixel  = 0
+	header.Size = UDim2.new(1,0,0,36); header.Position = UDim2.new(0,0,0,3)
+	header.BackgroundColor3 = Color3.fromRGB(22,22,30); header.BorderSizePixel = 0
 
 	local titleLbl = Instance.new("TextLabel", header)
-	titleLbl.Size                 = UDim2.new(1, -70, 1, 0)
-	titleLbl.Position             = UDim2.new(0, PAD, 0, 0)
-	titleLbl.BackgroundTransparency = 1
-	titleLbl.Text                 = "[ JMODS ] Notificaciones"
-	titleLbl.TextColor3           = Color3.fromRGB(220, 220, 235)
-	titleLbl.Font                 = Enum.Font.GothamBold
-	titleLbl.TextSize             = esMobil and 15 or 14
-	titleLbl.TextXAlignment       = Enum.TextXAlignment.Left
+	titleLbl.Size = UDim2.new(1,-65,1,0); titleLbl.Position = UDim2.new(0,PAD,0,0)
+	titleLbl.BackgroundTransparency = 1; titleLbl.Text = "[ JMODS ] Notificaciones"
+	titleLbl.TextColor3 = Color3.fromRGB(220,220,235); titleLbl.Font = Enum.Font.GothamBold
+	titleLbl.TextSize = esMobil and 14 or 13; titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
 	local verLbl = Instance.new("TextLabel", header)
-	verLbl.Size                 = UDim2.new(0, 55, 1, 0)
-	verLbl.Position             = UDim2.new(1, -60, 0, 0)
-	verLbl.BackgroundTransparency = 1
-	verLbl.Text                 = "v2.2"
-	verLbl.TextColor3           = Color3.fromRGB(80, 80, 110)
-	verLbl.Font                 = Enum.Font.Gotham
-	verLbl.TextSize             = 12
-	verLbl.TextXAlignment       = Enum.TextXAlignment.Right
+	verLbl.Size = UDim2.new(0,55,1,0); verLbl.Position = UDim2.new(1,-58,0,0)
+	verLbl.BackgroundTransparency = 1; verLbl.Text = "v2.6"
+	verLbl.TextColor3 = Color3.fromRGB(80,80,110); verLbl.Font = Enum.Font.Gotham
+	verLbl.TextSize = 11; verLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-	-- ScrollingFrame de contenido
 	local scroll = Instance.new("ScrollingFrame", frame)
-	scroll.Size                  = UDim2.new(1, 0, 1, -46)
-	scroll.Position              = UDim2.new(0, 0, 0, 46)
-	scroll.BackgroundTransparency = 1
-	scroll.BorderSizePixel       = 0
-	scroll.ScrollBarThickness    = esMobil and 3 or 2
-	scroll.ScrollBarImageColor3  = Color3.fromRGB(80, 80, 120)
-	scroll.CanvasSize            = UDim2.new(0, 0, 0, 0)
-	scroll.ElasticBehavior       = Enum.ElasticBehavior.Never
+	scroll.Size = UDim2.new(1,0,1,-42); scroll.Position = UDim2.new(0,0,0,42)
+	scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0
+	scroll.ScrollBarThickness = esMobil and 3 or 2
+	scroll.ScrollBarImageColor3 = Color3.fromRGB(80,80,120)
+	scroll.CanvasSize = UDim2.new(0,0,0,0)
+	scroll.ElasticBehavior = Enum.ElasticBehavior.Never
 
 	local content = Instance.new("Frame", scroll)
-	content.Size             = UDim2.new(1, 0, 0, 0)
-	content.BackgroundTransparency = 1
-	content.BorderSizePixel  = 0
+	content.Size = UDim2.new(1,0,0,0); content.BackgroundTransparency = 1; content.BorderSizePixel = 0
 
 	local layout = Instance.new("UIListLayout", content)
-	layout.FillDirection       = Enum.FillDirection.Vertical
+	layout.FillDirection = Enum.FillDirection.Vertical
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.SortOrder           = Enum.SortOrder.LayoutOrder
-	layout.Padding             = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Padding = UDim.new(0, 6)
 
 	local padding = Instance.new("UIPadding", content)
-	padding.PaddingLeft   = UDim.new(0, PAD)
-	padding.PaddingRight  = UDim.new(0, PAD)
-	padding.PaddingTop    = UDim.new(0, 10)
-	padding.PaddingBottom = UDim.new(0, 10)
+	padding.PaddingLeft = UDim.new(0,PAD); padding.PaddingRight = UDim.new(0,PAD)
+	padding.PaddingTop = UDim.new(0,8); padding.PaddingBottom = UDim.new(0,8)
 
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		local h = layout.AbsoluteContentSize.Y + 24
-		content.Size     = UDim2.new(1, 0, 0, h)
-		scroll.CanvasSize = UDim2.new(0, 0, 0, h)
+		local h = layout.AbsoluteContentSize.Y + 20
+		content.Size = UDim2.new(1,0,0,h); scroll.CanvasSize = UDim2.new(0,0,0,h)
 	end)
 
-	-- Helpers para crear secciones e inputs
 	local function crearSeccion(labelText, order)
 		local sec = Instance.new("Frame", content)
-		sec.Size             = UDim2.new(1, 0, 0, INP_H + 18)
-		sec.BackgroundTransparency = 1
-		sec.LayoutOrder      = order
-
+		sec.Size = UDim2.new(1,0,0,INP_H+16); sec.BackgroundTransparency = 1; sec.LayoutOrder = order
 		local lbl = Instance.new("TextLabel", sec)
-		lbl.Size                 = UDim2.new(1, 0, 0, 14)
-		lbl.BackgroundTransparency = 1
-		lbl.Text                 = labelText
-		lbl.TextColor3           = Color3.fromRGB(90, 130, 255)
-		lbl.Font                 = Enum.Font.GothamBold
-		lbl.TextSize             = FONT_LBL
-		lbl.TextXAlignment       = Enum.TextXAlignment.Left
-
+		lbl.Size = UDim2.new(1,0,0,13); lbl.BackgroundTransparency = 1
+		lbl.Text = labelText; lbl.TextColor3 = Color3.fromRGB(90,130,255)
+		lbl.Font = Enum.Font.GothamBold; lbl.TextSize = FONT_LBL
+		lbl.TextXAlignment = Enum.TextXAlignment.Left
 		return sec, lbl
 	end
 
 	local function crearInputBox(parent, placeholder, default, yPos, w, h)
 		local bg = Instance.new("Frame", parent)
-		bg.Size             = UDim2.new(0, w or (PANEL_W - PAD*2), 0, h or INP_H)
-		bg.Position         = UDim2.new(0, 0, 0, yPos or 16)
-		bg.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
-		bg.BorderSizePixel  = 0
-		addCorner(bg, 7)
-		addStroke(bg, Color3.fromRGB(55, 55, 78), 1, 0.1)
-
+		bg.Size = UDim2.new(0, w or (PANEL_W-PAD*2), 0, h or INP_H)
+		bg.Position = UDim2.new(0,0,0,yPos or 14)
+		bg.BackgroundColor3 = Color3.fromRGB(26,26,36)
+		bg.BorderSizePixel = 0; addCorner(bg,6); addStroke(bg, Color3.fromRGB(55,55,78),1,0.1)
 		local box = Instance.new("TextBox", bg)
-		box.Size              = UDim2.new(1, -12, 1, 0)
-		box.Position          = UDim2.new(0, 7, 0, 0)
-		box.BackgroundTransparency = 1
-		box.PlaceholderText   = placeholder or ""
-		box.PlaceholderColor3 = Color3.fromRGB(70, 70, 95)
-		box.Text              = default or ""
-		box.TextColor3        = Color3.fromRGB(210, 210, 228)
-		box.Font              = Enum.Font.Gotham
-		box.TextSize          = FONT_INP
-		box.TextXAlignment    = Enum.TextXAlignment.Left
-		box.TextWrapped       = true
-		box.ClearTextOnFocus  = false
-
+		box.Size = UDim2.new(1,-10,1,0); box.Position = UDim2.new(0,6,0,0)
+		box.BackgroundTransparency = 1; box.PlaceholderText = placeholder or ""
+		box.PlaceholderColor3 = Color3.fromRGB(70,70,95); box.Text = default or ""
+		box.TextColor3 = Color3.fromRGB(210,210,228); box.Font = Enum.Font.Gotham
+		box.TextSize = FONT_INP; box.TextXAlignment = Enum.TextXAlignment.Left
+		box.TextWrapped = true; box.ClearTextOnFocus = false
 		box.Focused:Connect(function()
-			tw(bg, { BackgroundColor3 = Color3.fromRGB(30, 30, 46) })
-			local s = bg:FindFirstChildOfClass("UIStroke")
-			if s then tw(s, { Color = Color3.fromRGB(90, 130, 255) }) end
+			tw(bg,{BackgroundColor3=Color3.fromRGB(30,30,46)})
+			local s=bg:FindFirstChildOfClass("UIStroke"); if s then tw(s,{Color=Color3.fromRGB(90,130,255)}) end
 		end)
 		box.FocusLost:Connect(function()
-			tw(bg, { BackgroundColor3 = Color3.fromRGB(26, 26, 36) })
-			local s = bg:FindFirstChildOfClass("UIStroke")
-			if s then tw(s, { Color = Color3.fromRGB(55, 55, 78) }) end
+			tw(bg,{BackgroundColor3=Color3.fromRGB(26,26,36)})
+			local s=bg:FindFirstChildOfClass("UIStroke"); if s then tw(s,{Color=Color3.fromRGB(55,55,78)}) end
 		end)
 		return box, bg
 	end
 
-	-- =========================================================
-	--  SECCIONES DEL FORMULARIO
-	-- =========================================================
-
-	-- Encabezado
 	local secEnc, _ = crearSeccion("ENCABEZADO", 1)
-	local encabezadoBox = crearInputBox(secEnc, "Título de la notificación", "", 16)
+	local encabezadoBox = crearInputBox(secEnc, "Titulo de la notificacion", "", 14)
 
-	-- Mensaje
-	local MSG_H = esMobil and 56 or 50
+	local MSG_H = esMobil and 48 or 44
 	local secMsg, _ = crearSeccion("MENSAJE", 2)
-	secMsg.Size = UDim2.new(1, 0, 0, MSG_H + 18)
-	local cajaMensaje, _ = crearInputBox(secMsg, "Escribe el mensaje... (soporta https://links)", "", 16, nil, MSG_H)
+	secMsg.Size = UDim2.new(1,0,0,MSG_H+16)
+	local cajaMensaje = crearInputBox(secMsg, "Escribe el mensaje... (soporta https://links)", "", 14, nil, MSG_H)
 
-	-- Duración
-	local secDur, _ = crearSeccion("DURACIÓN (segundos)", 3)
-	local duracionBox = crearInputBox(secDur, "6", "6", 16)
+	local secDur, _ = crearSeccion("DURACION (segundos)", 3)
+	local duracionBox = crearInputBox(secDur, "6", "6", 14)
 
-	-- Posición (dropdown)
-	local secPos, _ = crearSeccion("POSICIÓN", 4)
-
+	-- Dropdown posicion
+	local secPos, _ = crearSeccion("POSICION", 4)
 	local dropBtn = Instance.new("TextButton", secPos)
-	dropBtn.Size             = UDim2.new(1, 0, 0, INP_H)
-	dropBtn.Position         = UDim2.new(0, 0, 0, 16)
-	dropBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
-	dropBtn.TextColor3       = Color3.fromRGB(210, 210, 228)
-	dropBtn.Font             = Enum.Font.Gotham
-	dropBtn.TextSize         = FONT_INP
-	dropBtn.Text             = ">> Arriba derecha"
-	dropBtn.BorderSizePixel  = 0
-	dropBtn.TextXAlignment   = Enum.TextXAlignment.Left
-	dropBtn.AutoButtonColor  = false
-	addCorner(dropBtn, 7)
-	addStroke(dropBtn, Color3.fromRGB(55, 55, 78), 1, 0.1)
-
-	local dpPad = Instance.new("UIPadding", dropBtn)
-	dpPad.PaddingLeft = UDim.new(0, 8)
-
-	local chevron = Instance.new("TextLabel", dropBtn)
-	chevron.Size                 = UDim2.new(0, 24, 1, 0)
-	chevron.Position             = UDim2.new(1, -26, 0, 0)
-	chevron.BackgroundTransparency = 1
-	chevron.Text                 = "v"
-	chevron.TextColor3           = Color3.fromRGB(90, 90, 120)
-	chevron.Font                 = Enum.Font.GothamBold
-	chevron.TextSize             = 16
+	dropBtn.Size = UDim2.new(1,0,0,INP_H); dropBtn.Position = UDim2.new(0,0,0,14)
+	dropBtn.BackgroundColor3 = Color3.fromRGB(26,26,36)
+	dropBtn.TextColor3 = Color3.fromRGB(210,210,228)
+	dropBtn.Font = Enum.Font.Gotham; dropBtn.TextSize = FONT_INP
+	dropBtn.Text = ">> Arriba derecha"
+	dropBtn.BorderSizePixel = 0; dropBtn.TextXAlignment = Enum.TextXAlignment.Left
+	dropBtn.AutoButtonColor = false
+	addCorner(dropBtn,6); addStroke(dropBtn, Color3.fromRGB(55,55,78),1,0.1)
+	local dpPad = Instance.new("UIPadding",dropBtn); dpPad.PaddingLeft = UDim.new(0,8)
+	local chevron = Instance.new("TextLabel",dropBtn)
+	chevron.Size=UDim2.new(0,22,1,0); chevron.Position=UDim2.new(1,-24,0,0)
+	chevron.BackgroundTransparency=1; chevron.Text="v"
+	chevron.TextColor3=Color3.fromRGB(90,90,120)
+	chevron.Font=Enum.Font.GothamBold; chevron.TextSize=14
 
 	local dropOverlay = Instance.new("Frame", screenGui)
-	dropOverlay.Size             = UDim2.new(0, PANEL_W - PAD*2, 0, #POSICIONES * (INP_H + 2))
-	dropOverlay.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	dropOverlay.BorderSizePixel  = 0
-	dropOverlay.Visible          = false
-	dropOverlay.ZIndex           = 50
-	addCorner(dropOverlay, 8)
-	addStroke(dropOverlay, Color3.fromRGB(70, 70, 100), 1, 0.1)
+	dropOverlay.Size = UDim2.new(0, PANEL_W-PAD*2, 0, #POSICIONES*(INP_H+2))
+	dropOverlay.BackgroundColor3 = Color3.fromRGB(20,20,30)
+	dropOverlay.BorderSizePixel = 0; dropOverlay.Visible = false; dropOverlay.ZIndex = 50
+	addCorner(dropOverlay,7); addStroke(dropOverlay, Color3.fromRGB(70,70,100),1,0.1)
 
 	for i, pos in ipairs(POSICIONES) do
+		local posId   = pos.id     -- captura local para el closure
+		local posLabel = pos.label
 		local opt = Instance.new("TextButton", dropOverlay)
-		opt.Size             = UDim2.new(1, -4, 0, INP_H)
-		opt.Position         = UDim2.new(0, 2, 0, (i-1) * (INP_H + 2) + 2)
-		opt.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-		opt.TextColor3       = Color3.fromRGB(200, 200, 218)
-		opt.Font             = Enum.Font.Gotham
-		opt.TextSize         = FONT_INP
-		opt.Text             = pos.label
-		opt.BorderSizePixel  = 0
-		opt.ZIndex           = 51
-		opt.AutoButtonColor  = false
-		opt.TextXAlignment   = Enum.TextXAlignment.Left
-		addCorner(opt, 6)
-		local oPad = Instance.new("UIPadding", opt)
-		oPad.PaddingLeft = UDim.new(0, 10)
-
-		opt.MouseEnter:Connect(function() tw(opt, { BackgroundColor3 = Color3.fromRGB(40, 48, 78) }) end)
-		opt.MouseLeave:Connect(function() tw(opt, { BackgroundColor3 = Color3.fromRGB(28, 28, 42) }) end)
+		opt.Size = UDim2.new(1,-4,0,INP_H); opt.Position = UDim2.new(0,2,0,(i-1)*(INP_H+2)+2)
+		opt.BackgroundColor3 = Color3.fromRGB(28,28,42)
+		opt.TextColor3 = Color3.fromRGB(200,200,218)
+		opt.Font = Enum.Font.Gotham; opt.TextSize = FONT_INP; opt.Text = posLabel
+		opt.BorderSizePixel = 0; opt.ZIndex = 51; opt.AutoButtonColor = false
+		opt.TextXAlignment = Enum.TextXAlignment.Left; addCorner(opt,5)
+		local oPad=Instance.new("UIPadding",opt); oPad.PaddingLeft=UDim.new(0,8)
+		opt.MouseEnter:Connect(function() tw(opt,{BackgroundColor3=Color3.fromRGB(40,48,78)}) end)
+		opt.MouseLeave:Connect(function() tw(opt,{BackgroundColor3=Color3.fromRGB(28,28,42)}) end)
 		opt.MouseButton1Click:Connect(function()
-			posicionSeleccionada = pos.id
-			dropBtn.Text         = pos.label
-			dropOverlay.Visible  = false
-			chevron.Text         = "v"
+			posicionSeleccionada = posId        -- <-- variable del modulo
+			dropBtn.Text = posLabel
+			dropOverlay.Visible = false
+			chevron.Text = "v"
 		end)
 	end
 
@@ -368,914 +405,533 @@ if duenos[player.Name] then
 		local absS = dropBtn.AbsoluteSize
 		dropOverlay.Position = UDim2.new(0, abs.X, 0, abs.Y + absS.Y + 4)
 	end
-
 	dropBtn.MouseButton1Click:Connect(function()
 		actualizarPosDropdown()
 		dropOverlay.Visible = not dropOverlay.Visible
 		chevron.Text = dropOverlay.Visible and "^" or "v"
 	end)
-
 	UserInput.InputBegan:Connect(function(input)
-		if dropOverlay.Visible then
-			if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-				task.wait(0.05)
-				dropOverlay.Visible = false
-				chevron.Text = "v"
-			end
-		end
-	end)
-
-	-- =========================================================
-	--  SECCIÓN COLOR CON PICKER + RGB INPUTS
-	-- =========================================================
-	local COL_W = math.floor((PANEL_W - PAD*2 - 44) / 3)
-
-	-- Sección contenedora de color (altura mayor para picker)
-	local PICKER_H   = 140 -- altura del widget picker
-	local secColor   = Instance.new("Frame", content)
-	secColor.Size    = UDim2.new(1, 0, 0, 14 + PICKER_H + 12 + INP_H + 8)
-	secColor.BackgroundTransparency = 1
-	secColor.LayoutOrder = 5
-
-	-- Label sección
-	local colorSectionLbl = Instance.new("TextLabel", secColor)
-	colorSectionLbl.Size                 = UDim2.new(1, 0, 0, 14)
-	colorSectionLbl.BackgroundTransparency = 1
-	colorSectionLbl.Text                 = "COLOR"
-	colorSectionLbl.TextColor3           = Color3.fromRGB(90, 130, 255)
-	colorSectionLbl.Font                 = Enum.Font.GothamBold
-	colorSectionLbl.TextSize             = FONT_LBL
-	colorSectionLbl.TextXAlignment       = Enum.TextXAlignment.Left
-
-	-- ---------------------------------------------------------
-	--  COLOR PICKER WIDGET  (HSV rueda + SV box)
-	-- ---------------------------------------------------------
-	local PICKER_W    = PANEL_W - PAD*2
-	local SV_SIZE     = PICKER_H           -- cuadrado saturación/brillo
-	local HUE_W       = 18                 -- barra de tono
-	local HUE_GAP     = 6
-
-	-- Contenedor del picker
-	local pickerFrame = Instance.new("Frame", secColor)
-	pickerFrame.Size             = UDim2.new(1, 0, 0, PICKER_H)
-	pickerFrame.Position         = UDim2.new(0, 0, 0, 16)
-	pickerFrame.BackgroundTransparency = 1
-	pickerFrame.BorderSizePixel  = 0
-
-	-- ---- SV Box (saturación / brillo) ----
-	local svBox = Instance.new("Frame", pickerFrame)
-	svBox.Size             = UDim2.new(0, SV_SIZE, 0, SV_SIZE)
-	svBox.Position         = UDim2.new(0, 0, 0, 0)
-	svBox.BackgroundColor3 = Color3.fromHSV(0.6, 1, 1)  -- color puro por defecto (= hue inicial)
-	svBox.BorderSizePixel  = 0
-	addCorner(svBox, 6)
-	addStroke(svBox, Color3.fromRGB(55, 55, 78), 1, 0.1)
-
-	-- Gradiente blanco → transparente (saturación)
-	local svGradW = Instance.new("UIGradient", svBox)
-	svGradW.Color    = ColorSequence.new(Color3.new(1,1,1), Color3.new(1,1,1))
-	svGradW.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	svGradW.Rotation = 0
-
-	-- Frame negro sobre el de arriba (brillo)
-	local svDark = Instance.new("Frame", svBox)
-	svDark.Size             = UDim2.new(1, 0, 1, 0)
-	svDark.BackgroundColor3 = Color3.new(0, 0, 0)
-	svDark.BackgroundTransparency = 0
-	svDark.BorderSizePixel  = 0
-	addCorner(svDark, 6)
-
-	local svGradD = Instance.new("UIGradient", svDark)
-	svGradD.Color    = ColorSequence.new(Color3.new(0,0,0), Color3.new(0,0,0))
-	svGradD.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	svGradD.Rotation = 90
-
-	-- Cursor del SV box
-	local svCursor = Instance.new("Frame", svBox)
-	svCursor.Size             = UDim2.new(0, 10, 0, 10)
-	svCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
-	svCursor.Position         = UDim2.new(1, 0, 0, 0) -- se actualiza
-	svCursor.BackgroundColor3 = Color3.new(1,1,1)
-	svCursor.BorderSizePixel  = 0
-	svCursor.ZIndex           = 5
-	addCorner(svCursor, 10)
-	addStroke(svCursor, Color3.new(0,0,0), 1.5, 0)
-
-	-- ---- Barra Hue ----
-	local hueBar = Instance.new("Frame", pickerFrame)
-	hueBar.Size             = UDim2.new(0, HUE_W, 0, SV_SIZE)
-	hueBar.Position         = UDim2.new(0, SV_SIZE + HUE_GAP, 0, 0)
-	hueBar.BackgroundColor3 = Color3.new(1,1,1)
-	hueBar.BorderSizePixel  = 0
-	addCorner(hueBar, 5)
-	addStroke(hueBar, Color3.fromRGB(55, 55, 78), 1, 0.1)
-
-	local hueGrad = Instance.new("UIGradient", hueBar)
-	hueGrad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0/6, Color3.fromHSV(0/6, 1, 1)),
-		ColorSequenceKeypoint.new(1/6, Color3.fromHSV(1/6, 1, 1)),
-		ColorSequenceKeypoint.new(2/6, Color3.fromHSV(2/6, 1, 1)),
-		ColorSequenceKeypoint.new(3/6, Color3.fromHSV(3/6, 1, 1)),
-		ColorSequenceKeypoint.new(4/6, Color3.fromHSV(4/6, 1, 1)),
-		ColorSequenceKeypoint.new(5/6, Color3.fromHSV(5/6, 1, 1)),
-		ColorSequenceKeypoint.new(1,   Color3.fromHSV(1,   1, 1)),
-	})
-	hueGrad.Rotation = 90
-
-	-- Cursor de hue
-	local hueCursor = Instance.new("Frame", hueBar)
-	hueCursor.Size             = UDim2.new(1, 4, 0, 6)
-	hueCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
-	hueCursor.Position         = UDim2.new(0.5, 0, 0.6, 0)
-	hueCursor.BackgroundColor3 = Color3.new(1,1,1)
-	hueCursor.BorderSizePixel  = 0
-	hueCursor.ZIndex           = 5
-	addCorner(hueCursor, 3)
-	addStroke(hueCursor, Color3.new(0,0,0), 1, 0)
-
-	-- ---- Preview color grande ----
-	local colorPreviewBig = Instance.new("Frame", pickerFrame)
-	colorPreviewBig.Size             = UDim2.new(0, SV_SIZE - HUE_W - HUE_GAP - 4, 0, SV_SIZE)
-	colorPreviewBig.Position         = UDim2.new(0, SV_SIZE + HUE_W + HUE_GAP*2 + 2, 0, 0)
-	colorPreviewBig.BackgroundColor3 = Color3.fromRGB(100, 140, 255)
-	colorPreviewBig.BorderSizePixel  = 0
-	addCorner(colorPreviewBig, 8)
-	addStroke(colorPreviewBig, Color3.fromRGB(55,55,78), 1, 0.1)
-
-	-- Hex label dentro del preview
-	local hexLbl = Instance.new("TextLabel", colorPreviewBig)
-	hexLbl.Size                 = UDim2.new(1, -4, 0, 16)
-	hexLbl.Position             = UDim2.new(0, 2, 1, -18)
-	hexLbl.BackgroundTransparency = 1
-	hexLbl.Text                 = "#648CFF"
-	hexLbl.TextColor3           = Color3.new(1,1,1)
-	hexLbl.Font                 = Enum.Font.GothamBold
-	hexLbl.TextSize             = 10
-	hexLbl.TextXAlignment       = Enum.TextXAlignment.Center
-	hexLbl.TextStrokeTransparency = 0.4
-	hexLbl.ZIndex               = 3
-
-	-- ---------------------------------------------------------
-	--  RGB INPUTS (debajo del picker)
-	-- ---------------------------------------------------------
-	local rgbRowY = 16 + PICKER_H + 8
-
-	local colorR, bgR = crearInputBox(secColor, "R", "100", rgbRowY, COL_W)
-	local colorG, bgG = crearInputBox(secColor, "G", "140", rgbRowY, COL_W)
-	local colorB, bgB = crearInputBox(secColor, "B", "255", rgbRowY, COL_W)
-	bgG.Position = UDim2.new(0, COL_W + 6,   0, rgbRowY)
-	bgB.Position = UDim2.new(0, (COL_W+6)*2, 0, rgbRowY)
-
-	-- ---------------------------------------------------------
-	--  LÓGICA DEL PICKER (HSV)
-	-- ---------------------------------------------------------
-	local currentH, currentS, currentV = Color3.fromRGB(100,140,255):ToHSV()
-	local draggingSV  = false
-	local draggingHue = false
-
-	local function hexFromRGB(r, g, b)
-		return string.format("#%02X%02X%02X", math.floor(r), math.floor(g), math.floor(b))
-	end
-
-	-- Actualizar todo a partir de H, S, V
-	local function applyHSV(h, s, v)
-		currentH, currentS, currentV = h, s, v
-		local col = Color3.fromHSV(h, s, v)
-		currentR = math.floor(col.R * 255 + 0.5)
-		currentG = math.floor(col.G * 255 + 0.5)
-		currentB = math.floor(col.B * 255 + 0.5)
-
-		-- Actualizar SV box color puro
-		svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-		-- Mover cursor SV
-		svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
-		-- Mover cursor hue
-		hueCursor.Position = UDim2.new(0.5, 0, h, 0)
-
-		-- Actualizar preview
-		colorPreviewBig.BackgroundColor3 = col
-		hexLbl.Text = hexFromRGB(currentR, currentG, currentB)
-
-		-- Contraste del texto hex
-		local lum = 0.299*col.R + 0.587*col.G + 0.114*col.B
-		hexLbl.TextColor3 = lum > 0.5 and Color3.fromRGB(30,30,30) or Color3.new(1,1,1)
-
-		-- Actualizar RGB inputs (sin disparar sus callbacks)
-		colorR.Text = tostring(currentR)
-		colorG.Text = tostring(currentG)
-		colorB.Text = tostring(currentB)
-	end
-
-	-- Actualizar picker desde RGB inputs
-	local function applyRGB(r, g, b)
-		local h, s, v = Color3.fromRGB(r, g, b):ToHSV()
-		applyHSV(h, s, v)
-	end
-
-	-- Inicializar
-	applyHSV(currentH, currentS, currentV)
-
-	-- Helpers para posición relativa dentro de un frame
-	local function getRelative(frame, absPos)
-		local fPos = frame.AbsolutePosition
-		local fSiz = frame.AbsoluteSize
-		local x = math.clamp((absPos.X - fPos.X) / fSiz.X, 0, 1)
-		local y = math.clamp((absPos.Y - fPos.Y) / fSiz.Y, 0, 1)
-		return x, y
-	end
-
-	-- SV Box input
-	local function onSVInput(pos)
-		local x, y = getRelative(svBox, pos)
-		applyHSV(currentH, x, 1 - y)
-	end
-
-	local function onHueInput(pos)
-		local _, y = getRelative(hueBar, pos)
-		applyHSV(y, currentS, currentV)
-	end
-
-	-- Detectar drag en SV
-	svBox.InputBegan:Connect(function(input)
+		if not dropOverlay.Visible then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch then
-			draggingSV = true
-			onSVInput(input.Position)
+			task.wait(0.08)
+			dropOverlay.Visible = false
+			chevron.Text = "v"
 		end
 	end)
 
-	-- Detectar drag en Hue
-	hueBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
-			draggingHue = true
-			onHueInput(input.Position)
-		end
-	end)
+	-- Seccion COLOR (RGB inputs)
+	local COL_W = math.floor((PANEL_W-PAD*2-40)/3)
+	local secColor, _ = crearSeccion("COLOR  (R / G / B)", 5)
+	secColor.Size = UDim2.new(1,0,0,INP_H+16)
+	local colorR, bgR = crearInputBox(secColor, "R", "100", 14, COL_W)
+	local colorG, bgG = crearInputBox(secColor, "G", "140", 14, COL_W)
+	local colorB, bgB = crearInputBox(secColor, "B", "255", 14, COL_W)
+	bgG.Position = UDim2.new(0, COL_W+5, 0, 14)
+	bgB.Position = UDim2.new(0, (COL_W+5)*2, 0, 14)
 
-	-- Mover mientras arrastra
-	UserInput.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement
-		or input.UserInputType == Enum.UserInputType.Touch then
-			if draggingSV  then onSVInput(input.Position)  end
-			if draggingHue then onHueInput(input.Position) end
-		end
-	end)
+	local colorPreview = Instance.new("Frame", secColor)
+	colorPreview.Size = UDim2.new(0,INP_H,0,INP_H)
+	colorPreview.Position = UDim2.new(1,-INP_H,0,14)
+	colorPreview.BackgroundColor3 = Color3.fromRGB(100,140,255)
+	colorPreview.BorderSizePixel = 0
+	addCorner(colorPreview,6); addStroke(colorPreview, Color3.fromRGB(55,55,78),1,0.1)
 
-	UserInput.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
-			draggingSV  = false
-			draggingHue = false
-		end
-	end)
-
-	-- Cuando cambian los inputs RGB manualmente
+	local function refreshColorPreview()
+		colorPreview.BackgroundColor3 = Color3.fromRGB(currentR, currentG, currentB)
+	end
 	local function onRGBChange()
 		local r = math.clamp(tonumber(colorR.Text) or currentR, 0, 255)
 		local g = math.clamp(tonumber(colorG.Text) or currentG, 0, 255)
 		local b = math.clamp(tonumber(colorB.Text) or currentB, 0, 255)
-		-- Solo actualizar picker si los valores son distintos para evitar loop
-		if r ~= currentR or g ~= currentG or b ~= currentB then
-			applyRGB(r, g, b)
-		end
+		currentR, currentG, currentB = r, g, b
+		currentH, currentS, currentV = Color3.fromRGB(r,g,b):ToHSV()
+		refreshColorPreview()
 	end
 	colorR:GetPropertyChangedSignal("Text"):Connect(onRGBChange)
 	colorG:GetPropertyChangedSignal("Text"):Connect(onRGBChange)
 	colorB:GetPropertyChangedSignal("Text"):Connect(onRGBChange)
 
-	-- Colores presets rápidos (fila de chips)
-	local PRESETS = {
-		Color3.fromRGB(255, 70,  70),   -- rojo
-		Color3.fromRGB(255, 160, 50),   -- naranja
-		Color3.fromRGB(255, 220, 50),   -- amarillo
-		Color3.fromRGB(60,  200, 80),   -- verde
-		Color3.fromRGB(60,  190, 255),  -- celeste
-		Color3.fromRGB(90,  120, 255),  -- azul
-		Color3.fromRGB(180, 80,  255),  -- morado
-		Color3.fromRGB(255, 80,  180),  -- rosa
-		Color3.fromRGB(255, 255, 255),  -- blanco
-		Color3.fromRGB(100, 100, 100),  -- gris
-	}
+	-- ==========================================================
+	--  COLOR PICKER FLOTANTE
+	-- ==========================================================
+	local pickerGui = Instance.new("ScreenGui", guiParent)
+	pickerGui.Name = "JmodsColorPicker"; pickerGui.ResetOnSpawn = false
+	pickerGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
-	local presetRow = Instance.new("Frame", content)
-	presetRow.Size             = UDim2.new(1, 0, 0, 24)
-	presetRow.BackgroundTransparency = 1
-	presetRow.LayoutOrder      = 6
+	local PK_W  = 268
+	local SV_SZ = 152
+	local HB_W  = 15
+	local PK_H  = 3 + 28 + 8 + SV_SZ + 8 + 22 + 6 + 28 + 10
 
-	local presetLayout = Instance.new("UIListLayout", presetRow)
-	presetLayout.FillDirection       = Enum.FillDirection.Horizontal
-	presetLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	presetLayout.VerticalAlignment   = Enum.VerticalAlignment.Center
-	presetLayout.Padding             = UDim.new(0, 5)
+	local pickerWin = Instance.new("Frame", pickerGui)
+	pickerWin.Size = UDim2.new(0,PK_W,0,PK_H)
+	pickerWin.Position = UDim2.new(0,400,0,80)
+	pickerWin.BackgroundColor3 = Color3.fromRGB(14,14,20)
+	pickerWin.BorderSizePixel = 0; pickerWin.Active = true
+	pickerWin.Draggable = false; pickerWin.Visible = false
+	addCorner(pickerWin,10); addStroke(pickerWin, Color3.fromRGB(70,70,100),1,0)
 
-	for _, col in ipairs(PRESETS) do
-		local chip = Instance.new("TextButton", presetRow)
-		chip.Size             = UDim2.new(0, 22, 0, 22)
-		chip.BackgroundColor3 = col
-		chip.Text             = ""
-		chip.BorderSizePixel  = 0
-		chip.AutoButtonColor  = false
-		addCorner(chip, 5)
-		addStroke(chip, Color3.fromRGB(55,55,78), 1, 0.2)
+	local pkAccent = Instance.new("Frame", pickerWin)
+	pkAccent.Size=UDim2.new(1,0,0,3); pkAccent.BorderSizePixel=0
+	pkAccent.BackgroundColor3=Color3.fromRGB(90,130,255); addCorner(pkAccent,10)
+	addGradient(pkAccent, Color3.fromRGB(90,130,255), Color3.fromRGB(180,90,255))
 
-		chip.MouseEnter:Connect(function()
-			tw(chip, { Size = UDim2.new(0, 25, 0, 25) }, 0.1)
+	local pkHeader = Instance.new("Frame", pickerWin)
+	pkHeader.Size=UDim2.new(1,0,0,28); pkHeader.Position=UDim2.new(0,0,0,3)
+	pkHeader.BackgroundColor3=Color3.fromRGB(20,20,28); pkHeader.BorderSizePixel=0; pkHeader.Active=true
+
+	local pkTitle = Instance.new("TextLabel", pkHeader)
+	pkTitle.Size=UDim2.new(1,-34,1,0); pkTitle.Position=UDim2.new(0,8,0,0)
+	pkTitle.BackgroundTransparency=1; pkTitle.Text="[CP] Color Picker"
+	pkTitle.TextColor3=Color3.fromRGB(200,200,220); pkTitle.Font=Enum.Font.GothamBold
+	pkTitle.TextSize=12; pkTitle.TextXAlignment=Enum.TextXAlignment.Left
+
+	local pkClose = Instance.new("TextButton", pkHeader)
+	pkClose.Size=UDim2.new(0,22,0,18); pkClose.Position=UDim2.new(1,-25,0,5)
+	pkClose.BackgroundColor3=Color3.fromRGB(180,50,50); pkClose.Text="X"
+	pkClose.TextColor3=Color3.new(1,1,1); pkClose.Font=Enum.Font.GothamBold
+	pkClose.TextSize=11; pkClose.BorderSizePixel=0; pkClose.AutoButtonColor=false
+	addCorner(pkClose,4)
+	pkClose.MouseButton1Click:Connect(function() pickerWin.Visible=false end)
+
+	-- Drag manual desde pkHeader
+	do
+		local dragWin=false; local dragStart=Vector2.new(); local winStart=Vector2.new()
+		pkHeader.InputBegan:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then
+				dragWin=true
+				dragStart=Vector2.new(input.Position.X,input.Position.Y)
+				winStart=Vector2.new(pickerWin.Position.X.Offset,pickerWin.Position.Y.Offset)
+			end
 		end)
-		chip.MouseLeave:Connect(function()
-			tw(chip, { Size = UDim2.new(0, 22, 0, 22) }, 0.1)
+		UserInput.InputChanged:Connect(function(input)
+			if not dragWin then return end
+			if input.UserInputType~=Enum.UserInputType.MouseMovement
+			and input.UserInputType~=Enum.UserInputType.Touch then return end
+			local d=Vector2.new(input.Position.X,input.Position.Y)-dragStart
+			pickerWin.Position=UDim2.new(0,winStart.X+d.X,0,winStart.Y+d.Y)
 		end)
-		chip.MouseButton1Click:Connect(function()
-			local h, s, v = col:ToHSV()
-			applyHSV(h, s, v)
+		UserInput.InputEnded:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then dragWin=false end
 		end)
 	end
 
-	-- =========================================================
-	--  TOGGLE FIJAR
-	-- =========================================================
-	local fijarNotificacion = false
-	local secFijar = Instance.new("Frame", content)
-	secFijar.Size             = UDim2.new(1, 0, 0, INP_H)
-	secFijar.BackgroundTransparency = 1
-	secFijar.LayoutOrder      = 7
+	local WORK_PAD = 7
+	local pkContent = Instance.new("Frame", pickerWin)
+	pkContent.Size=UDim2.new(1,-WORK_PAD*2,0,SV_SZ+64)
+	pkContent.Position=UDim2.new(0,WORK_PAD,0,37)
+	pkContent.BackgroundTransparency=1; pkContent.BorderSizePixel=0
 
-	local fijarBtn = Instance.new("TextButton", secFijar)
-	fijarBtn.Size             = UDim2.new(1, 0, 1, 0)
-	fijarBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
-	fijarBtn.TextColor3       = Color3.fromRGB(180, 180, 205)
-	fijarBtn.Font             = Enum.Font.Gotham
-	fijarBtn.TextSize         = esMobil and 13 or 12
-	fijarBtn.Text             = "[PIN] Fijar notificacion (no expira)  -  OFF"
-	fijarBtn.BorderSizePixel  = 0
-	fijarBtn.AutoButtonColor  = false
-	addCorner(fijarBtn, 8)
-	addStroke(fijarBtn, Color3.fromRGB(55, 55, 78), 1, 0.3)
+	local svBox = Instance.new("Frame", pkContent)
+	svBox.Size=UDim2.new(0,SV_SZ,0,SV_SZ); svBox.Position=UDim2.new(0,0,0,0)
+	svBox.BackgroundColor3=Color3.fromHSV(currentH,1,1)
+	svBox.BorderSizePixel=0; svBox.ClipsDescendants=false; svBox.Active=true
+	addCorner(svBox,5); addStroke(svBox, Color3.fromRGB(55,55,78),1,0.1)
 
+	local svLW=Instance.new("Frame",svBox); svLW.Size=UDim2.new(1,0,1,0)
+	svLW.BackgroundColor3=Color3.new(1,1,1); svLW.BorderSizePixel=0; svLW.Active=false; addCorner(svLW,5)
+	local svGW=Instance.new("UIGradient",svLW)
+	svGW.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,1)}); svGW.Rotation=0
+
+	local svLB=Instance.new("Frame",svBox); svLB.Size=UDim2.new(1,0,1,0)
+	svLB.BackgroundColor3=Color3.new(0,0,0); svLB.BorderSizePixel=0; svLB.Active=false; addCorner(svLB,5)
+	local svGB=Instance.new("UIGradient",svLB)
+	svGB.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(1,0)}); svGB.Rotation=90
+
+	local svCursor=Instance.new("Frame",svBox)
+	svCursor.Size=UDim2.new(0,11,0,11); svCursor.AnchorPoint=Vector2.new(0.5,0.5)
+	svCursor.BackgroundColor3=Color3.new(1,1,1); svCursor.BorderSizePixel=0
+	svCursor.ZIndex=20; svCursor.Active=false
+	svCursor.Position=UDim2.new(currentS,0,1-currentV,0)
+	addCorner(svCursor,10); addStroke(svCursor,Color3.new(0,0,0),1.5,0)
+
+	local hueBar=Instance.new("Frame",pkContent)
+	hueBar.Size=UDim2.new(0,HB_W,0,SV_SZ); hueBar.Position=UDim2.new(0,SV_SZ+6,0,0)
+	hueBar.BackgroundColor3=Color3.new(1,1,1); hueBar.BorderSizePixel=0; hueBar.Active=true
+	addCorner(hueBar,4); addStroke(hueBar, Color3.fromRGB(55,55,78),1,0.1)
+	local hueGrad=Instance.new("UIGradient",hueBar)
+	hueGrad.Color=ColorSequence.new({
+		ColorSequenceKeypoint.new(0,    Color3.fromHSV(0,1,1)),
+		ColorSequenceKeypoint.new(1/6,  Color3.fromHSV(1/6,1,1)),
+		ColorSequenceKeypoint.new(2/6,  Color3.fromHSV(2/6,1,1)),
+		ColorSequenceKeypoint.new(3/6,  Color3.fromHSV(3/6,1,1)),
+		ColorSequenceKeypoint.new(4/6,  Color3.fromHSV(4/6,1,1)),
+		ColorSequenceKeypoint.new(5/6,  Color3.fromHSV(5/6,1,1)),
+		ColorSequenceKeypoint.new(1,    Color3.fromHSV(0,1,1)),
+	}); hueGrad.Rotation=90
+
+	local hueCursor=Instance.new("Frame",hueBar)
+	hueCursor.Size=UDim2.new(1,5,0,5); hueCursor.AnchorPoint=Vector2.new(0.5,0.5)
+	hueCursor.BackgroundColor3=Color3.new(1,1,1); hueCursor.BorderSizePixel=0
+	hueCursor.ZIndex=20; hueCursor.Active=false
+	hueCursor.Position=UDim2.new(0.5,0,currentH,0)
+	addCorner(hueCursor,2); addStroke(hueCursor,Color3.new(0,0,0),1.5,0)
+
+	local previewW = PK_W - WORK_PAD*2 - SV_SZ - HB_W - 12
+	local pkPreview=Instance.new("Frame",pkContent)
+	pkPreview.Size=UDim2.new(0,previewW,0,SV_SZ)
+	pkPreview.Position=UDim2.new(0,SV_SZ+HB_W+11,0,0)
+	pkPreview.BackgroundColor3=Color3.fromRGB(currentR,currentG,currentB)
+	pkPreview.BorderSizePixel=0; addCorner(pkPreview,6); addStroke(pkPreview,Color3.fromRGB(55,55,78),1,0.1)
+
+	local pkHexLbl=Instance.new("TextLabel",pkPreview)
+	pkHexLbl.Size=UDim2.new(1,-2,0,28); pkHexLbl.Position=UDim2.new(0,1,1,-30)
+	pkHexLbl.BackgroundTransparency=1
+	pkHexLbl.Text=string.format("#%02X%02X%02X",currentR,currentG,currentB)
+	pkHexLbl.TextColor3=Color3.new(1,1,1); pkHexLbl.Font=Enum.Font.GothamBold
+	pkHexLbl.TextSize=8; pkHexLbl.TextXAlignment=Enum.TextXAlignment.Center
+	pkHexLbl.TextWrapped=true; pkHexLbl.TextStrokeTransparency=0.3; pkHexLbl.ZIndex=22
+
+	local PRESETS={
+		Color3.fromRGB(255,70,70),Color3.fromRGB(255,160,50),Color3.fromRGB(255,220,50),
+		Color3.fromRGB(60,200,80),Color3.fromRGB(60,190,255),Color3.fromRGB(90,120,255),
+		Color3.fromRGB(180,80,255),Color3.fromRGB(255,80,180),Color3.fromRGB(255,255,255),
+		Color3.fromRGB(100,100,100),
+	}
+	local presetsRow=Instance.new("Frame",pkContent)
+	presetsRow.Size=UDim2.new(1,0,0,20); presetsRow.Position=UDim2.new(0,0,0,SV_SZ+8)
+	presetsRow.BackgroundTransparency=1; presetsRow.BorderSizePixel=0
+	local presetsLayout=Instance.new("UIListLayout",presetsRow)
+	presetsLayout.FillDirection=Enum.FillDirection.Horizontal; presetsLayout.Padding=UDim.new(0,4)
+	presetsLayout.VerticalAlignment=Enum.VerticalAlignment.Center
+
+	local pkHexInput=Instance.new("Frame",pkContent)
+	pkHexInput.Size=UDim2.new(1,0,0,26); pkHexInput.Position=UDim2.new(0,0,0,SV_SZ+34)
+	pkHexInput.BackgroundColor3=Color3.fromRGB(22,22,32); pkHexInput.BorderSizePixel=0
+	addCorner(pkHexInput,6); addStroke(pkHexInput,Color3.fromRGB(55,55,78),1,0.1)
+	local hexBox=Instance.new("TextBox",pkHexInput)
+	hexBox.Size=UDim2.new(1,-10,1,0); hexBox.Position=UDim2.new(0,6,0,0)
+	hexBox.BackgroundTransparency=1; hexBox.PlaceholderText="#648CFF"
+	hexBox.Text=string.format("#%02X%02X%02X",currentR,currentG,currentB)
+	hexBox.TextColor3=Color3.fromRGB(210,210,228); hexBox.Font=Enum.Font.Gotham
+	hexBox.TextSize=FONT_INP; hexBox.ClearTextOnFocus=false
+
+	-- DRAG: variable unica activeZone
+	local activeZone = nil
+
+	local function getRelative(f, pos)
+		local fp=f.AbsolutePosition; local fs=f.AbsoluteSize
+		return math.clamp((pos.X-fp.X)/fs.X,0,1), math.clamp((pos.Y-fp.Y)/fs.Y,0,1)
+	end
+	local function inside(f, pos)
+		local fp=f.AbsolutePosition; local fs=f.AbsoluteSize
+		return pos.X>=fp.X and pos.X<=fp.X+fs.X and pos.Y>=fp.Y and pos.Y<=fp.Y+fs.Y
+	end
+
+	local function applyHSV(h, s, v)
+		currentH=math.clamp(h,0,1); currentS=math.clamp(s,0,1); currentV=math.clamp(v,0,1)
+		local col=Color3.fromHSV(currentH,currentS,currentV)
+		currentR=math.clamp(math.floor(col.R*255+0.5),0,255)
+		currentG=math.clamp(math.floor(col.G*255+0.5),0,255)
+		currentB=math.clamp(math.floor(col.B*255+0.5),0,255)
+		svBox.BackgroundColor3=Color3.fromHSV(currentH,1,1)
+		svCursor.Position=UDim2.new(currentS,0,1-currentV,0)
+		hueCursor.Position=UDim2.new(0.5,0,currentH,0)
+		pkPreview.BackgroundColor3=col
+		local hex=string.format("#%02X%02X%02X",currentR,currentG,currentB)
+		pkHexLbl.Text=hex; hexBox.Text=hex
+		local lum=0.299*col.R+0.587*col.G+0.114*col.B
+		pkHexLbl.TextColor3=lum>0.55 and Color3.fromRGB(30,30,30) or Color3.new(1,1,1)
+		colorR.Text=tostring(currentR); colorG.Text=tostring(currentG); colorB.Text=tostring(currentB)
+		refreshColorPreview()
+	end
+
+	applyHSV(currentH, currentS, currentV)
+
+	svBox.InputBegan:Connect(function(input)
+		if (input.UserInputType~=Enum.UserInputType.MouseButton1
+		and input.UserInputType~=Enum.UserInputType.Touch) then return end
+		if not inside(svBox, input.Position) then return end
+		activeZone = "sv"
+		local x,y=getRelative(svBox, input.Position)
+		applyHSV(currentH, x, 1-y)
+	end)
+
+	hueBar.InputBegan:Connect(function(input)
+		if (input.UserInputType~=Enum.UserInputType.MouseButton1
+		and input.UserInputType~=Enum.UserInputType.Touch) then return end
+		if not inside(hueBar, input.Position) then return end
+		activeZone = "hue"
+		local _,y=getRelative(hueBar, input.Position)
+		applyHSV(y, currentS, currentV)
+	end)
+
+	UserInput.InputChanged:Connect(function(input)
+		if input.UserInputType~=Enum.UserInputType.MouseMovement
+		and input.UserInputType~=Enum.UserInputType.Touch then return end
+		if not pickerWin.Visible then activeZone=nil; return end
+		if activeZone=="sv" then
+			local x,y=getRelative(svBox, input.Position); applyHSV(currentH, x, 1-y)
+		elseif activeZone=="hue" then
+			local _,y=getRelative(hueBar, input.Position); applyHSV(y, currentS, currentV)
+		end
+	end)
+
+	UserInput.InputEnded:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1
+		or input.UserInputType==Enum.UserInputType.Touch then activeZone=nil end
+	end)
+
+	pickerWin:GetPropertyChangedSignal("Visible"):Connect(function()
+		if not pickerWin.Visible then activeZone=nil end
+	end)
+
+	hexBox.FocusLost:Connect(function()
+		local hex=hexBox.Text:gsub("#",""):upper()
+		if #hex==6 then
+			local r=tonumber(hex:sub(1,2),16) or currentR
+			local g=tonumber(hex:sub(3,4),16) or currentG
+			local b=tonumber(hex:sub(5,6),16) or currentB
+			local h,s,v=Color3.fromRGB(r,g,b):ToHSV(); applyHSV(h,s,v)
+		end
+	end)
+
+	for _,col in ipairs(PRESETS) do
+		local chip=Instance.new("TextButton",presetsRow)
+		chip.Size=UDim2.new(0,17,0,17); chip.BackgroundColor3=col; chip.Text=""
+		chip.BorderSizePixel=0; chip.AutoButtonColor=false; addCorner(chip,3)
+		addStroke(chip,Color3.fromRGB(55,55,78),1,0.2)
+		chip.MouseEnter:Connect(function() tw(chip,{Size=UDim2.new(0,20,0,20)},0.1) end)
+		chip.MouseLeave:Connect(function() tw(chip,{Size=UDim2.new(0,17,0,17)},0.1) end)
+		chip.MouseButton1Click:Connect(function() local h,s,v=col:ToHSV(); applyHSV(h,s,v) end)
+	end
+
+	-- Boton abrir/cerrar picker
+	local secColorBtn=Instance.new("Frame",content)
+	secColorBtn.Size=UDim2.new(1,0,0,BTN_H-4); secColorBtn.BackgroundTransparency=1; secColorBtn.LayoutOrder=6
+
+	local openPickerBtn=Instance.new("TextButton",secColorBtn)
+	openPickerBtn.Size=UDim2.new(1,0,1,0); openPickerBtn.BackgroundColor3=Color3.fromRGB(24,28,40)
+	openPickerBtn.TextColor3=Color3.fromRGB(160,185,255); openPickerBtn.Font=Enum.Font.GothamBold
+	openPickerBtn.TextSize=esMobil and 13 or 12; openPickerBtn.Text="Abrir Color Picker"
+	openPickerBtn.BorderSizePixel=0; openPickerBtn.AutoButtonColor=false
+	addCorner(openPickerBtn,7); addStroke(openPickerBtn,Color3.fromRGB(70,100,200),1,0.2)
+	openPickerBtn.MouseEnter:Connect(function() tw(openPickerBtn,{BackgroundColor3=Color3.fromRGB(30,38,60)}) end)
+	openPickerBtn.MouseLeave:Connect(function() tw(openPickerBtn,{BackgroundColor3=Color3.fromRGB(24,28,40)}) end)
+	openPickerBtn.MouseButton1Click:Connect(function()
+		pickerWin.Visible=not pickerWin.Visible
+		if pickerWin.Visible then
+			openPickerBtn.Text="Cerrar Color Picker"
+			tw(openPickerBtn,{BackgroundColor3=Color3.fromRGB(22,48,28)})
+			local s=openPickerBtn:FindFirstChildOfClass("UIStroke")
+			if s then s.Color=Color3.fromRGB(50,160,70);s.Transparency=0 end
+		else
+			openPickerBtn.Text="Abrir Color Picker"
+			tw(openPickerBtn,{BackgroundColor3=Color3.fromRGB(24,28,40)})
+			local s=openPickerBtn:FindFirstChildOfClass("UIStroke")
+			if s then s.Color=Color3.fromRGB(70,100,200);s.Transparency=0.2 end
+		end
+	end)
+
+	-- Toggle Fijar
+	local fijarNotificacion=false
+	local secFijar=Instance.new("Frame",content)
+	secFijar.Size=UDim2.new(1,0,0,INP_H); secFijar.BackgroundTransparency=1; secFijar.LayoutOrder=7
+
+	local fijarBtn=Instance.new("TextButton",secFijar)
+	fijarBtn.Size=UDim2.new(1,0,1,0); fijarBtn.BackgroundColor3=Color3.fromRGB(26,26,36)
+	fijarBtn.TextColor3=Color3.fromRGB(180,180,205); fijarBtn.Font=Enum.Font.Gotham
+	fijarBtn.TextSize=esMobil and 12 or 11
+	fijarBtn.Text="[PIN] Fijar notificacion (no expira)  -  OFF"
+	fijarBtn.BorderSizePixel=0; fijarBtn.AutoButtonColor=false
+	addCorner(fijarBtn,7); addStroke(fijarBtn,Color3.fromRGB(55,55,78),1,0.3)
 	fijarBtn.MouseButton1Click:Connect(function()
-		fijarNotificacion = not fijarNotificacion
+		fijarNotificacion=not fijarNotificacion
 		if fijarNotificacion then
-			fijarBtn.Text = "[PIN] Fijar notificacion (no expira)  -  ON"
-			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(22, 48, 28) })
-			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
-			if s then s.Color = Color3.fromRGB(50, 160, 70); s.Transparency = 0 end
+			fijarBtn.Text="[PIN] Fijar notificacion (no expira)  -  ON"
+			tw(fijarBtn,{BackgroundColor3=Color3.fromRGB(22,48,28)})
+			local s=fijarBtn:FindFirstChildOfClass("UIStroke"); if s then s.Color=Color3.fromRGB(50,160,70);s.Transparency=0 end
 		else
-			fijarBtn.Text = "[PIN] Fijar notificacion (no expira)  -  OFF"
-			tw(fijarBtn, { BackgroundColor3 = Color3.fromRGB(26, 26, 36) })
-			local s = fijarBtn:FindFirstChildOfClass("UIStroke")
-			if s then s.Color = Color3.fromRGB(55, 55, 78); s.Transparency = 0.3 end
+			fijarBtn.Text="[PIN] Fijar notificacion (no expira)  -  OFF"
+			tw(fijarBtn,{BackgroundColor3=Color3.fromRGB(26,26,36)})
+			local s=fijarBtn:FindFirstChildOfClass("UIStroke"); if s then s.Color=Color3.fromRGB(55,55,78);s.Transparency=0.3 end
 		end
 	end)
 
-	-- =========================================================
-	--  BOTÓN PREVISUALIZACIÓN
-	-- =========================================================
-	local previewActive = false
-	local previewGui    = nil  -- referencia a la gui de preview
+	-- Boton PREVIEW
+	local previewActive=false; local previewGui=nil
+	local secPreview=Instance.new("Frame",content)
+	secPreview.Size=UDim2.new(1,0,0,BTN_H); secPreview.BackgroundTransparency=1; secPreview.LayoutOrder=8
 
-	local secPreview = Instance.new("Frame", content)
-	secPreview.Size             = UDim2.new(1, 0, 0, BTN_H)
-	secPreview.BackgroundTransparency = 1
-	secPreview.LayoutOrder      = 8
+	local previewBtn=Instance.new("TextButton",secPreview)
+	previewBtn.Size=UDim2.new(1,0,1,0); previewBtn.BackgroundColor3=Color3.fromRGB(30,38,55)
+	previewBtn.TextColor3=Color3.fromRGB(160,180,230); previewBtn.Font=Enum.Font.GothamBold
+	previewBtn.TextSize=esMobil and 13 or 12; previewBtn.Text="[ PREVIEW ] Ver previsualizacion"
+	previewBtn.BorderSizePixel=0; previewBtn.AutoButtonColor=false
+	addCorner(previewBtn,8); addStroke(previewBtn,Color3.fromRGB(70,100,200),1,0.2)
+	previewBtn.MouseEnter:Connect(function() if not previewActive then tw(previewBtn,{BackgroundColor3=Color3.fromRGB(38,50,75)}) end end)
+	previewBtn.MouseLeave:Connect(function() if not previewActive then tw(previewBtn,{BackgroundColor3=Color3.fromRGB(30,38,55)}) end end)
 
-	local previewBtn = Instance.new("TextButton", secPreview)
-	previewBtn.Size             = UDim2.new(1, 0, 1, 0)
-	previewBtn.BackgroundColor3 = Color3.fromRGB(30, 38, 55)
-	previewBtn.TextColor3       = Color3.fromRGB(160, 180, 230)
-	previewBtn.Font             = Enum.Font.GothamBold
-	previewBtn.TextSize         = esMobil and 14 or 13
-	previewBtn.Text             = "[ PREVIEW ] Ver previsualización"
-	previewBtn.BorderSizePixel  = 0
-	previewBtn.AutoButtonColor  = false
-	addCorner(previewBtn, 9)
-	addStroke(previewBtn, Color3.fromRGB(70, 100, 200), 1, 0.2)
-
-	previewBtn.MouseEnter:Connect(function()
-		tw(previewBtn, { BackgroundColor3 = Color3.fromRGB(38, 50, 75) })
-	end)
-	previewBtn.MouseLeave:Connect(function()
-		if not previewActive then
-			tw(previewBtn, { BackgroundColor3 = Color3.fromRGB(30, 38, 55) })
-		end
-	end)
-
-	-- Función para mostrar/actualizar el preview
 	local function mostrarPreview()
-		-- Destruir preview previo
-		if previewGui and previewGui.Parent then
-			previewGui:Destroy()
-		end
-
-		-- Datos actuales del formulario
-		local enc    = encabezadoBox.Text ~= "" and encabezadoBox.Text or "[ Encabezado de ejemplo ]"
-		local msg    = cajaMensaje.Text   ~= "" and cajaMensaje.Text   or "Aquí aparecerá tu mensaje..."
-		local posId  = posicionSeleccionada
-		local dur    = tonumber(duracionBox.Text) or 6
-		local r, g, b = currentR, currentG, currentB
-
-		-- Calcular altura
-		local lineas = 1
-		for _ in msg:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineas += 1 end
-		local altH = math.max(72, 52 + lineas * 20)
-
-		-- Crear GUI del preview (solo en screenGui del dueño, no se envía a nadie)
+		if previewGui and previewGui.Parent then previewGui:Destroy() end
+		local enc = encabezadoBox.Text~="" and encabezadoBox.Text or "[ Encabezado de ejemplo ]"
+		local msg = cajaMensaje.Text~="" and cajaMensaje.Text or "Aqui aparecera tu mensaje..."
 		previewGui = Instance.new("ScreenGui", guiParent)
-		previewGui.Name            = "JmodsPreviewLocal"
-		previewGui.ResetOnSpawn    = false
-		previewGui.ZIndexBehavior  = Enum.ZIndexBehavior.Global
-
-		-- Badge "PREVIEW"
+		previewGui.Name = "JmodsPreviewLocal"; previewGui.ResetOnSpawn=false
+		previewGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+		local data = {
+			encabezado = enc, mensaje = msg,
+			duracion   = tonumber(duracionBox.Text) or 6,
+			posicion   = posicionSeleccionada,         -- usa la seleccion actual
+			color      = {currentR, currentG, currentB}
+		}
+		local nFrame,pFill,posInicial,posId,dur = construirNotifFrame(previewGui, data, 10)
 		local badge = Instance.new("TextLabel", previewGui)
-		local bPos  = getPosUDim2(posId, 340, altH)
-		-- posición del badge encima/debajo del frame
-		local bOffY = (posId == "bottom_right" or posId == "bottom_left") and -(altH + 24) or altH + 4
-
-		badge.Size                 = UDim2.new(0, 90, 0, 18)
-		badge.Position             = bPos + UDim2.new(0, 125, 0, bOffY)
-		badge.BackgroundColor3     = Color3.fromRGB(200, 55, 55)
-		badge.TextColor3           = Color3.new(1,1,1)
-		badge.Font                 = Enum.Font.GothamBold
-		badge.TextSize             = 10
-		badge.Text                 = "  PREVIEW LOCAL  "
-		badge.BorderSizePixel      = 0
-		badge.ZIndex               = 20
-		addCorner(badge, 5)
-
-		local nFrame = Instance.new("Frame", previewGui)
-		nFrame.Size                = UDim2.new(0, 340, 0, altH)
-		nFrame.BackgroundTransparency = 0.1
-		nFrame.BorderSizePixel     = 0
-		nFrame.ClipsDescendants    = true
-		nFrame.ZIndex              = 10
-		addCorner(nFrame, 10)
-
-		nFrame.Position = getPosUDim2(posId, 340, altH)
-
-		-- Color del frame
-		nFrame.BackgroundColor3 = Color3.fromRGB(
-			math.clamp(r - 25, 0, 255),
-			math.clamp(g - 25, 0, 255),
-			math.clamp(b - 25, 0, 255)
-		)
-		addStroke(nFrame, Color3.fromRGB(80, 80, 115), 1, 0.25)
-
-		-- Accent lateral
-		local accent = Instance.new("Frame", nFrame)
-		accent.Size            = UDim2.new(0, 4, 1, 0)
-		accent.BackgroundColor3 = Color3.fromRGB(r, g, b)
-		accent.BorderSizePixel = 0
-		addCorner(accent, 4)
-
-		-- Ícono
-		local icon = Instance.new("TextLabel", nFrame)
-		icon.Size                  = UDim2.new(0, 26, 0, 26)
-		icon.Position              = UDim2.new(0, 12, 0, 12)
-		icon.BackgroundTransparency = 1
-		icon.Text                  = "*"
-		icon.TextSize              = 18
-		icon.Font                  = Enum.Font.GothamBold
-		icon.TextColor3            = Color3.new(1,1,1)
-
-		-- Encabezado
-		local encLbl = Instance.new("TextLabel", nFrame)
-		encLbl.Size                  = UDim2.new(1, -52, 0, 20)
-		encLbl.Position              = UDim2.new(0, 46, 0, 10)
-		encLbl.Text                  = enc
-		encLbl.TextColor3            = Color3.fromRGB(255, 255, 255)
-		encLbl.Font                  = Enum.Font.GothamBold
-		encLbl.TextSize              = 14
-		encLbl.BackgroundTransparency = 1
-		encLbl.TextXAlignment        = Enum.TextXAlignment.Left
-		encLbl.TextTruncate          = Enum.TextTruncate.AtEnd
-
-		-- Mensaje
-		local yOff = 32
-		local function crearLineaPreview(texto, url)
-			local lbl
-			if url then
-				lbl = Instance.new("TextLabel", nFrame)
-				lbl.Text       = "[URL] " .. texto
-				lbl.TextColor3 = Color3.fromRGB(120, 185, 255)
-			else
-				lbl = Instance.new("TextLabel", nFrame)
-				lbl.Text       = texto
-				lbl.TextColor3 = Color3.fromRGB(210, 210, 225)
-			end
-			lbl.Size              = UDim2.new(1, -52, 0, 18)
-			lbl.Position          = UDim2.new(0, 46, 0, yOff)
-			lbl.Font              = Enum.Font.Gotham
-			lbl.TextSize          = 13
-			lbl.BackgroundTransparency = 1
-			lbl.TextXAlignment    = Enum.TextXAlignment.Left
-			lbl.TextTruncate      = Enum.TextTruncate.AtEnd
-			yOff += 20
-		end
-
-		local function nombreAmigablePreview(url)
-			if url:find("youtube") or url:find("youtu%.be") then return "YouTube"
-			elseif url:find("roblox%.com")    then return "Roblox"
-			elseif url:find("discord%.gg")    then return "Discord"
-			elseif url:find("twitter%.com")   then return "Twitter / X"
-			elseif url:find("tiktok%.com")    then return "TikTok"
-			elseif url:find("github%.com")    then return "GitHub"
-			else return "Link"
-			end
-		end
-
-		local lastE = 1
-		for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
-			local prev = msg:sub(lastE, ini - 1)
-			if prev ~= "" then crearLineaPreview(prev, nil) end
-			crearLineaPreview(nombreAmigablePreview(link), link)
-			lastE = fin
-		end
-		local resto = msg:sub(lastE)
-		if resto ~= "" then crearLineaPreview(resto, nil) end
-
-		-- Barra de progreso (estética, no animada en preview)
-		local pBg = Instance.new("Frame", nFrame)
-		pBg.Size             = UDim2.new(1, -10, 0, 3)
-		pBg.Position         = UDim2.new(0, 5, 1, -5)
-		pBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-		pBg.BorderSizePixel  = 0
-		addCorner(pBg, 2)
-
-		local pFill = Instance.new("Frame", pBg)
-		pFill.Size             = UDim2.new(0.65, 0, 1, 0) -- muestra al 65% como ejemplo
-		pFill.BackgroundColor3 = Color3.fromRGB(r, g, b)
-		pFill.BorderSizePixel  = 0
-		addCorner(pFill, 2)
-
-		-- Animación de entrada igual que la real
-		local posInicial = nFrame.Position
-		if posId == "top_right" or posId == "bottom_right" then
-			nFrame.Position = posInicial + UDim2.new(0, 370, 0, 0)
-		elseif posId == "top_left" or posId == "bottom_left" then
-			nFrame.Position = posInicial + UDim2.new(0, -370, 0, 0)
-		else
-			nFrame.BackgroundTransparency = 1
-			TweenService:Create(nFrame, TweenInfo.new(0.35), { BackgroundTransparency = 0.1 }):Play()
-		end
-		if posId ~= "center" then
-			TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = posInicial }):Play()
-		end
-
-		-- Auto-destruir después de 5 segundos de preview
-		task.delay(5, function()
-			if previewGui and previewGui.Parent then
-				previewGui:Destroy()
-				previewGui = nil
-			end
-			previewActive = false
-			previewBtn.Text = "[ PREVIEW ] Ver previsualización"
-			tw(previewBtn, { BackgroundColor3 = Color3.fromRGB(30, 38, 55) })
+		badge.Size = UDim2.new(0,110,0,16)
+		local bY = (posId=="bottom_right" or posId=="bottom_left")
+			and (posInicial.Y.Offset - 20)
+			or  (posInicial.Y.Offset + nFrame.Size.Y.Offset + 3)
+		badge.Position = UDim2.fromOffset(posInicial.X.Offset + 4, bY)
+		badge.BackgroundColor3 = Color3.fromRGB(200,55,55)
+		badge.TextColor3 = Color3.new(1,1,1)
+		badge.Font = Enum.Font.GothamBold; badge.TextSize=9
+		badge.Text = "  PREVIEW LOCAL  "
+		badge.BorderSizePixel=0; badge.ZIndex=20; addCorner(badge,4)
+		TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {Size=UDim2.new(0,0,1,0)}):Play()
+		task.delay(dur, function()
+			if previewGui and previewGui.Parent then previewGui:Destroy(); previewGui=nil end
+			previewActive=false; previewBtn.Text="[ PREVIEW ] Ver previsualizacion"
+			tw(previewBtn,{BackgroundColor3=Color3.fromRGB(30,38,55)})
 		end)
 	end
 
 	previewBtn.MouseButton1Click:Connect(function()
-		previewActive = not previewActive
+		previewActive=not previewActive
 		if previewActive then
-			previewBtn.Text = "[ PREVIEW ] Cerrando en 5s..."
-			tw(previewBtn, { BackgroundColor3 = Color3.fromRGB(22, 48, 28) })
-			local str = previewBtn:FindFirstChildOfClass("UIStroke")
-			if str then str.Color = Color3.fromRGB(50, 160, 70); str.Transparency = 0 end
+			previewBtn.Text="[ PREVIEW ] Cerrando en "..(tonumber(duracionBox.Text) or 6).."s..."
+			tw(previewBtn,{BackgroundColor3=Color3.fromRGB(22,48,28)})
+			local str=previewBtn:FindFirstChildOfClass("UIStroke"); if str then str.Color=Color3.fromRGB(50,160,70);str.Transparency=0 end
 			mostrarPreview()
 		else
-			previewBtn.Text = "[ PREVIEW ] Ver previsualización"
-			tw(previewBtn, { BackgroundColor3 = Color3.fromRGB(30, 38, 55) })
-			if previewGui and previewGui.Parent then
-				previewGui:Destroy()
-				previewGui = nil
-			end
+			previewBtn.Text="[ PREVIEW ] Ver previsualizacion"
+			tw(previewBtn,{BackgroundColor3=Color3.fromRGB(30,38,55)})
+			if previewGui and previewGui.Parent then previewGui:Destroy(); previewGui=nil end
 		end
 	end)
 
-	-- =========================================================
-	--  BOTÓN ENVIAR
-	-- =========================================================
-	local secEnviar = Instance.new("Frame", content)
-	secEnviar.Size             = UDim2.new(1, 0, 0, BTN_H)
-	secEnviar.BackgroundTransparency = 1
-	secEnviar.LayoutOrder      = 9
+	-- Boton ENVIAR
+	local secEnviar=Instance.new("Frame",content)
+	secEnviar.Size=UDim2.new(1,0,0,BTN_H); secEnviar.BackgroundTransparency=1; secEnviar.LayoutOrder=9
 
-	local sendBtn = Instance.new("TextButton", secEnviar)
-	sendBtn.Size             = UDim2.new(1, 0, 1, 0)
-	sendBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
-	sendBtn.TextColor3       = Color3.new(1, 1, 1)
-	sendBtn.Font             = Enum.Font.GothamBold
-	sendBtn.TextSize         = esMobil and 15 or 14
-	sendBtn.Text             = "ENVIAR A TODOS"
-	sendBtn.BorderSizePixel  = 0
-	sendBtn.AutoButtonColor  = false
-	addCorner(sendBtn, 9)
-	addGradient(sendBtn, Color3.fromRGB(70, 130, 255), Color3.fromRGB(110, 70, 230))
+	local sendBtn=Instance.new("TextButton",secEnviar)
+	sendBtn.Size=UDim2.new(1,0,1,0); sendBtn.BackgroundColor3=Color3.fromRGB(60,120,255)
+	sendBtn.TextColor3=Color3.new(1,1,1); sendBtn.Font=Enum.Font.GothamBold
+	sendBtn.TextSize=esMobil and 14 or 13; sendBtn.Text="ENVIAR A TODOS"
+	sendBtn.BorderSizePixel=0; sendBtn.AutoButtonColor=false
+	addCorner(sendBtn,8); addGradient(sendBtn,Color3.fromRGB(70,130,255),Color3.fromRGB(110,70,230))
+	sendBtn.MouseEnter:Connect(function() tw(sendBtn,{BackgroundColor3=Color3.fromRGB(80,145,255)}) end)
+	sendBtn.MouseLeave:Connect(function() tw(sendBtn,{BackgroundColor3=Color3.fromRGB(60,120,255)}) end)
 
-	sendBtn.MouseEnter:Connect(function()
-		tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(80, 145, 255) })
-	end)
-	sendBtn.MouseLeave:Connect(function()
-		tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 120, 255) })
-	end)
-
-	local enviandoLock = false
+	local enviandoLock=false
 	local function feedbackEnviar(ok)
 		if ok then
-			sendBtn.Text = "OK  ENVIADO!"
-			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(40, 175, 80) })
+			sendBtn.Text="OK  ENVIADO!"; tw(sendBtn,{BackgroundColor3=Color3.fromRGB(40,175,80)})
 		else
-			sendBtn.Text = "! ENCABEZADO REQUERIDO"
-			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(200, 55, 55) })
+			sendBtn.Text="! ENCABEZADO REQUERIDO"; tw(sendBtn,{BackgroundColor3=Color3.fromRGB(200,55,55)})
 		end
 		task.delay(2.2, function()
-			sendBtn.Text = "ENVIAR A TODOS"
-			tw(sendBtn, { BackgroundColor3 = Color3.fromRGB(60, 120, 255) })
-			enviandoLock = false
+			sendBtn.Text="ENVIAR A TODOS"; tw(sendBtn,{BackgroundColor3=Color3.fromRGB(60,120,255)}); enviandoLock=false
 		end)
 	end
 
 	sendBtn.MouseButton1Click:Connect(function()
 		if enviandoLock then return end
 		local enc = encabezadoBox.Text
-		if enc == "" then feedbackEnviar(false) return end
-		enviandoLock = true
-
-		-- Cerrar preview si estaba abierto
-		if previewGui and previewGui.Parent then
-			previewGui:Destroy()
-			previewGui = nil
-		end
-
+		if enc=="" then feedbackEnviar(false); return end
+		enviandoLock=true
+		if previewGui and previewGui.Parent then previewGui:Destroy(); previewGui=nil end
 		local data = {
 			encabezado = enc,
 			mensaje    = cajaMensaje.Text,
 			duracion   = tonumber(duracionBox.Text) or 6,
-			posicion   = posicionSeleccionada,
-			color      = { currentR, currentG, currentB },
+			posicion   = posicionSeleccionada,        -- envia la posicion elegida
+			color      = {currentR, currentG, currentB},
 			timestamp  = os.time(),
 			key        = claveSeguridad,
 			fijar      = fijarNotificacion
 		}
-
 		local req = (syn and syn.request) or (http and http.request) or request
 		if req then
 			req({
-				Url     = firebaseURL,
-				Method  = "PUT",
-				Headers = { ["Content-Type"] = "application/json" },
-				Body    = HttpService:JSONEncode(data)
+				Url    = firebaseURL,
+				Method = "PUT",
+				Headers = {["Content-Type"] = "application/json"},
+				Body   = HttpService:JSONEncode(data)
 			})
 			if not fijarNotificacion then
 				task.delay(tonumber(duracionBox.Text) or 6, function()
-					req({ Url = firebaseURL, Method = "DELETE" })
+					req({Url=firebaseURL, Method="DELETE"})
 				end)
 			end
 			feedbackEnviar(true)
 		else
-			enviandoLock = false
+			enviandoLock=false
 		end
 	end)
 
-	-- =========================================================
-	--  TOGGLE PANEL (L en PC / botón flotante en móvil)
-	-- =========================================================
+	-- Toggle panel con tecla L
 	UserInput.InputBegan:Connect(function(input, gp)
 		if gp then return end
-		if input.KeyCode == Enum.KeyCode.L then
-			frame.Visible = not frame.Visible
-		end
+		if input.KeyCode==Enum.KeyCode.L then frame.Visible=not frame.Visible end
 	end)
 
 	if esMobil then
-		local toggleBtn = Instance.new("TextButton", screenGui)
-		toggleBtn.Size             = UDim2.new(0, 50, 0, 50)
-		toggleBtn.Position         = UDim2.new(0, 10, 0, 10)
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
-		toggleBtn.Text             = "= ="
-		toggleBtn.TextScaled       = true
-		toggleBtn.TextColor3       = Color3.new(1, 1, 1)
-		toggleBtn.Active           = true
-		toggleBtn.Draggable        = true
-		toggleBtn.ZIndex           = 10
-		addCorner(toggleBtn, 12)
-		addStroke(toggleBtn, Color3.fromRGB(80, 140, 255), 2, 0.2)
-		addGradient(toggleBtn, Color3.fromRGB(70, 130, 255), Color3.fromRGB(110, 70, 230))
-
-		toggleBtn.MouseButton1Click:Connect(function()
-			frame.Visible = not frame.Visible
-		end)
+		local toggleBtn=Instance.new("TextButton", screenGui)
+		toggleBtn.Size=UDim2.new(0,46,0,46); toggleBtn.Position=UDim2.new(0,10,0,10)
+		toggleBtn.BackgroundColor3=Color3.fromRGB(60,120,255)
+		toggleBtn.Text="J"; toggleBtn.TextScaled=true; toggleBtn.TextColor3=Color3.new(1,1,1)
+		toggleBtn.Active=true; toggleBtn.Draggable=true; toggleBtn.ZIndex=10
+		addCorner(toggleBtn,11); addStroke(toggleBtn,Color3.fromRGB(80,140,255),2,0.2)
+		addGradient(toggleBtn,Color3.fromRGB(70,130,255),Color3.fromRGB(110,70,230))
+		toggleBtn.MouseButton1Click:Connect(function() frame.Visible=not frame.Visible end)
 	end
 
-end -- fin bloque dueños
-
+end -- fin bloque duenos
 
 -- =============================================================
 --  RECEPTOR DE NOTIFICACIONES - todos los jugadores
 -- =============================================================
 task.spawn(function()
-	local req = (syn and syn.request) or (http and http.request) or request
+	local req=(syn and syn.request) or (http and http.request) or request
 	if not req then return end
-
 	while true do
 		task.wait(2.5)
 		pcall(function()
-			local res = req({ Url = firebaseURL, Method = "GET" })
-			if not res or res.StatusCode ~= 200 then return end
-			if not res.Body or res.Body == "null" or res.Body == "" then return end
+			local res=req({Url=firebaseURL, Method="GET"})
+			if not res or res.StatusCode~=200 then return end
+			if not res.Body or res.Body=="null" or res.Body=="" then return end
+			local ok,data=pcall(function() return HttpService:JSONDecode(res.Body) end)
+			if not ok or type(data)~="table" then return end
+			if not data.encabezado or data.encabezado=="" then return end
+			if not data.timestamp or data.timestamp==ultimoTimestamp then return end
+			ultimoTimestamp=data.timestamp
 
-			local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
-			if not ok or type(data) ~= "table" then return end
-			if not data.encabezado or data.encabezado == "" then return end
-			if not data.timestamp  or data.timestamp == ultimoTimestamp then return end
-			ultimoTimestamp = data.timestamp
-
-			for _, g in ipairs(guiParent:GetChildren()) do
-				if g.Name == "JmodsNotificacionVisual" then g:Destroy() end
+			for _,g in ipairs(guiParent:GetChildren()) do
+				if g.Name=="JmodsNotificacionVisual" then g:Destroy() end
 			end
 
-			local msg        = data.mensaje or ""
-			local lineas     = 1
-			for _ in msg:gmatch("https?://[%w%.%-%_/%?%=%&%#%+%%]+") do lineas += 1 end
-			local altH       = math.max(72, 52 + lineas * 20)
+			local notifGui=Instance.new("ScreenGui", guiParent)
+			notifGui.Name="JmodsNotificacionVisual"; notifGui.ResetOnSpawn=false
+			notifGui.ZIndexBehavior=Enum.ZIndexBehavior.Global
 
-			local notifGui   = Instance.new("ScreenGui", guiParent)
-			notifGui.Name    = "JmodsNotificacionVisual"
-			notifGui.ResetOnSpawn  = false
-			notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+			local nFrame,pFill,posInicial,posId,dur=construirNotifFrame(notifGui, data, 1)
+			TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {Size=UDim2.new(0,0,1,0)}):Play()
 
-			local nFrame = Instance.new("Frame", notifGui)
-			nFrame.Size                = UDim2.new(0, 340, 0, altH)
-			nFrame.BackgroundTransparency = 0.1
-			nFrame.BorderSizePixel     = 0
-			nFrame.ClipsDescendants    = true
-			addCorner(nFrame, 10)
-
-			local posId = data.posicion or "top_right"
-			nFrame.Position = getPosUDim2(posId, 340, altH)
-			local posInicial = nFrame.Position
-
-			if posId == "top_right" or posId == "bottom_right" then
-				nFrame.Position = posInicial + UDim2.new(0, 370, 0, 0)
-			elseif posId == "top_left" or posId == "bottom_left" then
-				nFrame.Position = posInicial + UDim2.new(0, -370, 0, 0)
-			else
-				nFrame.BackgroundTransparency = 1
-				TweenService:Create(nFrame, TweenInfo.new(0.35), { BackgroundTransparency = 0.1 }):Play()
-			end
-			if posId ~= "center" then
-				TweenService:Create(nFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = posInicial }):Play()
-			end
-
-			local accent = Instance.new("Frame", nFrame)
-			accent.Size            = UDim2.new(0, 4, 1, 0)
-			accent.BorderSizePixel = 0
-			addCorner(accent, 4)
-
-			local cr = (data.color and data.color[1]) or 100
-			local cg = (data.color and data.color[2]) or 140
-			local cb = (data.color and data.color[3]) or 255
-
-			if data.rainbow then
-				task.spawn(function()
-					local h = 0
-					while nFrame.Parent do
-						h = (h + 0.01) % 1
-						nFrame.BackgroundColor3 = Color3.fromHSV(h, 0.65, 0.85)
-						accent.BackgroundColor3 = Color3.fromHSV((h+0.5)%1, 1, 1)
-						task.wait(0.05)
-					end
-				end)
-			else
-				nFrame.BackgroundColor3 = Color3.fromRGB(
-					math.clamp(cr - 25, 0, 255),
-					math.clamp(cg - 25, 0, 255),
-					math.clamp(cb - 25, 0, 255)
-				)
-				accent.BackgroundColor3 = Color3.fromRGB(cr, cg, cb)
-			end
-
-			addStroke(nFrame, Color3.fromRGB(80, 80, 115), 1, 0.25)
-
-			local icon = Instance.new("TextLabel", nFrame)
-			icon.Size                  = UDim2.new(0, 26, 0, 26)
-			icon.Position              = UDim2.new(0, 12, 0, 12)
-			icon.BackgroundTransparency = 1
-			icon.Text                  = "*"
-			icon.TextSize              = 18
-			icon.Font                  = Enum.Font.GothamBold
-			icon.TextColor3            = Color3.fromRGB(255, 255, 255)
-
-			local encLbl = Instance.new("TextLabel", nFrame)
-			encLbl.Size                  = UDim2.new(1, -52, 0, 20)
-			encLbl.Position              = UDim2.new(0, 46, 0, 10)
-			encLbl.Text                  = data.encabezado
-			encLbl.TextColor3            = Color3.fromRGB(255, 255, 255)
-			encLbl.Font                  = Enum.Font.GothamBold
-			encLbl.TextSize              = 14
-			encLbl.BackgroundTransparency = 1
-			encLbl.TextXAlignment        = Enum.TextXAlignment.Left
-			encLbl.TextTruncate          = Enum.TextTruncate.AtEnd
-
-			local yOff = 32
-			local function crearLinea(texto, url)
-				local lbl
-				if url then
-					lbl = Instance.new("TextButton", nFrame)
-					lbl.Text      = "[URL] " .. texto
-					lbl.TextColor3 = Color3.fromRGB(120, 185, 255)
-					lbl.BackgroundTransparency = 1
-					lbl.AutoButtonColor = false
-					local function open()
-						if setclipboard then setclipboard(url) end
-						if syn and syn.open_url then syn.open_url(url)
-						elseif getgenv and getgenv().openurl then getgenv().openurl(url) end
-					end
-					lbl.MouseButton1Click:Connect(open)
-					lbl.TouchTap:Connect(open)
-				else
-					lbl = Instance.new("TextLabel", nFrame)
-					lbl.Text      = texto
-					lbl.TextColor3 = Color3.fromRGB(210, 210, 225)
-					lbl.BackgroundTransparency = 1
-				end
-				lbl.Size           = UDim2.new(1, -52, 0, 18)
-				lbl.Position       = UDim2.new(0, 46, 0, yOff)
-				lbl.Font           = Enum.Font.Gotham
-				lbl.TextSize       = 13
-				lbl.TextXAlignment = Enum.TextXAlignment.Left
-				lbl.TextTruncate   = Enum.TextTruncate.AtEnd
-				yOff += 20
-			end
-
-			local function nombreAmigable(url)
-				if url:find("youtube") or url:find("youtu%.be") then return "YouTube"
-				elseif url:find("roblox%.com")    then return "Roblox"
-				elseif url:find("discord%.gg")    then return "Discord"
-				elseif url:find("twitter%.com")   then return "Twitter / X"
-				elseif url:find("tiktok%.com")    then return "TikTok"
-				elseif url:find("github%.com")    then return "GitHub"
-				elseif url:find("instagram%.com") then return "Instagram"
-				elseif url:find("facebook%.com")  then return "Facebook"
-				else return "Link"
-				end
-			end
-
-			local lastE = 1
-			for ini, link, fin in msg:gmatch("()(https?://[%w%.%-%_/%?%=%&%#%+%%]+)()") do
-				local prev = msg:sub(lastE, ini - 1)
-				if prev ~= "" then crearLinea(prev, nil) end
-				crearLinea(nombreAmigable(link), link)
-				lastE = fin
-			end
-			local resto = msg:sub(lastE)
-			if resto ~= "" then crearLinea(resto, nil) end
-
-			local dur = tonumber(data.duracion) or 6
-
-			local pBg = Instance.new("Frame", nFrame)
-			pBg.Size             = UDim2.new(1, -10, 0, 3)
-			pBg.Position         = UDim2.new(0, 5, 1, -5)
-			pBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-			pBg.BorderSizePixel  = 0
-			addCorner(pBg, 2)
-
-			local pFill = Instance.new("Frame", pBg)
-			pFill.Size             = UDim2.new(1, 0, 1, 0)
-			pFill.BackgroundColor3 = accent.BackgroundColor3
-			pFill.BorderSizePixel  = 0
-			addCorner(pFill, 2)
-
-			TweenService:Create(pFill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
-				Size = UDim2.new(0, 0, 1, 0)
-			}):Play()
-
-			task.delay(dur - 0.3, function()
+			task.delay(dur-0.3, function()
 				if not nFrame or not nFrame.Parent then return end
-				if posId == "top_right" or posId == "bottom_right" then
-					TweenService:Create(nFrame, TweenInfo.new(0.28), {
-						Position = posInicial + UDim2.new(0, 380, 0, 0)
-					}):Play()
-				elseif posId == "top_left" or posId == "bottom_left" then
-					TweenService:Create(nFrame, TweenInfo.new(0.28), {
-						Position = posInicial + UDim2.new(0, -380, 0, 0)
-					}):Play()
+				if posId=="top_right" or posId=="bottom_right" then
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {Position=UDim2.fromOffset(posInicial.X.Offset+380, posInicial.Y.Offset)}):Play()
+				elseif posId=="top_left" or posId=="bottom_left" then
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {Position=UDim2.fromOffset(posInicial.X.Offset-380, posInicial.Y.Offset)}):Play()
 				else
-					TweenService:Create(nFrame, TweenInfo.new(0.28), {
-						BackgroundTransparency = 1
-					}):Play()
+					TweenService:Create(nFrame, TweenInfo.new(0.28), {BackgroundTransparency=1}):Play()
 				end
 			end)
-
 			task.delay(dur, function()
-				if notifGui and notifGui.Parent then
-					notifGui:Destroy()
-				end
+				if notifGui and notifGui.Parent then notifGui:Destroy() end
 			end)
 		end)
 	end
