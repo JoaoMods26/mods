@@ -26,6 +26,19 @@ local favoritos = {}
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
+-- ── Estado global del drag de reordenamiento ──
+local reorderMode = false
+local dragState = {
+	active      = false,
+	rowFrame    = nil,
+	capturedFav = nil,
+	clone       = nil,  -- ahora vive en cloneLayer, NO en scrollFrame
+	offsetY     = 0,
+}
+
+-- Frame transparente encima de todo donde vive el clon durante el drag
+-- Se crea junto con la GUI y se destruye con ella
+local cloneLayer = nil
 
 local EMOTE_PRIORITIES = {
 	[Enum.AnimationPriority.Action]  = true,
@@ -38,25 +51,17 @@ local function isEmoteTrack(track)
 	return EMOTE_PRIORITIES[track.Priority] == true
 end
 
-
-
 local SAVE_FOLDER = "JmodsFavoritos"
 local SAVE_FILE   = SAVE_FOLDER .. "/animaciones.json"
 
 local function ensureFolder()
-	if not isfolder(SAVE_FOLDER) then
-		makefolder(SAVE_FOLDER)
-	end
+	if not isfolder(SAVE_FOLDER) then makefolder(SAVE_FOLDER) end
 end
 
 local function saveFavoritos()
 	ensureFolder()
-	local ok, encoded = pcall(function()
-		return HttpService:JSONEncode(favoritos)
-	end)
-	if ok then
-		pcall(function() writefile(SAVE_FILE, encoded) end)
-	end
+	local ok, encoded = pcall(function() return HttpService:JSONEncode(favoritos) end)
+	if ok then pcall(function() writefile(SAVE_FILE, encoded) end) end
 end
 
 local function loadFavoritos()
@@ -65,19 +70,14 @@ local function loadFavoritos()
 	local ok, raw = pcall(function() return readfile(SAVE_FILE) end)
 	if not ok or not raw or raw == "" then return end
 	local ok2, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
-	if ok2 and type(decoded) == "table" then
-		favoritos = decoded
-	end
+	if ok2 and type(decoded) == "table" then favoritos = decoded end
 end
 
 loadFavoritos()
 
-
 local function getHumanoid()
 	local char = LocalPlayer.Character
-	if char then
-		return char:FindFirstChildWhichIsA("Humanoid")
-	end
+	if char then return char:FindFirstChildWhichIsA("Humanoid") end
 	return nil
 end
 
@@ -95,23 +95,13 @@ end
 local function safePlayAnim(animId)
 	local humanoid = getHumanoid()
 	if not humanoid then return end
-
-	for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-		track:Stop()
-	end
-
+	for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 	local anim = Instance.new("Animation")
 	anim.AnimationId = animId
-
 	for attempt = 1, 5 do
 		local animator = getAnimator(humanoid)
-		if not animator then
-			warn("No se pudo obtener Animator.")
-			return
-		end
-		local success, track = pcall(function()
-			return animator:LoadAnimation(anim)
-		end)
+		if not animator then warn("No se pudo obtener Animator.") return end
+		local success, track = pcall(function() return animator:LoadAnimation(anim) end)
 		if success and track then
 			track:Play()
 			track:AdjustSpeed(selectedSpeed)
@@ -125,48 +115,35 @@ local function safePlayAnim(animId)
 end
 
 local function playLastAnimation()
-	if lastAnimationId then
-		safePlayAnim(lastAnimationId)
-	end
+	if lastAnimationId then safePlayAnim(lastAnimationId) end
 end
 
 local function stopCurrentAnimation()
 	local humanoid = getHumanoid()
 	if humanoid then
-		for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-			track:Stop()
-		end
+		for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 	end
 	currentTrack = nil
 end
-
 
 local externalDetectionConnection = nil
 local lastDetectedExternalId = nil
 
 local function startExternalDetection()
 	if externalDetectionConnection then return end
-
 	externalDetectionConnection = RunService.Heartbeat:Connect(function()
 		local humanoid = getHumanoid()
 		if not humanoid then return end
-
-		local playingTracks = humanoid:GetPlayingAnimationTracks()
-
-		for _, track in ipairs(playingTracks) do
+		for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
 			if not isEmoteTrack(track) then continue end
-
 			local animId = track.Animation and track.Animation.AnimationId or ""
 			if animId == "" then continue end
-
 			if animId ~= lastDetectedExternalId and animId ~= lastAnimationId then
 				lastDetectedExternalId = animId
-
 				local animName = track.Animation and track.Animation.Name or ""
 				if animName == "" or animName == "Animation" then
 					animName = "[Externo] " .. (animId:match("%d+") or animId)
 				end
-
 				lastAnimationId = animId
 				lastAnimationName = animName
 			end
@@ -182,38 +159,30 @@ local function stopExternalDetection()
 	lastDetectedExternalId = nil
 end
 
-
 local favListFrame = nil
 local emptyLabel   = nil
 
--- ── Paleta: negro puro con acento plateado ──
 local C = {
-	black       = Color3.fromRGB(0, 0, 0),
-
-	-- Transparencias por capa
-	tMain       = 0.45,   -- ventana principal
-	tPanel      = 0.58,   -- panel "activa ahora" y scrollframe
-	tRow        = 0.62,   -- filas de favoritos
-	tTitle      = 0.42,   -- barra de título
-	tMiniBtn    = 0.42,   -- botón minimizado flotante
-
-	-- Acento plateado
-	accent      = Color3.fromRGB(178, 182, 190),
-	accentDim   = Color3.fromRGB(50, 52, 58),
-	accentBright= Color3.fromRGB(215, 218, 224),
-
-	-- Botones acción (sin cambios)
-	btnPlay     = Color3.fromRGB(34, 197, 94),
-	btnPlayDark = Color3.fromRGB(20, 120, 56),
-	btnStop     = Color3.fromRGB(234, 88, 12),
-	btnStopDark = Color3.fromRGB(140, 52, 8),
-	btnDel      = Color3.fromRGB(239, 68, 68),
-	btnDelDark  = Color3.fromRGB(140, 38, 38),
-
-	-- Texto
-	textPrimary = Color3.fromRGB(228, 228, 232),
-	textMuted   = Color3.fromRGB(120, 122, 130),
-	textHint    = Color3.fromRGB(65, 66, 72),
+	black        = Color3.fromRGB(0, 0, 0),
+	tMain        = 0.45,
+	tPanel       = 0.58,
+	tRow         = 0.62,
+	tTitle       = 0.42,
+	tMiniBtn     = 0.42,
+	accent       = Color3.fromRGB(178, 182, 190),
+	accentDim    = Color3.fromRGB(50, 52, 58),
+	accentBright = Color3.fromRGB(215, 218, 224),
+	btnPlay      = Color3.fromRGB(34, 197, 94),
+	btnPlayDark  = Color3.fromRGB(20, 120, 56),
+	btnStop      = Color3.fromRGB(234, 88, 12),
+	btnStopDark  = Color3.fromRGB(140, 52, 8),
+	btnDel       = Color3.fromRGB(239, 68, 68),
+	btnDelDark   = Color3.fromRGB(140, 38, 38),
+	textPrimary  = Color3.fromRGB(228, 228, 232),
+	textMuted    = Color3.fromRGB(120, 122, 130),
+	textHint     = Color3.fromRGB(65, 66, 72),
+	dragHandle   = Color3.fromRGB(70, 73, 82),
+	dragActive   = Color3.fromRGB(110, 114, 125),
 }
 
 local function updateCanvasSize()
@@ -231,9 +200,129 @@ local function syncEmptyLabel()
 	for _, child in ipairs(favListFrame:GetChildren()) do
 		if child:IsA("Frame") then hasRows = true break end
 	end
-	if emptyLabel then
-		emptyLabel.Visible = not hasRows
+	if emptyLabel then emptyLabel.Visible = not hasRows end
+end
+
+local function applyReorderStateToRow(rowFrame, active)
+	local handle    = rowFrame:FindFirstChild("DragHandle")
+	local nameLabel = rowFrame:FindFirstChild("NameLabel")
+	if handle    then handle.Visible = active end
+	if nameLabel then
+		nameLabel.Position = active
+			and UDim2.new(0, 28, 0, 0)
+			or  UDim2.new(0, 12, 0, 0)
 	end
+end
+
+local function syncReorderHandles(active)
+	if not favListFrame then return end
+	for _, child in ipairs(favListFrame:GetChildren()) do
+		if child:IsA("Frame") then
+			applyReorderStateToRow(child, active)
+		end
+	end
+end
+
+-- ── Destruir el clon de forma segura ──
+local function destroyClone()
+	if dragState.clone then
+		pcall(function() dragState.clone:Destroy() end)
+		dragState.clone = nil
+	end
+end
+
+-- ── Finalizar drag: limpiar todo ──
+local function endDrag()
+	if not dragState.active then return end
+
+	destroyClone()
+
+	if dragState.rowFrame then
+		dragState.rowFrame.BackgroundTransparency = C.tRow
+		local handle = dragState.rowFrame:FindFirstChild("DragHandle")
+		if handle then handle.BackgroundColor3 = C.dragHandle end
+	end
+
+	dragState.active      = false
+	dragState.rowFrame    = nil
+	dragState.capturedFav = nil
+	dragState.offsetY     = 0
+
+	saveFavoritos()
+end
+
+-- ── Conexiones globales de InputChanged e InputEnded ──
+local globalDragConnections = {}
+
+local function connectGlobalDrag()
+	for _, conn in ipairs(globalDragConnections) do conn:Disconnect() end
+	globalDragConnections = {}
+
+	table.insert(globalDragConnections,
+		UserInputService.InputChanged:Connect(function(input)
+			if not dragState.active then return end
+			if not dragState.clone or not dragState.clone.Parent then
+				endDrag()
+				return
+			end
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and
+			   input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+			-- ── CLON: se mueve en coordenadas absolutas de pantalla (cloneLayer = fullscreen) ──
+			local cloneH = dragState.rowFrame.AbsoluteSize.Y
+			local cloneW = favListFrame.AbsoluteSize.X - 8
+
+			dragState.clone.Position = UDim2.new(
+				0, favListFrame.AbsolutePosition.X + 4,
+				0, input.Position.Y - dragState.offsetY
+			)
+
+			-- ── Swap de filas: comparar con posicion absoluta de cada fila ──
+			local cursorAbsY = input.Position.Y
+
+			for _, child in ipairs(favListFrame:GetChildren()) do
+				if not child:IsA("Frame") then continue end
+				if child == dragState.rowFrame then continue end
+
+				local childY = child.AbsolutePosition.Y
+				local childH = child.AbsoluteSize.Y
+
+				if cursorAbsY >= childY and cursorAbsY <= childY + childH then
+					local myLO    = dragState.rowFrame.LayoutOrder
+					local otherLO = child.LayoutOrder
+					if myLO == otherLO then break end
+
+					dragState.rowFrame.LayoutOrder = otherLO
+					child.LayoutOrder              = myLO
+
+					local myIdx, otherIdx = nil, nil
+					for i, f in ipairs(favoritos) do
+						if f == dragState.capturedFav then myIdx = i end
+						if "FavRow_" .. f.animationid == child.Name then otherIdx = i end
+					end
+					if myIdx and otherIdx then
+						favoritos[myIdx], favoritos[otherIdx] = favoritos[otherIdx], favoritos[myIdx]
+					end
+					break
+				end
+			end
+		end)
+	)
+
+	table.insert(globalDragConnections,
+		UserInputService.InputEnded:Connect(function(input)
+			if not dragState.active then return end
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or
+			   input.UserInputType == Enum.UserInputType.Touch then
+				endDrag()
+			end
+		end)
+	)
+end
+
+local function disconnectGlobalDrag()
+	for _, conn in ipairs(globalDragConnections) do conn:Disconnect() end
+	globalDragConnections = {}
 end
 
 local function makeRenameable(nameLabel, fav, rowFrame)
@@ -243,6 +332,7 @@ local function makeRenameable(nameLabel, fav, rowFrame)
 	nameLabel.InputBegan:Connect(function(input)
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and
 		   input.UserInputType ~= Enum.UserInputType.Touch then return end
+		if reorderMode then return end
 
 		clickCount += 1
 		if clickTimer then task.cancel(clickTimer) end
@@ -264,40 +354,110 @@ local function makeRenameable(nameLabel, fav, rowFrame)
 			box.PlaceholderText = "Nombre..."
 			box.ZIndex = 10
 			box.Parent = rowFrame
-
-			local boxCorner = Instance.new("UICorner")
-			boxCorner.CornerRadius = UDim.new(0, 4)
-			boxCorner.Parent = box
-
+			local bc = Instance.new("UICorner")
+			bc.CornerRadius = UDim.new(0, 4)
+			bc.Parent = box
 			box:CaptureFocus()
-
 			local function commitRename()
 				local newName = box.Text
 				if newName and newName ~= "" then
 					fav.name = newName
 					nameLabel.Text = newName
-					if lastAnimationId == fav.animationid then
-						lastAnimationName = newName
-					end
+					if lastAnimationId == fav.animationid then lastAnimationName = newName end
 					saveFavoritos()
 				end
 				box:Destroy()
 			end
-
-			box.FocusLost:Connect(function()
-				commitRename()
-			end)
+			box.FocusLost:Connect(commitRename)
 		else
-			clickTimer = task.delay(0.3, function()
-				clickCount = 0
-			end)
+			clickTimer = task.delay(0.3, function() clickCount = 0 end)
 		end
 	end)
 end
 
+-- ── Iniciar drag desde el handle de una fila ──
+-- El clon ahora vive en cloneLayer (ScreenGui fullscreen), NO en el scrollFrame.
+-- Así el UIListLayout no lo toca y se posiciona con coordenadas absolutas de pantalla.
+local function setupRowDrag(handleBtn, rowFrame, capturedFav)
+	handleBtn.InputBegan:Connect(function(input)
+		if not reorderMode then return end
+		if dragState.active then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and
+		   input.UserInputType ~= Enum.UserInputType.Touch then return end
+		if not cloneLayer then return end
+
+		destroyClone()
+
+		dragState.active      = true
+		dragState.rowFrame    = rowFrame
+		dragState.capturedFav = capturedFav
+
+		rowFrame.BackgroundTransparency = 0.85
+		handleBtn.BackgroundColor3 = C.dragActive
+
+		-- offsetY = distancia desde el top de la fila hasta donde hizo clic
+		dragState.offsetY = input.Position.Y - rowFrame.AbsolutePosition.Y
+
+		-- ── Crear clon en cloneLayer (coordenadas absolutas de pantalla) ──
+		local cloneW = favListFrame.AbsoluteSize.X - 8
+		local cloneH = rowFrame.AbsoluteSize.Y
+
+		local clone = Instance.new("Frame")
+		clone.Name = "DragClone"
+		clone.Size = UDim2.new(0, cloneW, 0, cloneH)
+		-- posicion inicial: exactamente donde esta la fila en pantalla
+		clone.Position = UDim2.new(
+			0, favListFrame.AbsolutePosition.X + 4,
+			0, input.Position.Y - dragState.offsetY
+		)
+		clone.BackgroundColor3 = C.accentDim
+		clone.BackgroundTransparency = 0.05
+		clone.BorderSizePixel = 0
+		clone.ZIndex = 100
+		clone.Parent = cloneLayer
+
+		local cloneCorner = Instance.new("UICorner")
+		cloneCorner.CornerRadius = UDim.new(0, 7)
+		cloneCorner.Parent = clone
+
+		local cloneLine = Instance.new("Frame")
+		cloneLine.Size = UDim2.new(0, 2, 0.55, 0)
+		cloneLine.Position = UDim2.new(0, 0, 0.225, 0)
+		cloneLine.BackgroundColor3 = C.accent
+		cloneLine.BackgroundTransparency = 0.1
+		cloneLine.BorderSizePixel = 0
+		cloneLine.ZIndex = 101
+		cloneLine.Parent = clone
+		local cloneLineCorner = Instance.new("UICorner")
+		cloneLineCorner.CornerRadius = UDim.new(1, 0)
+		cloneLineCorner.Parent = cloneLine
+
+		local cloneLabel = Instance.new("TextLabel")
+		cloneLabel.Size = UDim2.new(1, -16, 1, 0)
+		cloneLabel.Position = UDim2.new(0, 16, 0, 0)
+		cloneLabel.BackgroundTransparency = 1
+		cloneLabel.Text = capturedFav.name
+		cloneLabel.TextColor3 = C.accentBright
+		cloneLabel.TextSize = 12
+		cloneLabel.Font = Enum.Font.GothamSemibold
+		cloneLabel.TextXAlignment = Enum.TextXAlignment.Left
+		cloneLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		cloneLabel.ZIndex = 102
+		cloneLabel.Parent = clone
+
+		dragState.clone = clone
+	end)
+end
 
 local function addFavRow(fav)
 	if not favListFrame then return end
+
+	local maxLO = 0
+	for _, child in ipairs(favListFrame:GetChildren()) do
+		if child:IsA("Frame") and child.LayoutOrder > maxLO then
+			maxLO = child.LayoutOrder
+		end
+	end
 
 	local rowFrame = Instance.new("Frame")
 	rowFrame.Name = "FavRow_" .. fav.animationid
@@ -305,13 +465,35 @@ local function addFavRow(fav)
 	rowFrame.BackgroundColor3 = C.black
 	rowFrame.BackgroundTransparency = C.tRow
 	rowFrame.BorderSizePixel = 0
+	rowFrame.LayoutOrder = maxLO + 1
 	rowFrame.Parent = favListFrame
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 7)
 	corner.Parent = rowFrame
 
-	-- Barra de acento plateada a la izquierda
+	-- Handle de arrastre
+	local dragHandle = Instance.new("TextButton")
+	dragHandle.Name = "DragHandle"
+	dragHandle.Size = UDim2.new(0, 18, 0, 32)
+	dragHandle.Position = UDim2.new(0, 2, 0.5, -16)
+	dragHandle.BackgroundColor3 = C.dragHandle
+	dragHandle.BackgroundTransparency = 0.25
+	dragHandle.Text = "::"
+	dragHandle.TextColor3 = C.accent
+	dragHandle.TextSize = 11
+	dragHandle.Font = Enum.Font.GothamBold
+	dragHandle.AutoButtonColor = false
+	dragHandle.BorderSizePixel = 0
+	dragHandle.Visible = false
+	dragHandle.ZIndex = 5
+	dragHandle.Parent = rowFrame
+
+	local dragHandleCorner = Instance.new("UICorner")
+	dragHandleCorner.CornerRadius = UDim.new(0, 4)
+	dragHandleCorner.Parent = dragHandle
+
+	-- Barra acento izquierda
 	local accentBar = Instance.new("Frame")
 	accentBar.Size = UDim2.new(0, 2, 0.55, 0)
 	accentBar.Position = UDim2.new(0, 0, 0.225, 0)
@@ -319,13 +501,13 @@ local function addFavRow(fav)
 	accentBar.BackgroundTransparency = 0.4
 	accentBar.BorderSizePixel = 0
 	accentBar.Parent = rowFrame
-
 	local accentCorner = Instance.new("UICorner")
 	accentCorner.CornerRadius = UDim.new(1, 0)
 	accentCorner.Parent = accentBar
 
 	-- Nombre
 	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "NameLabel"
 	nameLabel.Size = UDim2.new(1, -126, 1, 0)
 	nameLabel.Position = UDim2.new(0, 12, 0, 0)
 	nameLabel.BackgroundTransparency = 1
@@ -337,7 +519,7 @@ local function addFavRow(fav)
 	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nameLabel.Parent = rowFrame
 
-	-- Tooltip doble clic
+	-- Tooltip
 	local hintLabel = Instance.new("TextLabel")
 	hintLabel.Size = UDim2.new(1, -126, 0, 10)
 	hintLabel.Position = UDim2.new(0, 12, 0, 2)
@@ -349,45 +531,42 @@ local function addFavRow(fav)
 	hintLabel.TextXAlignment = Enum.TextXAlignment.Left
 	hintLabel.Visible = false
 	hintLabel.Parent = rowFrame
-
-	nameLabel.MouseEnter:Connect(function() hintLabel.Visible = true end)
+	nameLabel.MouseEnter:Connect(function() if not reorderMode then hintLabel.Visible = true end end)
 	nameLabel.MouseLeave:Connect(function() hintLabel.Visible = false end)
 
-	-- Botón Reproducir
+	-- Boton Reproducir
 	local playBtn = Instance.new("TextButton")
 	playBtn.Size = UDim2.new(0, 30, 0, 26)
 	playBtn.Position = UDim2.new(1, -100, 0.5, -13)
 	playBtn.BackgroundColor3 = C.btnPlay
-	playBtn.Text = "▶"
+	playBtn.Text = ">"
 	playBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	playBtn.TextSize = 11
+	playBtn.TextSize = 13
 	playBtn.Font = Enum.Font.GothamBold
 	playBtn.AutoButtonColor = false
 	playBtn.BorderSizePixel = 0
 	playBtn.Parent = rowFrame
-
 	local playCorner = Instance.new("UICorner")
 	playCorner.CornerRadius = UDim.new(0, 6)
 	playCorner.Parent = playBtn
 
-	-- Botón Detener
+	-- Boton Detener
 	local stopBtn = Instance.new("TextButton")
 	stopBtn.Size = UDim2.new(0, 30, 0, 26)
 	stopBtn.Position = UDim2.new(1, -64, 0.5, -13)
 	stopBtn.BackgroundColor3 = C.btnStop
-	stopBtn.Text = "■"
+	stopBtn.Text = "[]"
 	stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	stopBtn.TextSize = 11
+	stopBtn.TextSize = 10
 	stopBtn.Font = Enum.Font.GothamBold
 	stopBtn.AutoButtonColor = false
 	stopBtn.BorderSizePixel = 0
 	stopBtn.Parent = rowFrame
-
 	local stopBtnCorner = Instance.new("UICorner")
 	stopBtnCorner.CornerRadius = UDim.new(0, 6)
 	stopBtnCorner.Parent = stopBtn
 
-	-- Botón Eliminar
+	-- Boton Eliminar
 	local delBtn = Instance.new("TextButton")
 	delBtn.Size = UDim2.new(0, 30, 0, 26)
 	delBtn.Position = UDim2.new(1, -28, 0.5, -13)
@@ -399,12 +578,10 @@ local function addFavRow(fav)
 	delBtn.AutoButtonColor = false
 	delBtn.BorderSizePixel = 0
 	delBtn.Parent = rowFrame
-
 	local delCorner = Instance.new("UICorner")
 	delCorner.CornerRadius = UDim.new(0, 6)
 	delCorner.Parent = delBtn
 
-	-- Hover en botones de acción
 	local function btnHover(btn, normal, dark)
 		btn.MouseEnter:Connect(function() btn.BackgroundColor3 = dark end)
 		btn.MouseLeave:Connect(function() btn.BackgroundColor3 = normal end)
@@ -417,20 +594,20 @@ local function addFavRow(fav)
 	local capturedFav = fav
 
 	playBtn.MouseButton1Click:Connect(function()
+		if reorderMode then return end
 		lastAnimationName = capturedFav.name
 		safePlayAnim(capturedId)
 	end)
 
 	stopBtn.MouseButton1Click:Connect(function()
+		if reorderMode then return end
 		stopCurrentAnimation()
 	end)
 
 	delBtn.MouseButton1Click:Connect(function()
+		if reorderMode then return end
 		for j, f in ipairs(favoritos) do
-			if f == capturedFav then
-				table.remove(favoritos, j)
-				break
-			end
+			if f == capturedFav then table.remove(favoritos, j) break end
 		end
 		rowFrame:Destroy()
 		saveFavoritos()
@@ -439,6 +616,9 @@ local function addFavRow(fav)
 	end)
 
 	makeRenameable(nameLabel, fav, rowFrame)
+	setupRowDrag(dragHandle, rowFrame, capturedFav)
+	applyReorderStateToRow(rowFrame, reorderMode)
+
 	updateCanvasSize()
 	syncEmptyLabel()
 end
@@ -448,44 +628,41 @@ local function populateAllRows()
 	for _, child in ipairs(favListFrame:GetChildren()) do
 		if child:IsA("Frame") then child:Destroy() end
 	end
-	for _, fav in ipairs(favoritos) do
+	for i, fav in ipairs(favoritos) do
 		addFavRow(fav)
+		local row = favListFrame:FindFirstChild("FavRow_" .. fav.animationid)
+		if row then row.LayoutOrder = i end
 	end
 	syncEmptyLabel()
 end
 
-
-
 local function saveCurrentAsFavorite(customName)
-	if not lastAnimationId then
-		warn("No hay animacion activa para guardar.")
-		return
-	end
-
+	if not lastAnimationId then warn("No hay animacion activa para guardar.") return end
 	local name = customName
 	if not name or name == "" then
 		name = lastAnimationName or ("Anim " .. tostring(#favoritos + 1))
 	end
-
 	for _, fav in ipairs(favoritos) do
 		if fav.animationid == lastAnimationId then
 			warn("Esta animacion ya esta en favoritos: " .. fav.name)
 			return
 		end
 	end
-
 	local newFav = { name = name, animationid = lastAnimationId }
 	table.insert(favoritos, newFav)
 	saveFavoritos()
 	addFavRow(newFav)
 end
 
-
 local function createFavoritosGui()
 	if favoritosGui then
 		favoritosGui:Destroy()
 		favoritosGui = nil
 	end
+
+	dragState.active = false
+	dragState.clone  = nil
+	cloneLayer = nil
 
 	favoritosGui = Instance.new("ScreenGui")
 	favoritosGui.Name = "FavoritosAnimaciones"
@@ -494,14 +671,25 @@ local function createFavoritosGui()
 	favoritosGui.Enabled = favoritosVisible
 	favoritosGui.Parent = (gethui and gethui()) or CoreGui
 
-	-- ── Botón flotante minimizado ──
+	-- ── cloneLayer: Frame transparente fullscreen para el clon de drag ──
+	-- Al estar en la ScreenGui raiz (no en el scrollFrame), NO le afecta UIListLayout
+	local layerFrame = Instance.new("Frame")
+	layerFrame.Name = "CloneLayer"
+	layerFrame.Size = UDim2.new(1, 0, 1, 0)
+	layerFrame.BackgroundTransparency = 1
+	layerFrame.BorderSizePixel = 0
+	layerFrame.ZIndex = 90
+	layerFrame.Parent = favoritosGui
+	cloneLayer = layerFrame
+
+	-- Boton flotante minimizado
 	local miniBtn = Instance.new("TextButton")
 	miniBtn.Name = "MinimizedBtn"
 	miniBtn.Size = UDim2.new(0, 40, 0, 40)
 	miniBtn.Position = UDim2.new(0.5, -20, 0.5, -20)
 	miniBtn.BackgroundColor3 = C.black
 	miniBtn.BackgroundTransparency = C.tMiniBtn
-	miniBtn.Text = "★"
+	miniBtn.Text = "*"
 	miniBtn.TextColor3 = C.accent
 	miniBtn.TextSize = 17
 	miniBtn.Font = Enum.Font.GothamBold
@@ -509,12 +697,10 @@ local function createFavoritosGui()
 	miniBtn.BorderSizePixel = 0
 	miniBtn.Visible = false
 	miniBtn.Parent = favoritosGui
-
 	local miniBtnCorner = Instance.new("UICorner")
 	miniBtnCorner.CornerRadius = UDim.new(1, 0)
 	miniBtnCorner.Parent = miniBtn
 
-	-- Drag mini btn
 	local miniDragging = false
 	local miniDragInput, miniDragStart, miniStartPos
 	local miniWasDragged = false
@@ -526,25 +712,19 @@ local function createFavoritosGui()
 			miniStartPos = miniBtn.Position
 			miniWasDragged = false
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					miniDragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then miniDragging = false end
 			end)
 		end
 	end)
-
 	miniBtn.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			miniDragInput = input
 			if miniDragStart then
 				local delta = input.Position - miniDragStart
-				if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then
-					miniWasDragged = true
-				end
+				if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then miniWasDragged = true end
 			end
 		end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
 		if input == miniDragInput and miniDragging then
 			local delta = input.Position - miniDragStart
@@ -555,7 +735,7 @@ local function createFavoritosGui()
 		end
 	end)
 
-	-- ── Ventana principal ──
+	-- Ventana principal
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
 	if isMobile then
@@ -569,12 +749,11 @@ local function createFavoritosGui()
 	mainFrame.BackgroundTransparency = C.tMain
 	mainFrame.BorderSizePixel = 0
 	mainFrame.Parent = favoritosGui
-
 	local mainCorner = Instance.new("UICorner")
 	mainCorner.CornerRadius = UDim.new(0, 10)
 	mainCorner.Parent = mainFrame
 
-	-- ── Barra de título ──
+	-- Barra de titulo
 	local titleBar = Instance.new("Frame")
 	titleBar.Name = "TitleBar"
 	titleBar.Size = UDim2.new(1, 0, 0, 34)
@@ -582,7 +761,6 @@ local function createFavoritosGui()
 	titleBar.BackgroundTransparency = C.tTitle
 	titleBar.BorderSizePixel = 0
 	titleBar.Parent = mainFrame
-
 	local titleCorner = Instance.new("UICorner")
 	titleCorner.CornerRadius = UDim.new(0, 10)
 	titleCorner.Parent = titleBar
@@ -595,7 +773,6 @@ local function createFavoritosGui()
 	titlePatch.BorderSizePixel = 0
 	titlePatch.Parent = titleBar
 
-	-- Separador plateado sutil bajo el título
 	local titleLine = Instance.new("Frame")
 	titleLine.Size = UDim2.new(0.88, 0, 0, 1)
 	titleLine.Position = UDim2.new(0.06, 0, 1, 0)
@@ -608,7 +785,7 @@ local function createFavoritosGui()
 	iconLabel.Size = UDim2.new(0, 22, 1, 0)
 	iconLabel.Position = UDim2.new(0, 10, 0, 0)
 	iconLabel.BackgroundTransparency = 1
-	iconLabel.Text = "★"
+	iconLabel.Text = "*"
 	iconLabel.TextSize = 13
 	iconLabel.Font = Enum.Font.GothamBold
 	iconLabel.TextColor3 = C.accent
@@ -625,19 +802,58 @@ local function createFavoritosGui()
 	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	titleLabel.Parent = titleBar
 
+	-- Boton Reordenar
+	local reorderToggleBtn = Instance.new("TextButton")
+	reorderToggleBtn.Name = "ReorderBtn"
+	reorderToggleBtn.Size = UDim2.new(0, 60, 0, 20)
+	reorderToggleBtn.Position = UDim2.new(1, -94, 0.5, -10)
+	reorderToggleBtn.BackgroundColor3 = C.accentDim
+	reorderToggleBtn.BackgroundTransparency = 0.2
+	reorderToggleBtn.Text = "Reordenar"
+	reorderToggleBtn.TextColor3 = C.accent
+	reorderToggleBtn.TextSize = 8
+	reorderToggleBtn.Font = Enum.Font.GothamBold
+	reorderToggleBtn.AutoButtonColor = false
+	reorderToggleBtn.BorderSizePixel = 0
+	reorderToggleBtn.Parent = titleBar
+	local reorderToggleCorner = Instance.new("UICorner")
+	reorderToggleCorner.CornerRadius = UDim.new(0, 4)
+	reorderToggleCorner.Parent = reorderToggleBtn
+
+	reorderToggleBtn.MouseEnter:Connect(function()
+		if not reorderMode then reorderToggleBtn.BackgroundColor3 = Color3.fromRGB(70, 72, 80) end
+	end)
+	reorderToggleBtn.MouseLeave:Connect(function()
+		if not reorderMode then reorderToggleBtn.BackgroundColor3 = C.accentDim end
+	end)
+	reorderToggleBtn.MouseButton1Click:Connect(function()
+		reorderMode = not reorderMode
+		if reorderMode then
+			reorderToggleBtn.Text = "Listo"
+			reorderToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 110, 55)
+			reorderToggleBtn.TextColor3 = Color3.fromRGB(190, 255, 200)
+		else
+			if dragState.active then endDrag() end
+			reorderToggleBtn.Text = "Reordenar"
+			reorderToggleBtn.BackgroundColor3 = C.accentDim
+			reorderToggleBtn.TextColor3 = C.accent
+		end
+		syncReorderHandles(reorderMode)
+	end)
+
+	-- Boton minimizar
 	local minimizeBtn = Instance.new("TextButton")
-	minimizeBtn.Size = UDim2.new(0, 24, 0, 22)
-	minimizeBtn.Position = UDim2.new(1, -30, 0.5, -11)
+	minimizeBtn.Size = UDim2.new(0, 24, 0, 20)
+	minimizeBtn.Position = UDim2.new(1, -30, 0.5, -10)
 	minimizeBtn.BackgroundColor3 = C.black
 	minimizeBtn.BackgroundTransparency = 0.5
-	minimizeBtn.Text = "─"
+	minimizeBtn.Text = "-"
 	minimizeBtn.TextColor3 = C.textMuted
-	minimizeBtn.TextSize = 11
+	minimizeBtn.TextSize = 14
 	minimizeBtn.Font = Enum.Font.GothamBold
 	minimizeBtn.AutoButtonColor = false
 	minimizeBtn.BorderSizePixel = 0
 	minimizeBtn.Parent = titleBar
-
 	local minimizeBtnCorner = Instance.new("UICorner")
 	minimizeBtnCorner.CornerRadius = UDim.new(0, 5)
 	minimizeBtnCorner.Parent = minimizeBtn
@@ -652,13 +868,11 @@ local function createFavoritosGui()
 	end)
 
 	local isMinimized = false
-
 	minimizeBtn.MouseButton1Click:Connect(function()
 		isMinimized = true
 		mainFrame.Visible = false
 		miniBtn.Visible = true
 	end)
-
 	miniBtn.MouseButton1Click:Connect(function()
 		if not miniWasDragged then
 			isMinimized = false
@@ -668,29 +882,24 @@ local function createFavoritosGui()
 		miniWasDragged = false
 	end)
 
-	-- ── Drag ──
+	-- Drag ventana
 	local dragging = false
 	local dragInput, dragStart, startPos
-
 	titleBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
 			startPos = mainFrame.Position
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
 			end)
 		end
 	end)
-
 	titleBar.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			dragInput = input
 		end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
 		if input == dragInput and dragging then
 			local delta = input.Position - dragStart
@@ -701,7 +910,7 @@ local function createFavoritosGui()
 		end
 	end)
 
-	-- ── Panel: Animación activa ──
+	-- Panel animacion activa
 	local activeSection = Instance.new("Frame")
 	activeSection.Name = "ActiveSection"
 	activeSection.Size = UDim2.new(1, -12, 0, 52)
@@ -710,7 +919,6 @@ local function createFavoritosGui()
 	activeSection.BackgroundTransparency = C.tPanel
 	activeSection.BorderSizePixel = 0
 	activeSection.Parent = mainFrame
-
 	local activeCorner = Instance.new("UICorner")
 	activeCorner.CornerRadius = UDim.new(0, 8)
 	activeCorner.Parent = activeSection
@@ -753,7 +961,6 @@ local function createFavoritosGui()
 	saveBtn.AutoButtonColor = false
 	saveBtn.BorderSizePixel = 0
 	saveBtn.Parent = activeSection
-
 	local saveCorner = Instance.new("UICorner")
 	saveCorner.CornerRadius = UDim.new(0, 6)
 	saveCorner.Parent = saveBtn
@@ -766,12 +973,10 @@ local function createFavoritosGui()
 		saveBtn.BackgroundColor3 = C.accentDim
 		saveBtn.TextColor3 = C.accent
 	end)
-
 	saveBtn.MouseButton1Click:Connect(function()
 		saveCurrentAsFavorite(lastAnimationName)
 	end)
 
-	-- Loop de actualización del panel activo
 	task.spawn(function()
 		while favoritosGui and favoritosGui.Parent do
 			if activeAnimLabel and activeAnimLabel.Parent then
@@ -787,7 +992,7 @@ local function createFavoritosGui()
 		end
 	end)
 
-	-- ── Encabezado lista ──
+	-- Header lista
 	local listHeader = Instance.new("TextLabel")
 	listHeader.Size = UDim2.new(1, -12, 0, 14)
 	listHeader.Position = UDim2.new(0, 8, 0, 100)
@@ -800,7 +1005,7 @@ local function createFavoritosGui()
 	listHeader.TextXAlignment = Enum.TextXAlignment.Left
 	listHeader.Parent = mainFrame
 
-	-- ── ScrollFrame ──
+	-- ScrollFrame
 	local scrollFrame = Instance.new("ScrollingFrame")
 	scrollFrame.Name = "FavScrollFrame"
 	scrollFrame.Size = UDim2.new(1, -12, 0, 210)
@@ -813,7 +1018,6 @@ local function createFavoritosGui()
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.None
 	scrollFrame.Parent = mainFrame
-
 	local scrollCorner = Instance.new("UICorner")
 	scrollCorner.CornerRadius = UDim.new(0, 8)
 	scrollCorner.Parent = scrollFrame
@@ -842,11 +1046,11 @@ local function createFavoritosGui()
 	emptyLabel = emptyLbl
 
 	favListFrame = scrollFrame
-	populateAllRows()
 
+	connectGlobalDrag()
+	populateAllRows()
 	startExternalDetection()
 end
-
 
 local function setFavoritosVisible(value)
 	favoritosVisible = value
@@ -862,15 +1066,14 @@ local function setFavoritosVisible(value)
 		if favoritosGui then
 			favoritosGui.Enabled = false
 		end
+		if dragState.active then endDrag() end
 		stopExternalDetection()
 	end
 end
 
-
 local function makeDraggable(frame)
 	local dragging = false
 	local dragInput, dragStart, startPos
-
 	local function update(input)
 		local delta = input.Position - dragStart
 		frame.Position = UDim2.new(
@@ -878,38 +1081,28 @@ local function makeDraggable(frame)
 			startPos.Y.Scale, startPos.Y.Offset + delta.Y
 		)
 	end
-
 	frame.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
 			startPos = frame.Position
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
 			end)
 		end
 	end)
-
 	frame.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
 			dragInput = input
 		end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
+		if input == dragInput and dragging then update(input) end
 	end)
 end
 
 local function createMobileButtons()
-	if mobileButtonsGui then
-		mobileButtonsGui:Destroy()
-	end
-
+	if mobileButtonsGui then mobileButtonsGui:Destroy() end
 	mobileButtonsGui = Instance.new("ScreenGui")
 	mobileButtonsGui.Name = "MobileAnimationButtons"
 	mobileButtonsGui.ResetOnSpawn = false
@@ -921,20 +1114,17 @@ local function createMobileButtons()
 	playButton.Size = UDim2.new(0, 80, 0, 80)
 	playButton.Position = UDim2.new(0.1, 0, 0.7, 0)
 	playButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-	playButton.Text = "▶️"
+	playButton.Text = "Play"
 	playButton.TextColor3 = Color3.new(1, 1, 1)
-	playButton.TextSize = 35
+	playButton.TextSize = 16
 	playButton.Font = Enum.Font.GothamBold
 	playButton.AutoButtonColor = false
 	playButton.BorderSizePixel = 0
 	playButton.Parent = mobileButtonsGui
-
 	local playCorner = Instance.new("UICorner")
 	playCorner.CornerRadius = UDim.new(0.25, 0)
 	playCorner.Parent = playButton
-
 	makeDraggable(playButton)
-
 	playButton.MouseButton1Click:Connect(function()
 		playLastAnimation()
 		playButton.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
@@ -947,20 +1137,17 @@ local function createMobileButtons()
 	stopButton.Size = UDim2.new(0, 80, 0, 80)
 	stopButton.Position = UDim2.new(0.9, -80, 0.7, 0)
 	stopButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-	stopButton.Text = "⏹️"
+	stopButton.Text = "Stop"
 	stopButton.TextColor3 = Color3.new(1, 1, 1)
-	stopButton.TextSize = 35
+	stopButton.TextSize = 16
 	stopButton.Font = Enum.Font.GothamBold
 	stopButton.AutoButtonColor = false
 	stopButton.BorderSizePixel = 0
 	stopButton.Parent = mobileButtonsGui
-
 	local stopCorner = Instance.new("UICorner")
 	stopCorner.CornerRadius = UDim.new(0.25, 0)
 	stopCorner.Parent = stopButton
-
 	makeDraggable(stopButton)
-
 	stopButton.MouseButton1Click:Connect(function()
 		stopCurrentAnimation()
 		stopButton.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
@@ -1000,85 +1187,58 @@ local function removeMobileButtons()
 	end
 end
 
-
 local function setupUI_R15()
 	if buttonsCreated then return end
 	buttonsCreated = true
 
 	AnimacionesTab:CreateSection("Animaciones R15")
-
 	AnimacionesTab:CreateButton({
-		Name = "❌ Quitar Animación",
-		Callback = function()
-			stopCurrentAnimation()
-		end
+		Name = "Quitar Animacion",
+		Callback = function() stopCurrentAnimation() end
 	})
-
 	AnimacionesTab:CreateToggle({
-		Name = isMobile and "Activar Botones de Animación" or "Activar Binds de Animación",
+		Name = isMobile and "Activar Botones de Animacion" or "Activar Binds de Animacion",
 		CurrentValue = false,
 		Callback = function(value)
 			bindsEnabled = value
 			if isMobile then
-				if value then
-					createMobileButtons()
-				else
-					removeMobileButtons()
-				end
+				if value then createMobileButtons() else removeMobileButtons() end
 			end
 		end
 	})
-
 	AnimacionesTab:CreateToggle({
-		Name = "★ Favoritos",
+		Name = "Favoritos",
 		CurrentValue = false,
-		Callback = function(value)
-			setFavoritosVisible(value)
-		end
+		Callback = function(value) setFavoritosVisible(value) end
 	})
-
 	if not isMobile then
 		AnimacionesTab:CreateKeybind({
-			Name = "Reproducir Animación",
+			Name = "Reproducir Animacion",
 			CurrentKeybind = "Q",
-			Callback = function(key)
-				if bindsEnabled then
-					playLastAnimation()
-				end
-			end
+			Callback = function() if bindsEnabled then playLastAnimation() end end
 		})
-
 		AnimacionesTab:CreateKeybind({
-			Name = "Quitar Animación",
+			Name = "Quitar Animacion",
 			CurrentKeybind = "E",
-			Callback = function(key)
-				if bindsEnabled then
-					stopCurrentAnimation()
-				end
-			end
+			Callback = function() if bindsEnabled then stopCurrentAnimation() end end
 		})
 	end
-
 	AnimacionesTab:CreateSlider({
-		Name = "Velocidad de animación",
+		Name = "Velocidad de animacion",
 		Range = {0, 10},
 		Increment = 0.1,
 		Suffix = "x",
 		CurrentValue = selectedSpeed,
 		Callback = function(value)
 			selectedSpeed = value
-			if currentTrack then
-				currentTrack:AdjustSpeed(value)
-			end
+			if currentTrack then currentTrack:AdjustSpeed(value) end
 		end
 	})
 
 	task.spawn(function()
 		local success1, emotes1 = pcall(function()
-			local raw = game:HttpGet("https://pastebin.com/raw/h4981hMA")
-			return HttpService:JSONDecode(raw)
+			return HttpService:JSONDecode(game:HttpGet("https://pastebin.com/raw/h4981hMA"))
 		end)
-
 		if success1 and emotes1 then
 			for _, emote in ipairs(emotes1) do
 				if emote.name and emote.animationid then
@@ -1087,9 +1247,7 @@ local function setupUI_R15()
 						Callback = function()
 							local humanoid = getHumanoid()
 							if humanoid then
-								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-									track:Stop()
-								end
+								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 								lastAnimationName = emote.name
 								safePlayAnim(emote.animationid)
 							end
@@ -1097,12 +1255,9 @@ local function setupUI_R15()
 					})
 				end
 			end
-
 			local success2, emotes2 = pcall(function()
-				local raw = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
-				return HttpService:JSONDecode(raw)
+				return HttpService:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json"))
 			end)
-
 			if success2 and emotes2 then
 				for _, emote in ipairs(emotes2) do
 					if emote.name and emote.animationid then
@@ -1111,9 +1266,7 @@ local function setupUI_R15()
 							Callback = function()
 								local humanoid = getHumanoid()
 								if humanoid then
-									for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-										track:Stop()
-									end
+									for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 									lastAnimationName = emote.name
 									safePlayAnim(emote.animationid)
 								end
@@ -1130,34 +1283,26 @@ local function setupUI_R15()
 	end)
 end
 
-
 local function setupUI_R6()
 	if buttonsCreatedR6 then return end
 	buttonsCreatedR6 = true
-
 	AnimacionesTab:CreateSection("Animaciones R6")
-
 	AnimacionesTab:CreateButton({
-		Name = "❌ Quitar Animación R6",
+		Name = "Quitar Animacion R6",
 		Callback = function()
 			local humanoid = getHumanoid()
 			if humanoid then
-				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-					track:Stop()
-				end
+				for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 			end
 			currentTrack = nil
 			lastAnimationId = nil
 			lastAnimationName = nil
 		end
 	})
-
 	task.spawn(function()
 		local success, emotes = pcall(function()
-			local raw = game:HttpGet("https://pastebin.com/raw/iUCKWXKV")
-			return HttpService:JSONDecode(raw)
+			return HttpService:JSONDecode(game:HttpGet("https://pastebin.com/raw/iUCKWXKV"))
 		end)
-
 		if success then
 			for _, emote in ipairs(emotes) do
 				if emote.name and emote.animationid then
@@ -1166,9 +1311,7 @@ local function setupUI_R6()
 						Callback = function()
 							local humanoid = getHumanoid()
 							if humanoid then
-								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-									track:Stop()
-								end
+								for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop() end
 								lastAnimationName = "[R6] " .. emote.name
 								safePlayAnim(emote.animationid)
 							end
@@ -1182,24 +1325,14 @@ local function setupUI_R6()
 	end)
 end
 
-
-AnimacionesTab:CreateButton({
-	Name = "▶️ Cargar Animaciones R15",
-	Callback = setupUI_R15
-})
-
-AnimacionesTab:CreateButton({
-	Name = "▶️ Cargar Animaciones R6",
-	Callback = setupUI_R6
-})
-
+AnimacionesTab:CreateButton({ Name = "Cargar Animaciones R15", Callback = setupUI_R15 })
+AnimacionesTab:CreateButton({ Name = "Cargar Animaciones R6",  Callback = setupUI_R6  })
 
 LocalPlayer.CharacterAdded:Connect(function()
 	currentTrack = nil
 	lastAnimationId = nil
 	lastAnimationName = nil
 	lastDetectedExternalId = nil
-
 	if isMobile and bindsEnabled then
 		removeMobileButtons()
 		task.wait(0.5)
@@ -1216,10 +1349,14 @@ RunService.Heartbeat:Connect(function()
 	if favoritosGui and not favoritosGui.Parent then
 		favoritosGui = nil
 		favListFrame = nil
+		cloneLayer = nil
+		reorderMode = false
+		dragState.active = false
+		dragState.clone  = nil
+		disconnectGlobalDrag()
 		stopExternalDetection()
 	end
 end)
-
 
 
 
