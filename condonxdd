@@ -1,4 +1,4 @@
-ProteTab = _G.Window:CreateTab("Protecciones", nil) -- Title, Image
+ProteTab = _G.Window:CreateTab("Protecciones", nil)
 ProteSection = ProteTab:CreateSection("Protecciones")
 
 local Players = game:GetService("Players")
@@ -16,7 +16,7 @@ local MAX_VELOCITY = 17
 local MAX_ANGULAR = 15
 local MAX_POSITION_DELTA = 4
 local cachedParts = {}
-local lastRootCFrame = nil 
+local lastRootCFrame = nil
 
 local function buildCache(character)
     local parts = {}
@@ -41,7 +41,6 @@ local function StartVelocityProtection()
         if lastRootCFrame then
             local delta = (root.CFrame.Position - lastRootCFrame.Position).Magnitude
             if delta > MAX_POSITION_DELTA then
-                -- Resetear a la posición anterior
                 root.CFrame = lastRootCFrame
                 root.AssemblyLinearVelocity = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
@@ -215,129 +214,103 @@ ProteTab:CreateToggle({
 
 ProteSection = ProteTab:CreateSection("Anti Bloqueo de camara")
 
--- Servicios y variables necesarias
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local unlockCameraConnection
-local cameraUnlocked = false -- INICIALMENTE FALSO
+local cameraUnlocked = false
 local originalCameraSettings = {}
 
--- Función para forzar el control de cámara
- function enableCameraControl()
-	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local humanoid = character:WaitForChild("Humanoid")
+function enableCameraControl()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
 
-	-- Guardar estado original una sola vez
-	if not originalCameraSettings.saved then
-		originalCameraSettings.CameraType = Camera.CameraType
-		originalCameraSettings.CameraSubject = Camera.CameraSubject
-		originalCameraSettings.CameraMode = LocalPlayer.CameraMode
-		originalCameraSettings.MaxZoom = LocalPlayer.CameraMaxZoomDistance
-		originalCameraSettings.MinZoom = LocalPlayer.CameraMinZoomDistance
-		originalCameraSettings.saved = true
-	end
+    if not originalCameraSettings.saved then
+        originalCameraSettings.CameraType = Camera.CameraType
+        originalCameraSettings.CameraSubject = Camera.CameraSubject
+        originalCameraSettings.CameraMode = LocalPlayer.CameraMode
+        originalCameraSettings.MaxZoom = LocalPlayer.CameraMaxZoomDistance
+        originalCameraSettings.MinZoom = LocalPlayer.CameraMinZoomDistance
+        originalCameraSettings.saved = true
+    end
 
-	-- Desconectar si ya había una conexión previa
-	if unlockCameraConnection then
-		unlockCameraConnection:Disconnect()
-	end
+    if unlockCameraConnection then
+        unlockCameraConnection:Disconnect()
+    end
 
-	unlockCameraConnection = RunService.RenderStepped:Connect(function()
-		if not cameraUnlocked then return end
+    unlockCameraConnection = RunService.RenderStepped:Connect(function()
+        if not cameraUnlocked then return end
 
-		if Camera.CameraType ~= Enum.CameraType.Custom then
-			Camera.CameraType = Enum.CameraType.Custom
-		end
+        if Camera.CameraType ~= Enum.CameraType.Custom then
+            Camera.CameraType = Enum.CameraType.Custom
+        end
 
-		if Camera.CameraSubject ~= humanoid then
-			Camera.CameraSubject = humanoid
-		end
+        if Camera.CameraSubject ~= humanoid then
+            Camera.CameraSubject = humanoid
+        end
 
-		LocalPlayer.CameraMode = Enum.CameraMode.Classic
-		LocalPlayer.CameraMaxZoomDistance = 128
-		LocalPlayer.CameraMinZoomDistance = 0.5
-	end)
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMaxZoomDistance = 128
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end)
 end
 
--- TOGGLE: Unlock Camera
 ProteTab:CreateToggle({
-	Name = "Desbloquear Camara",
-	Flag = "unlockCam",
-	CurrentValue = false,
-	Callback = function(enabled)
-		cameraUnlocked = enabled
+    Name = "Desbloquear Camara",
+    Flag = "unlockCam",
+    CurrentValue = false,
+    Callback = function(enabled)
+        cameraUnlocked = enabled
 
-		if enabled then
-			enableCameraControl()
-		else
-			-- Desconectar render loop
-			if unlockCameraConnection then
-				unlockCameraConnection:Disconnect()
-				unlockCameraConnection = nil
-			end
+        if enabled then
+            enableCameraControl()
+        else
+            if unlockCameraConnection then
+                unlockCameraConnection:Disconnect()
+                unlockCameraConnection = nil
+            end
 
-			-- Restaurar valores originales si estaban guardados
-			if originalCameraSettings.saved then
-				Camera.CameraType = originalCameraSettings.CameraType
-				Camera.CameraSubject = originalCameraSettings.CameraSubject
-				LocalPlayer.CameraMode = originalCameraSettings.CameraMode
-				LocalPlayer.CameraMaxZoomDistance = originalCameraSettings.MaxZoom
-				LocalPlayer.CameraMinZoomDistance = originalCameraSettings.MinZoom
-			end
-		end
-	end
+            if originalCameraSettings.saved then
+                Camera.CameraType = originalCameraSettings.CameraType
+                Camera.CameraSubject = originalCameraSettings.CameraSubject
+                LocalPlayer.CameraMode = originalCameraSettings.CameraMode
+                LocalPlayer.CameraMaxZoomDistance = originalCameraSettings.MaxZoom
+                LocalPlayer.CameraMinZoomDistance = originalCameraSettings.MinZoom
+            end
+        end
+    end
 })
 
--- Ejecutar enableCameraControl() solo si el toggle está activado al cargar (opcional)
 if cameraUnlocked then
-	enableCameraControl()
+    enableCameraControl()
 end
 
--- Reaplicar si reaparece el personaje, pero solo si está activado
 LocalPlayer.CharacterAdded:Connect(function()
-	if cameraUnlocked then
-		enableCameraControl()
-	end
+    if cameraUnlocked then
+        enableCameraControl()
+    end
 end)
-
--- Reaplicar si reaparece el personaje
-
-
-
-
-
-
 
 
 ProteSection = ProteTab:CreateSection("Anti daño de caida")
 
-
---- Variables de estado de los toggles
 local FakePosEnabled = false
 local FallBreakerEnabled = false
 local HealthMultEnabled = false
 local God2018Active = false
 local SAFE_OFFSET = Vector3.new(0, 2, 0)
 
---- Variables de Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local lp = Players.LocalPlayer
 
---- Variable para guardar posición segura
 local lastSafeCF = CFrame.new()
-
---- Variables de fly (para mantener compatibilidad)
 local flyEnabled = false
 local noClipEnabled = false
 
---- 🛡️ FUNCIONES ORIGINALES (SIN MODIFICAR)
-
---- Función God Mode 2018 (original)
 local function apply2018GodMode()
     local char = lp.Character or lp.CharacterAdded:Wait()
     local oldHum = char:FindFirstChildOfClass("Humanoid")
@@ -358,26 +331,27 @@ local function apply2018GodMode()
     end
 end
 
---- Función principal que maneja todos los efectos (original)
+local activeHeartbeats = {}
+
 local function onChar(char)
     local hrp = char:WaitForChild("HumanoidRootPart")
     local hum = char:WaitForChild("Humanoid")
     lastSafeCF = hrp.CFrame
 
-    -- Main Loop para Fake Position, Health Multiplier y Fall Breaker
-    RunService.Heartbeat:Connect(function()
+    if activeHeartbeats[char] then
+        activeHeartbeats[char]:Disconnect()
+    end
+
+    activeHeartbeats[char] = RunService.Heartbeat:Connect(function()
         if not hrp or not hrp.Parent or hum.Health <= 0 then return end
-        
+
         local v = hrp.AssemblyLinearVelocity
 
-        -- 1. FAKE POSITION LOGIC (ORIGINAL)
         if FakePosEnabled then
-            -- Anti-Fling (Horizontal)
             if Vector3.new(v.X, 0, v.Z).Magnitude > 60 then
                 lastSafeCF = hrp.CFrame
             end
 
-            -- Anti-Fall Damage
             if v.Y < -80 then
                 local rayParam = RaycastParams.new()
                 rayParam.FilterDescendantsInstances = {char}
@@ -385,18 +359,16 @@ local function onChar(char)
                 local groundCheck = game.Workspace:Raycast(hrp.Position, Vector3.new(0, -15, 0), rayParam)
 
                 if groundCheck then
-                    hrp.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z) 
+                    hrp.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
                 end
             end
 
-            -- Glitch/Void Protection
             if v.Magnitude > 300 then
                 hrp.CFrame = lastSafeCF + SAFE_OFFSET
                 hrp.AssemblyLinearVelocity = Vector3.zero
             end
         end
 
-        -- 2. HEALTH MULTIPLIER (ORIGINAL)
         if HealthMultEnabled then
             local currentV = hrp.AssemblyLinearVelocity
             hrp.AssemblyLinearVelocity = Vector3.zero
@@ -404,7 +376,6 @@ local function onChar(char)
             if hrp.Parent then hrp.AssemblyLinearVelocity = currentV end
         end
 
-        -- 3. FALL DAMAGE BREAKER V2 (ORIGINAL)
         if FallBreakerEnabled then
             local currentV = hrp.AssemblyLinearVelocity
             hrp.AssemblyLinearVelocity = Vector3.zero
@@ -412,9 +383,17 @@ local function onChar(char)
             if hrp.Parent then hrp.AssemblyLinearVelocity = currentV end
         end
     end)
+
+    char.AncestryChanged:Connect(function()
+        if not char.Parent then
+            if activeHeartbeats[char] then
+                activeHeartbeats[char]:Disconnect()
+                activeHeartbeats[char] = nil
+            end
+        end
+    end)
 end
 
--- Conectar onChar solo cuando alguna protección lo necesite
 local onCharConnected = false
 
 local function ensureOnChar()
@@ -422,6 +401,7 @@ local function ensureOnChar()
     onCharConnected = true
 
     if lp.Character then onChar(lp.Character) end
+
     lp.CharacterAdded:Connect(function(char)
         onChar(char)
         if God2018Active then
@@ -431,86 +411,39 @@ local function ensureOnChar()
     end)
 end
 
-
-
-
---- Toggle Fake Position
 ProteTab:CreateToggle({
     Name = "Fake Position",
     CurrentValue = false,
     Callback = function(state)
         FakePosEnabled = state
         if state then
-ensureOnChar()
-            JmodsLib:Notify({
-                Title = "Fake Position Activado",
-                Content = "❌ Fling | ✅ Wins | Anti-Fall & Anti-Fling integrado",
-                Duration = 3
-            })
-        else
-            JmodsLib:Notify({
-                Title = "Fake Position Desactivado",
-                Content = "Todo vuelve a la normalidad",
-                Duration = 2
-            })
+            ensureOnChar()
         end
     end
 })
 
---- Toggle Fall Damage Breaker v2
 ProteTab:CreateToggle({
     Name = "Fall Damage Breaker v2",
     CurrentValue = false,
     Callback = function(state)
-        if state and game.PlaceId ~= 189707 then 
-            JmodsLib:Notify({
-                Title = "Advertencia",
-                Content = "Solo funciona en Natural Disaster Survival",
-                Duration = 3
-            })
-        end
         FallBreakerEnabled = state
         if state then
-ensureOnChar()
-            JmodsLib:Notify({
-                Title = "Fall Damage Breaker Activado",
-                Content = "❌ Fling | ✅ Wins | Velocity Nullification",
-                Duration = 3
-            })
-        else
-            JmodsLib:Notify({
-                Title = "Fall Damage Breaker Desactivado",
-                Content = "Todo vuelve a la normalidad",
-                Duration = 2
-            })
+            ensureOnChar()
         end
     end
 })
 
---- Toggle Health Multiplier
 ProteTab:CreateToggle({
     Name = "Health Multiplier",
     CurrentValue = false,
     Callback = function(state)
         HealthMultEnabled = state
         if state then
-ensureOnChar()
-            JmodsLib:Notify({
-                Title = "Health Multiplier Activado",
-                Content = "✅ Fling | ❌ Wins",
-                Duration = 3
-            })
-        else
-            JmodsLib:Notify({
-                Title = "Health Multiplier Desactivado",
-                Content = "Todo vuelve a la normalidad",
-                Duration = 2
-            })
+            ensureOnChar()
         end
     end
 })
 
---- Toggle 2018 Godmode
 ProteTab:CreateToggle({
     Name = "2018 Godmode",
     CurrentValue = false,
@@ -518,24 +451,12 @@ ProteTab:CreateToggle({
         God2018Active = state
         if state then
             apply2018GodMode()
-            JmodsLib:Notify({
-                Title = "2018 Godmode Activado",
-                Content = "❌ Fling | ❌ Wins | Inmortalidad activada",
-                Duration = 3
-            })
-        else
-            JmodsLib:Notify({
-                Title = "2018 Godmode Desactivado",
-                Content = "Todo vuelve a la normalidad",
-                Duration = 2
-            })
         end
     end
 })
 
 
 ProteSection = ProteTab:CreateSection("Anti Sits")
-
 
 local AntiSitV1 = false
 local antiSitLoop1
@@ -566,6 +487,15 @@ ProteTab:CreateToggle({
 })
 
 local AntiSitV2 = false
+local antiSitV2CharConn
+
+local function applyStateBlock(character, blocked)
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum:SetStateEnabled(Enum.HumanoidStateType.Seated, not blocked)
+        if blocked then hum.Sit = false end
+    end
+end
 
 ProteTab:CreateToggle({
     Name = "Anti Sit StateBlock",
@@ -573,14 +503,22 @@ ProteTab:CreateToggle({
     Callback = function(state)
         AntiSitV2 = state
 
-        local char = lp.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        applyStateBlock(lp.Character, state)
 
-        if hum then
-            hum:SetStateEnabled(Enum.HumanoidStateType.Seated, not state)
-
-            if state then
-                hum.Sit = false
+        if state then
+            antiSitV2CharConn = lp.CharacterAdded:Connect(function(char)
+                task.wait(0.1)
+                applyStateBlock(char, true)
+            end)
+        else
+            if antiSitV2CharConn then
+                antiSitV2CharConn:Disconnect()
+                antiSitV2CharConn = nil
+            end
+            local char = lp.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
             end
         end
     end
@@ -657,7 +595,6 @@ ProteTab:CreateToggle({
 
 ProteSection = ProteTab:CreateSection("Anti Freeze")
 
-
 local AntiAnchorEnabled = false
 local antiAnchorLoop
 
@@ -686,23 +623,11 @@ ProteTab:CreateToggle({
                     hum.AutoRotate = true
                 end
             end)
-
-            JmodsLib:Notify({
-                Title = "Anti Anchor Activado",
-                Content = "Protección contra freeze y cinemáticas activada",
-                Duration = 3
-            })
         else
             if antiAnchorLoop then
                 antiAnchorLoop:Disconnect()
                 antiAnchorLoop = nil
             end
-
-            JmodsLib:Notify({
-                Title = "Anti Anchor Desactivado",
-                Content = "Protección deshabilitada",
-                Duration = 2
-            })
         end
     end
 })
