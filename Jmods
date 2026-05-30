@@ -292,22 +292,117 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/aaaaa/refs
     
 ---barra de velocidad---
 local wsReady = false
+local lastSpeedValue = 16
+local DEFAULT_SPEED = 16
+local speedLockConnection = nil
+
+local function applySpeed(value)
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    -- Guardamos el valor actual
+    lastSpeedValue = value
+
+    -- Aplicamos la velocidad
+    humanoid.WalkSpeed = value
+
+    -- Anti-reset: desconectamos el anterior si existe
+    if speedLockConnection then
+        speedLockConnection:Disconnect()
+        speedLockConnection = nil
+    end
+
+    -- Solo activamos el lock si NO es el valor default
+    if value ~= DEFAULT_SPEED then
+        speedLockConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if humanoid and humanoid.WalkSpeed ~= lastSpeedValue then
+                humanoid.WalkSpeed = lastSpeedValue
+            end
+        end)
+    end
+end
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function onCharacterAdded(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    -- Solo re-aplica si el jugador había cambiado la velocidad
+    if lastSpeedValue ~= DEFAULT_SPEED then
+        task.wait(0.15) -- Pequeño delay para que cargue bien el personaje
+
+        humanoid.WalkSpeed = lastSpeedValue
+
+        -- Re-conectamos el anti-reset en el nuevo humanoid
+        if speedLockConnection then
+            speedLockConnection:Disconnect()
+            speedLockConnection = nil
+        end
+
+        speedLockConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if humanoid and humanoid.WalkSpeed ~= lastSpeedValue then
+                humanoid.WalkSpeed = lastSpeedValue
+            end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+local wsReady = false
 
 Slider = MainTab:CreateSlider({
     Name = "Velocidad al correr",
     Range = {1, 500},
     Increment = 1,
     Suffix = "velocidad",
-    CurrentValue = 16,
-    Flag = "sliderws", 
+    CurrentValue = DEFAULT_SPEED,
+    Flag = "sliderws",
     Callback = function(Value)
-        if wsReady then
-            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
-        else
+        -- Ignoramos el primer disparo automático del framework
+        if not wsReady then
             wsReady = true
+            return
         end
+
+        -- Solo actuamos si el valor cambió de verdad
+        if Value == lastSpeedValue then return end
+
+        applySpeed(Value)
     end,
 })
+
+Button_ResetSpeed = MainTab:CreateButton({
+    Name = "Restaurar velocidad original",
+    Callback = function()
+        -- Desactivamos el anti-reset antes de restaurar
+        if speedLockConnection then
+            speedLockConnection:Disconnect()
+            speedLockConnection = nil
+        end
+
+        lastSpeedValue = DEFAULT_SPEED
+
+        local player = game:GetService("Players").LocalPlayer
+        local character = player.Character
+        if not character then return end
+
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        humanoid.WalkSpeed = DEFAULT_SPEED
+
+        -- Opcional: notificación si tu framework la soporta
+        -- notify("WalkSpeed", "Velocidad restaurada a " .. DEFAULT_SPEED)
+    end,
+})
+
     
 
 
