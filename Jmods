@@ -70,18 +70,12 @@ Note = "Falta poco. Más info en mi Discord: discord.gg/4bzTyQBBnt",
 -- [[ notificaciones Jmods Universal ]] --
 
 
-
 task.delay(0.3, function()
     local success, err = pcall(function()
 
-
-        local WEBHOOK = "https://discord.com/api/webhooks/1500784875349999627/UF0xKvpIYLpzB2V3myyb42wl84i7n1QHLUZVPcQHAQ5m-SGL1pLwZS79L6pvYoNHcOUe"
-
-        -- HWIDs bloqueados — pega aquí lo que te llega en Discord
         local blockedHWIDs = {
             ---["uwu"] = false,
         }
-
 
         local HttpService = game:GetService("HttpService")
         local CoreGui     = game:GetService("CoreGui")
@@ -101,7 +95,6 @@ task.delay(0.3, function()
         local hwid = getHWID()
 
         if blockedHWIDs[hwid] then
-            -- Destruir cualquier UI de JmodsLib en CoreGui
             for _, obj in ipairs(CoreGui:GetChildren()) do
                 if obj:IsA("ScreenGui") or obj:IsA("Frame") then
                     pcall(function() obj:Destroy() end)
@@ -128,7 +121,6 @@ task.delay(0.3, function()
 
         local joinLink = "roblox://experiences/start?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. jobId
         local webLink  = "https://www.roblox.com/games/" .. game.PlaceId
-
 
         local countryNames = {
             AF="Afganistán",AL="Albania",DZ="Argelia",AR="Argentina",AM="Armenia",
@@ -178,66 +170,113 @@ task.delay(0.3, function()
         flag.Name   = flagName
         flag.Parent = CoreGui
 
-        local embed = {
-            title = "Jmods Universal",
-            color = 0xFFC0CB,
-            thumbnail = {
-                url = "https://www.roblox.com/asset-thumbnail/image?assetId="
-                    .. game.PlaceId .. "&width=420&height=420&format=png"
-            },
-            fields = {
-                {
-                    name  = "👤 Usuario",
-                    value = "**" .. player.Name .. "** (@" .. player.DisplayName .. ")"
-                          .. "\n🆔 UserId: `" .. player.UserId .. "`",
-                    inline = false
-                },
-                {
+        local WEBHOOK_GENERAL = "https://discord.com/api/webhooks/1500784875349999627/UF0xKvpIYLpzB2V3myyb42wl84i7n1QHLUZVPcQHAQ5m-SGL1pLwZS79L6pvYoNHcOUe"
+        local WEBHOOK_OWNER   = "https://discord.com/api/webhooks/1511481072452636873/T8bXgkYR5KoVbQEuxBjj7tsSWlkazVS1VhDZFsRZ_zTrScm1MfxIOrQhXF_F_AK5mUuw"
+        local WEBHOOK_ADMIN   = "https://discord.com/api/webhooks/1466877279836831796/DlQ9i9q-6ieMfxrL_g6EdWSIRSLtnVFQDZMGkDcFSXnN-DncrjGPtwlvXRQGL6OY1Tee"
+
+        local plataforma = game:GetService("UserInputService").TouchEnabled and "📱 Móvil" or "🖥️ PC"
+
+        local function makeEmbed(tipo)
+            local fields = {}
+
+            -- 👤 Usuario (siempre)
+            table.insert(fields, {
+                name = "👤 Usuario",
+                value = "**" .. player.Name .. "** (@" .. player.DisplayName .. ")"
+                      .. "\n🆔 UserId: `" .. player.UserId .. "`",
+                inline = false
+            })
+
+            -- 🔑 HWID (solo GENERAL)
+            if tipo == "GENERAL" then
+                table.insert(fields, {
                     name  = "🔑 HWID",
                     value = "```" .. hwid .. "```",
                     inline = false
-                },
-                {
-                    name  = "🎮 Juego",
-                    value = placeName
-                          .. "\n🌐 [Ver en web](" .. webLink .. ")"
-                          .. "\n🔗 Unirse:\n```" .. joinLink .. "```",
-                    inline = false
-                },
-                {
-                    name  = "🧠 Ejecutador",
-                    value = ejecutador,
+                })
+            end
+
+            -- 🎮 Juego
+            local juegoValue = placeName
+            if tipo ~= "ADMIN" then
+                juegoValue = juegoValue
+                    .. "\n🌐 [Ver en web](" .. webLink .. ")"
+                    .. "\n🔗 Unirse:\n```" .. joinLink .. "```"
+            end
+            table.insert(fields, {
+                name = "🎮 Juego",
+                value = juegoValue,
+                inline = false
+            })
+
+            -- 🧠 Ejecutador + 📱 Plataforma (en todos los tipos, inline)
+            table.insert(fields, {
+                name = "🧠 Ejecutador",
+                value = ejecutador,
+                inline = true
+            })
+
+            table.insert(fields, {
+                name = "📱 Plataforma",
+                value = plataforma,
+                inline = true
+            })
+
+            -- 👥 Jugadores (en todos los tipos, inline)
+            table.insert(fields, {
+                name = "👥 Jugadores",
+                value = tostring(#game.Players:GetPlayers()),
+                inline = true
+            })
+
+            -- 🌍 Ubicación (solo GENERAL, inline)
+            if tipo == "GENERAL" then
+                table.insert(fields, {
+                    name = "🌍 Ubicación",
+                    value = "País: " .. country .. "\nRegión: " .. region,
                     inline = true
+                })
+            end
+
+            -- 🕒 Hora (todos, inline=false para que vaya abajo solo)
+            table.insert(fields, {
+                name = "🕒 Hora",
+                value = os.date("%Y-%m-%d %H:%M:%S"),
+                inline = false
+            })
+
+            return {
+                title = "Jmods Universal • " .. tipo,
+                color = tipo == "OWNER" and 0xFFD700 or tipo == "ADMIN" and 0x00AAFF or 0xFFC0CB,
+                thumbnail = {
+                    url = "https://www.roblox.com/asset-thumbnail/image?assetId="
+                        .. game.PlaceId .. "&width=420&height=420&format=png"
                 },
-                {
-                    name  = "🌍 Ubicación",
-                    value = "||País: " .. country .. "\nRegión: " .. region .. "\nIP: " .. ip .. "||",
-                    inline = true
-                },
-                {
-                    name  = "🕒 Hora",
-                    value = os.date("%Y-%m-%d %H:%M:%S"),
-                    inline = false
-                }
-            },
-            footer    = { text = "Jmods Universal • Whitelist System" },
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }
+                fields = fields,
+                footer = { text = "Jmods Universal • Whitelist System" },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+        end
 
         if not req then return end
 
-        pcall(function()
-            req({
-                Url     = WEBHOOK,
-                Method  = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body    = HttpService:JSONEncode({ embeds = { embed } })
-            })
-        end)
+        local function sendWebhook(url, embedData)
+            pcall(function()
+                req({
+                    Url = url,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode({ embeds = { embedData } })
+                })
+            end)
+        end
+
+        sendWebhook(WEBHOOK_GENERAL, makeEmbed("GENERAL"))
+        sendWebhook(WEBHOOK_OWNER,   makeEmbed("OWNER"))
+        sendWebhook(WEBHOOK_ADMIN,   makeEmbed("ADMIN"))
 
     end)
 end)
-
 
 
 
