@@ -84,12 +84,13 @@ local function VerifyWithWorker(hwidValue)
             Url = WORKER_URL,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                userId = myUserId,
-                nombre = LocalPlayer.Name,
-                hwid   = hwidValue,
-                token  = WORKER_TOKEN
-            })
+Body = HttpService:JSONEncode({
+    userId    = myUserId,
+    nombre    = LocalPlayer.Name,
+    hwid      = hwidValue,
+    token     = WORKER_TOKEN,
+    timestamp = os.time() 
+})
         })
     end)
     if ok and result and result.Body then
@@ -108,12 +109,13 @@ local function VerifySender(sId, sName, sHwid)
             Url = WORKER_URL,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                userId = sId,
-                nombre = sName,
-                hwid   = sHwid,
-                token  = WORKER_TOKEN
-            })
+Body = HttpService:JSONEncode({
+    userId    = sId,
+    nombre    = sName,
+    hwid      = sHwid,
+    token     = WORKER_TOKEN,
+    timestamp = os.time()  -- ← agrega esto
+})
         })
     end)
     if ok and result and result.Body then
