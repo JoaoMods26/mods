@@ -330,62 +330,85 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/JoaoMods26/aaaaa/refs
     
     
 ---barra de velocidad---
-local wsReady = false
-local lastSpeedValue = 16
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local DEFAULT_SPEED = 16
+local lastSpeedValue = DEFAULT_SPEED
 local speedLockConnection = nil
+local wsReady = false          -- bloquea disparos automáticos del framework
+local userHasChangedSpeed = false  -- NUEVO: sólo true si el usuario movió el slider
+
+local originalGameSpeed = nil
 
 local function applySpeed(value)
-    local player = game:GetService("Players").LocalPlayer
-    local character = player.Character
+    local character = LocalPlayer.Character
     if not character then return end
-
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
 
-    -- Guardamos el valor actual
     lastSpeedValue = value
 
-    -- Aplicamos la velocidad
-    humanoid.WalkSpeed = value
-
-    -- Anti-reset: desconectamos el anterior si existe
+    -- Desconectar lock anterior
     if speedLockConnection then
         speedLockConnection:Disconnect()
         speedLockConnection = nil
     end
 
-    -- Solo activamos el lock si NO es el valor default
-    if value ~= DEFAULT_SPEED then
+    humanoid.WalkSpeed = value
+
+    -- Anti-reset sólo si no es la velocidad original del juego
+    if value ~= originalGameSpeed then
         speedLockConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid and humanoid.WalkSpeed ~= lastSpeedValue then
+            if humanoid.WalkSpeed ~= lastSpeedValue then
                 humanoid.WalkSpeed = lastSpeedValue
             end
         end)
     end
 end
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local function restoreSpeed()
+    if speedLockConnection then
+        speedLockConnection:Disconnect()
+        speedLockConnection = nil
+    end
+
+    userHasChangedSpeed = false
+    lastSpeedValue = originalGameSpeed or DEFAULT_SPEED
+
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    -- 2. Restaurar al valor que el propio juego puso, no a 16 hardcodeado
+    humanoid.WalkSpeed = originalGameSpeed or DEFAULT_SPEED
+end
+
 
 local function onCharacterAdded(character)
     local humanoid = character:WaitForChild("Humanoid", 5)
     if not humanoid then return end
 
-    -- Solo re-aplica si el jugador había cambiado la velocidad
-    if lastSpeedValue ~= DEFAULT_SPEED then
-        task.wait(0.15) -- Pequeño delay para que cargue bien el personaje
+    -- Esperamos a que el juego aplique su propia velocidad
+    task.wait(0.3)
 
+    -- Guardamos la speed "natural" del juego para este personaje
+    -- (puede ser 16, puede ser otra si el juego la modifica)
+    originalGameSpeed = humanoid.WalkSpeed
+
+    -- Si el usuario YA había activado un cambio, lo reaplicamos
+    if userHasChangedSpeed and lastSpeedValue ~= originalGameSpeed then
         humanoid.WalkSpeed = lastSpeedValue
 
-        -- Re-conectamos el anti-reset en el nuevo humanoid
         if speedLockConnection then
             speedLockConnection:Disconnect()
             speedLockConnection = nil
         end
 
         speedLockConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid and humanoid.WalkSpeed ~= lastSpeedValue then
+            if humanoid.WalkSpeed ~= lastSpeedValue then
                 humanoid.WalkSpeed = lastSpeedValue
             end
         end)
@@ -394,7 +417,17 @@ end
 
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-local wsReady = false
+-- Capturar speed del personaje actual si ya existe
+if LocalPlayer.Character then
+    task.spawn(function()
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            task.wait(0.3)
+            originalGameSpeed = humanoid.WalkSpeed
+        end
+    end)
+end
+
 
 Slider = MainTab:CreateSlider({
     Name = "Velocidad al correr",
@@ -404,15 +437,17 @@ Slider = MainTab:CreateSlider({
     CurrentValue = DEFAULT_SPEED,
     Flag = "sliderws",
     Callback = function(Value)
-        -- Ignoramos el primer disparo automático del framework
+        -- Bloqueamos el disparo automático inicial del framework
         if not wsReady then
             wsReady = true
             return
         end
 
-        -- Solo actuamos si el valor cambió de verdad
+        -- Si el valor es el mismo que ya tenemos, ignorar
         if Value == lastSpeedValue then return end
 
+        -- A partir de aquí el usuario SÍ quiso cambiar la speed
+        userHasChangedSpeed = (Value ~= (originalGameSpeed or DEFAULT_SPEED))
         applySpeed(Value)
     end,
 })
@@ -420,52 +455,134 @@ Slider = MainTab:CreateSlider({
 Button_ResetSpeed = MainTab:CreateButton({
     Name = "Restaurar velocidad original",
     Callback = function()
-        -- Desactivamos el anti-reset antes de restaurar
-        if speedLockConnection then
-            speedLockConnection:Disconnect()
-            speedLockConnection = nil
-        end
-
-        lastSpeedValue = DEFAULT_SPEED
-
-        local player = game:GetService("Players").LocalPlayer
-        local character = player.Character
-        if not character then return end
-
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-
-        humanoid.WalkSpeed = DEFAULT_SPEED
-
-        -- Opcional: notificación si tu framework la soporta
-        -- notify("WalkSpeed", "Velocidad restaurada a " .. DEFAULT_SPEED)
+        restoreSpeed()
+        -- notify("WalkSpeed", "Velocidad restaurada") -- descomenta si tu framework lo soporta
     end,
 })
 
     
 
 
+---Salto xd
 
-----barra Salto----
-local sliderReady = false  -- controlamos si ya está listo
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local DEFAULT_JUMP = 50        -- Roblox default real es 50
+local lastJumpValue = DEFAULT_JUMP
+local jumpLockConnection = nil
+local jpReady = false
+local userHasChangedJump = false
+local originalGameJump = nil
+
+local function applyJump(value)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    lastJumpValue = value
+
+    if jumpLockConnection then
+        jumpLockConnection:Disconnect()
+        jumpLockConnection = nil
+    end
+
+    humanoid.JumpPower = value
+
+    -- Anti-reset solo si difiere del valor original del juego
+    if value ~= originalGameJump then
+        jumpLockConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if humanoid.JumpPower ~= lastJumpValue then
+                humanoid.JumpPower = lastJumpValue
+            end
+        end)
+    end
+end
+
+local function restoreJump()
+    if jumpLockConnection then
+        jumpLockConnection:Disconnect()
+        jumpLockConnection = nil
+    end
+
+    userHasChangedJump = false
+    lastJumpValue = originalGameJump or DEFAULT_JUMP
+
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    humanoid.JumpPower = originalGameJump or DEFAULT_JUMP
+end
+
+local function onCharacterAdded(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    task.wait(0.3)
+
+    originalGameJump = humanoid.JumpPower
+
+    if userHasChangedJump and lastJumpValue ~= originalGameJump then
+        humanoid.JumpPower = lastJumpValue
+
+        if jumpLockConnection then
+            jumpLockConnection:Disconnect()
+            jumpLockConnection = nil
+        end
+
+        jumpLockConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if humanoid.JumpPower ~= lastJumpValue then
+                humanoid.JumpPower = lastJumpValue
+            end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- Capturar JumpPower del personaje actual si ya existe
+if LocalPlayer.Character then
+    task.spawn(function()
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            task.wait(0.3)
+            originalGameJump = humanoid.JumpPower
+        end
+    end)
+end
+
 
 Slider = MainTab:CreateSlider({
     Name = "Salto",
     Range = {1, 500},
     Increment = 1,
     Suffix = "Poder",
-    CurrentValue = 16,
-    Flag = "sliderjp", 
+    CurrentValue = DEFAULT_JUMP,
+    Flag = "sliderjp",
     Callback = function(Value)
-        if sliderReady then
-            game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
-        else
-            sliderReady = true -- la primera vez solo marca como listo, no cambia nada
+        if not jpReady then
+            jpReady = true
+            return
         end
+
+        if Value == lastJumpValue then return end
+
+        userHasChangedJump = (Value ~= (originalGameJump or DEFAULT_JUMP))
+        applyJump(Value)
     end,
 })
 
+Button_ResetJump = MainTab:CreateButton({
+    Name = "Restaurar salto original",
+    Callback = function()
+        restoreJump()
+    end,
+})
 
+---
 
     
 
