@@ -1,3 +1,6 @@
+local Rayfield = getgenv().Rayfield or _G.Rayfield
+local TelekinesisTab = getgenv().TelekinesisTab or _G.TelekinesisTab
+
 local Player = game.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local CoreGui = game:GetService("CoreGui")
@@ -10,7 +13,6 @@ if CoreGui:FindFirstChild("JMMobileControls") then
     CoreGui:FindFirstChild("JMMobileControls"):Destroy()
 end
 
-
 if not getgenv().AnchoredByScript then
     getgenv().AnchoredByScript = {}
 end
@@ -18,9 +20,7 @@ end
 local AnchoredByScript = getgenv().AnchoredByScript
 
 function addToAnchoredList(part)
-    if part and part:IsA("BasePart") then
-        AnchoredByScript[part] = true
-    end
+    if part and part:IsA("BasePart") then AnchoredByScript[part] = true end
 end
 
 function isAnchoredByScript(part)
@@ -34,15 +34,27 @@ end
 function updateAnchorCounter()
     local count = 0
     for part, _ in pairs(AnchoredByScript) do
-        if part and part.Parent then
-            count = count + 1
-        else
-            AnchoredByScript[part] = nil
-        end
+        if part and part.Parent then count = count + 1
+        else AnchoredByScript[part] = nil end
     end
     return count
 end
 
+pcall(function()
+    sethiddenproperty(Player, "SimulationRadius", 9e9)
+    sethiddenproperty(Player, "MaximumSimulationRadius", 9e9)
+end)
+
+Player.ReplicationFocus = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") or workspace
+
+Player.CharacterAdded:Connect(function(char)
+    char:WaitForChild("HumanoidRootPart", 10)
+    Player.ReplicationFocus = char.HumanoidRootPart
+    pcall(function()
+        sethiddenproperty(Player, "SimulationRadius", 9e9)
+        sethiddenproperty(Player, "MaximumSimulationRadius", 9e9)
+    end)
+end)
 
 if not getgenv().Network then
     getgenv().Network = {
@@ -55,22 +67,16 @@ if not getgenv().Network then
         if Part:IsA("BasePart") and Part:IsDescendantOf(workspace) then
             local alreadyAdded = false
             for _, p in pairs(Network.BaseParts) do
-                if p == Part then
-                    alreadyAdded = true
-                    break
-                end
+                if p == Part then alreadyAdded = true break end
             end
-            
             if not alreadyAdded then
                 table.insert(Network.BaseParts, Part)
                 Part.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
-                pcall(function()
-                    Part:SetNetworkOwner(Player)
-                end)
+                pcall(function() Part:SetNetworkOwner(Player) end)
             end
         end
     end
-    
+
     Network.ClearPart = function(Part)
         for i = #Network.BaseParts, 1, -1 do
             if Network.BaseParts[i] == Part then
@@ -79,33 +85,32 @@ if not getgenv().Network then
                     Part.CustomPhysicalProperties = nil
                     Part.Velocity = Vector3.new(0, 0, 0)
                     Part.RotVelocity = Vector3.new(0, 0, 0)
-                    pcall(function()
-                        Part:SetNetworkOwnershipAuto()
-                    end)
+                    pcall(function() Part:SetNetworkOwnershipAuto() end)
                 end
                 break
             end
         end
     end
-    
+
     Network.ClearAll = function()
         for _, Part in pairs(Network.BaseParts) do
             if Part and Part.Parent then
                 Part.CustomPhysicalProperties = nil
                 Part.Velocity = Vector3.new(0, 0, 0)
                 Part.RotVelocity = Vector3.new(0, 0, 0)
-                pcall(function()
-                    Part:SetNetworkOwnershipAuto()
-                end)
+                pcall(function() Part:SetNetworkOwnershipAuto() end)
             end
         end
         Network.BaseParts = {}
         Network.Active = false
     end
 
-    local NetworkConnection = RunService.Heartbeat:Connect(function()
+    RunService.Heartbeat:Connect(function()
         if not Network.Active then return end
-        sethiddenproperty(Player, "SimulationRadius", 9e9)
+        pcall(function()
+            sethiddenproperty(Player, "SimulationRadius", 9e9)
+            sethiddenproperty(Player, "MaximumSimulationRadius", 9e9)
+        end)
         for i = #Network.BaseParts, 1, -1 do
             local Part = Network.BaseParts[i]
             if Part and Part:IsDescendantOf(workspace) then
@@ -115,49 +120,31 @@ if not getgenv().Network then
             end
         end
     end)
-    
-    Player.ReplicationFocus = workspace
 end
 
-
-
-
+local function notify(title, content, duration)
+    pcall(function()
+        if Rayfield then
+            Rayfield:Notify({Title = title, Content = content, Duration = duration or 3})
+        end
+    end)
+end
 
 TelekinesisTab:CreateSection("Sistema de Telekinesis")
-
 
 TelekinesisTab:CreateButton({
     Name = "TELEKINESIS",
     Callback = function()
         local character = Player.Character
-        if not character then 
-            Rayfield:Notify({
-                Title = "❌ Error",
-                Content = "Personaje no encontrado",
-                Duration = 3
-            })
-            return 
-        end
-        
+        if not character then notify("❌ Error", "Personaje no encontrado", 3) return end
+
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then 
-            Rayfield:Notify({
-                Title = "❌ Error",
-                Content = "Humanoid no encontrado",
-                Duration = 3
-            })
-            return 
-        end
+        if not humanoid then notify("❌ Error", "Humanoid no encontrado", 3) return end
 
-        Rayfield:Notify({
-            Title = "✅ Telekinesis Activada",
-            Content = "Herramienta equipada. Usa Q/E/R/F/T/Y/C/Z/G/X",
-            Duration = 5
-        })
+        notify("✅ Telekinesis Activada", "Herramienta equipada. Usa Q/E/R/F/T/Y/C/Z/G/X", 5)
 
-   
         local MobileControlsGui = Instance.new("ScreenGui")
-MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
+        MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         MobileControlsGui.Name = "JMMobileControls"
         MobileControlsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         MobileControlsGui.Enabled = false
@@ -180,39 +167,31 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
             btn.TextWrapped = true
             btn.BorderSizePixel = 0
             btn.AutoButtonColor = false
-            
             local corner = Instance.new("UICorner", btn)
             corner.CornerRadius = UDim.new(0, 8)
-            
             local stroke = Instance.new("UIStroke", btn)
             stroke.Color = Color3.fromRGB(255, 255, 255)
             stroke.Thickness = 1
             stroke.Transparency = 0.8
-            
             btn.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
                     btn.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
                 end
             end)
-            
             btn.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
                     btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 70)
                 end
             end)
-            
             return btn
         end
 
-        -- Fila 1
         local BtnAcercar = createMobileButton("⬆️", "⬆️", UDim2.new(0, 0, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 120, 200))
         local BtnAlejar = createMobileButton("⬇️", "⬇️", UDim2.new(0, 45, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 120, 200))
         local BtnRotar = createMobileButton("🔄", "🔄", UDim2.new(0, 90, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(200, 100, 50))
         local BtnLanzar = createMobileButton("🚀", "🚀", UDim2.new(0, 135, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(200, 50, 50))
         local BtnSoltar = createMobileButton("❌", "❌", UDim2.new(0, 180, 0, 0), UDim2.new(0, 38, 0, 38), Color3.fromRGB(150, 50, 150))
         local BtnAnclarTodos = createMobileButton("📌ALL", "📌", UDim2.new(0, 221, 0, 0), UDim2.new(0, 42, 0, 38), Color3.fromRGB(180, 100, 220))
-        
-        -- Fila 2
         local BtnMagnetico = createMobileButton("🧲", "🧲", UDim2.new(0, 0, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(50, 200, 100))
         local BtnLiberar = createMobileButton("🔓", "🔓", UDim2.new(0, 45, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(100, 150, 50))
         local BtnAnclar = createMobileButton("📌", "📌", UDim2.new(0, 90, 0, 42), UDim2.new(0, 42, 0, 38), Color3.fromRGB(150, 100, 200))
@@ -229,11 +208,9 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         StatusLabel.Font = Enum.Font.GothamBold
         StatusLabel.TextSize = 9
         StatusLabel.TextWrapped = true
-        
         local statusCorner = Instance.new("UICorner", StatusLabel)
         statusCorner.CornerRadius = UDim.new(0, 6)
-        
-        -- Botón para mantener selección en móvil
+
         local BtnMantener = Instance.new("TextButton", ButtonContainer)
         BtnMantener.Size = UDim2.new(0, 260, 0, 25)
         BtnMantener.Position = UDim2.new(0, 3, 0, 118)
@@ -243,19 +220,15 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         BtnMantener.Font = Enum.Font.GothamBold
         BtnMantener.TextSize = 9
         BtnMantener.BorderSizePixel = 0
-        
         local mantenerCorner = Instance.new("UICorner", BtnMantener)
         mantenerCorner.CornerRadius = UDim.new(0, 6)
-        
         local mantenerActivo = false
 
-  
         local tool = Instance.new("Tool")
         tool.Name = "Telekinesis"
         tool.RequiresHandle = false
         tool.Parent = Player.Backpack
 
-        -- CORRECCIÓN: CentralPart INDEPENDIENTE del jugador
         local CentralPart = Instance.new("Part", workspace)
         CentralPart.Name = "TelekinesisAnchor"
         CentralPart.Anchored = true
@@ -263,7 +236,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         CentralPart.Transparency = 1
         CentralPart.Size = Vector3.new(1, 1, 1)
         CentralPart.CFrame = CFrame.new(0, 0, 0)
-        
         local CentralAttachment = Instance.new("Attachment", CentralPart)
 
         local selectionBox = Instance.new("SelectionBox")
@@ -285,7 +257,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         highlight.Enabled = false
         highlight.Parent = workspace
 
-        -- VARIABLES GLOBALES
         local currentObject = nil
         local alignPosition = nil
         local torque = nil
@@ -299,192 +270,111 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         local savedRotation = nil
         local toolEquipped = false
 
-
         function applyUltraForce(obj)
             if not toolEquipped then return end
-            
             for _, x in ipairs(obj:GetChildren()) do
-                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then
-                    x:Destroy()
-                end
+                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then x:Destroy() end
             end
-            if obj:FindFirstChild("Attachment") then
-                obj:FindFirstChild("Attachment"):Destroy()
-            end
-            
+            if obj:FindFirstChild("Attachment") then obj:FindFirstChild("Attachment"):Destroy() end
             obj.CanCollide = collisionsEnabled
             obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
-            
             torque = Instance.new("Torque", obj)
             torque.Torque = Vector3.new(0, 0, 0)
-            
             alignPosition = Instance.new("AlignPosition", obj)
             objectAttachment = Instance.new("Attachment", obj)
-            
             torque.Attachment0 = objectAttachment
             alignPosition.MaxForce = math.huge
             alignPosition.MaxVelocity = math.huge
             alignPosition.Responsiveness = 200
             alignPosition.Attachment0 = objectAttachment
             alignPosition.Attachment1 = CentralAttachment
-            
             Network.RetainPart(obj)
             Network.Active = true
-            
             obj.Velocity = Vector3.new(0, 0, 0)
             obj.RotVelocity = Vector3.new(0, 0, 0)
-            
-            pcall(function()
-                obj:SetNetworkOwner(Player)
-            end)
+            pcall(function() obj:SetNetworkOwner(Player) end)
         end
 
         function toggleCollisions()
             collisionsEnabled = not collisionsEnabled
-            
             if currentObject and currentObject.Parent then
                 currentObject.CanCollide = collisionsEnabled
-                
                 if collisionsEnabled then
                     savedRotation = currentObject.CFrame - currentObject.Position
                     currentObject.RotVelocity = Vector3.new(0, 0, 0)
-                    
-                    if rotationEnabled and torque then
-                        rotationEnabled = false
-                        torque.Torque = Vector3.new(0, 0, 0)
-                    end
-                else
-                    savedRotation = nil
-                end
+                    if rotationEnabled and torque then rotationEnabled = false torque.Torque = Vector3.new(0, 0, 0) end
+                else savedRotation = nil end
             end
-            
             for _, data in pairs(magnetizedObjects) do
                 if data.object and data.object.Parent then
                     data.object.CanCollide = collisionsEnabled
                     if collisionsEnabled then
                         data.object.RotVelocity = Vector3.new(0, 0, 0)
-                        if data.torque then
-                            data.torque.Torque = Vector3.new(0, 0, 0)
-                        end
+                        if data.torque then data.torque.Torque = Vector3.new(0, 0, 0) end
                     end
                 end
             end
-            
             local magCount = #magnetizedObjects
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
-            
+            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
             if collisionsEnabled then
                 BtnColisiones.BackgroundColor3 = Color3.fromRGB(100, 200, 50)
-                Rayfield:Notify({
-                    Title = "💥 Colisiones ON",
-                    Content = "Rotación congelada. Puedes subirte al objeto.",
-                    Duration = 3
-                })
+                notify("💥 Colisiones ON", "Rotación congelada. Puedes subirte al objeto.", 3)
             else
                 BtnColisiones.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
-                Rayfield:Notify({
-                    Title = "💥 Colisiones OFF",
-                    Content = "Objeto atraviesa todo. Rotación libre.",
-                    Duration = 3
-                })
+                notify("💥 Colisiones OFF", "Objeto atraviesa todo. Rotación libre.", 3)
             end
         end
 
-
         function magnetizeAllObjects()
             if not toolEquipped then return end
-            if not currentObject then 
-                Rayfield:Notify({
-                    Title = "⚠️ Error",
-                    Content = "Primero agarra un objeto",
-                    Duration = 3
-                })
-                return 
-            end
-            
+            if not currentObject then notify("⚠️ Error", "Primero agarra un objeto", 3) return end
             magnetMode = true
             local count = 0
-            
             for _, obj in pairs(workspace:GetDescendants()) do
                 if obj:IsA("BasePart") and not obj.Anchored and obj ~= currentObject then
                     local isPlayerPart = false
-                    if obj:IsDescendantOf(character) then
-                        isPlayerPart = true
+                    if obj:IsDescendantOf(character) then isPlayerPart = true
                     else
                         for _, player in pairs(game.Players:GetPlayers()) do
-                            if player.Character and obj:IsDescendantOf(player.Character) then
-                                isPlayerPart = true
-                                break
-                            end
+                            if player.Character and obj:IsDescendantOf(player.Character) then isPlayerPart = true break end
                         end
                     end
-                    
                     if not isPlayerPart then
                         local alreadyMagnetized = false
                         for _, data in pairs(magnetizedObjects) do
-                            if data.object == obj then
-                                alreadyMagnetized = true
-                                break
-                            end
+                            if data.object == obj then alreadyMagnetized = true break end
                         end
-                        
                         if not alreadyMagnetized then
                             for _, x in ipairs(obj:GetChildren()) do
-                                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then
-                                    x:Destroy()
-                                end
+                                if x:IsA("BodyMover") or x:IsA("RocketPropulsion") or x:IsA("AlignPosition") or x:IsA("Torque") then x:Destroy() end
                             end
-                            
                             obj.CanCollide = collisionsEnabled
                             obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
                             Network.RetainPart(obj)
-                            
                             obj.Velocity = Vector3.new(0, 0, 0)
                             obj.RotVelocity = Vector3.new(0, 0, 0)
-                            
-                            pcall(function()
-                                obj:SetNetworkOwner(Player)
-                            end)
-                            
+                            pcall(function() obj:SetNetworkOwner(Player) end)
                             local mTorque = Instance.new("Torque", obj)
                             mTorque.Torque = Vector3.new(0, 0, 0)
-                            
                             local mAlign = Instance.new("AlignPosition", obj)
                             local mAttach = Instance.new("Attachment", obj)
-                            
                             mTorque.Attachment0 = mAttach
                             mAlign.MaxForce = math.huge
                             mAlign.MaxVelocity = math.huge
                             mAlign.Responsiveness = 150
                             mAlign.Attachment0 = mAttach
                             mAlign.Attachment1 = CentralAttachment
-                            
-                            table.insert(magnetizedObjects, {
-                                object = obj,
-                                alignPosition = mAlign,
-                                torque = mTorque,
-                                attachment = mAttach
-                            })
-                            
+                            table.insert(magnetizedObjects, {object = obj, alignPosition = mAlign, torque = mTorque, attachment = mAttach})
                             count = count + 1
                         end
                     end
                 end
             end
-            
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                collisionsEnabled and "ON" or "OFF", count, anchorCount)
-            
-            Rayfield:Notify({
-                Title = "🧲 Modo Magnético",
-                Content = count .. " objetos magnetizados",
-                Duration = 4
-            })
+            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", count, anchorCount)
+            notify("🧲 Modo Magnético", count .. " objetos magnetizados", 4)
         end
-        
 
         function releaseMagnetizedObjects()
             for _, data in pairs(magnetizedObjects) do
@@ -493,7 +383,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                         if data.alignPosition then data.alignPosition:Destroy() end
                         if data.torque then data.torque:Destroy() end
                         if data.attachment then data.attachment:Destroy() end
-                        
                         if data.object.Parent then
                             data.object.CanCollide = true
                             data.object.CustomPhysicalProperties = nil
@@ -501,235 +390,114 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                             data.object.RotVelocity = Vector3.new(0, 0, 0)
                             data.object:SetNetworkOwnershipAuto()
                         end
-                        
                         Network.ClearPart(data.object)
                     end
                 end)
             end
             magnetizedObjects = {}
             magnetMode = false
-            
             Network.Active = false
-            
             if StatusLabel and StatusLabel.Parent then
                 local anchorCount = updateAnchorCounter()
-                StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
-                    collisionsEnabled and "ON" or "OFF", anchorCount)
+                StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", collisionsEnabled and "ON" or "OFF", anchorCount)
             end
-            
-            if Rayfield then
-                Rayfield:Notify({
-                    Title = "🔓 Liberados",
-                    Content = "Todos los objetos fueron liberados",
-                    Duration = 3
-                })
-            end
+            notify("🔓 Liberados", "Todos los objetos fueron liberados", 3)
         end
 
-
         function toggleAnchor()
-            if not currentObject then
-                Rayfield:Notify({
-                    Title = "⚠️ Error",
-                    Content = "Primero agarra un objeto",
-                    Duration = 3
-                })
-                return
-            end
-            
+            if not currentObject then notify("⚠️ Error", "Primero agarra un objeto", 3) return end
             if currentObject.Anchored and isAnchoredByScript(currentObject) then
                 currentObject.Anchored = false
                 removeFromAnchoredList(currentObject)
-                
-                if toolEquipped then
-                    applyUltraForce(currentObject)
-                end
-                
+                if toolEquipped then applyUltraForce(currentObject) end
                 local anchorCount = updateAnchorCounter()
-                local magCount = #magnetizedObjects
-                StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                    collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
-                
-                Rayfield:Notify({
-                    Title = "🔓 Desanclado",
-                    Content = currentObject.Name .. " desanclado",
-                    Duration = 3
-                })
+                StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", #magnetizedObjects, anchorCount)
+                notify("🔓 Desanclado", currentObject.Name .. " desanclado", 3)
             else
                 currentObject.Anchored = true
                 addToAnchoredList(currentObject)
-                
                 if alignPosition then alignPosition:Destroy() alignPosition = nil end
                 if torque then torque:Destroy() torque = nil end
                 if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
-                
                 Network.ClearPart(currentObject)
-                
                 local anchorCount = updateAnchorCounter()
-                local magCount = #magnetizedObjects
-                StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                    collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
-                
-                Rayfield:Notify({
-                    Title = "📌 Anclado",
-                    Content = currentObject.Name .. " anclado permanentemente",
-                    Duration = 3
-                })
+                StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", #magnetizedObjects, anchorCount)
+                notify("📌 Anclado", currentObject.Name .. " anclado permanentemente", 3)
             end
         end
 
-
         function toggleAnchorAll()
             local totalObjects = {}
-            
-            -- Agregar objeto actual si existe
-            if currentObject and currentObject.Parent then
-                table.insert(totalObjects, {object = currentObject, isMain = true})
-            end
-            
-            -- Agregar objetos magnetizados
+            if currentObject and currentObject.Parent then table.insert(totalObjects, {object = currentObject, isMain = true}) end
             for _, data in pairs(magnetizedObjects) do
-                if data.object and data.object.Parent then
-                    table.insert(totalObjects, {object = data.object, data = data, isMain = false})
-                end
+                if data.object and data.object.Parent then table.insert(totalObjects, {object = data.object, data = data, isMain = false}) end
             end
-            
-            -- También buscar objetos anclados por el script que no estén en las listas actuales
             for part, _ in pairs(AnchoredByScript) do
                 if part and part.Parent and part.Anchored then
                     local yaEnLista = false
-                    for _, item in pairs(totalObjects) do
-                        if item.object == part then
-                            yaEnLista = true
-                            break
-                        end
-                    end
-                    if not yaEnLista then
-                        table.insert(totalObjects, {object = part, isMain = false, wasOnlyAnchored = true})
-                    end
+                    for _, item in pairs(totalObjects) do if item.object == part then yaEnLista = true break end end
+                    if not yaEnLista then table.insert(totalObjects, {object = part, isMain = false, wasOnlyAnchored = true}) end
                 end
             end
-            
-            if #totalObjects == 0 then
-                Rayfield:Notify({
-                    Title = "⚠️ Error",
-                    Content = "No hay objetos seleccionados o magnetizados",
-                    Duration = 3
-                })
-                return
-            end
-            
-            -- Verificar si hay objetos anclados por el script para decidir la acción
+            if #totalObjects == 0 then notify("⚠️ Error", "No hay objetos seleccionados o magnetizados", 3) return end
             local hayAnclados = false
             for _, item in pairs(totalObjects) do
-                if item.object.Anchored and isAnchoredByScript(item.object) then
-                    hayAnclados = true
-                    break
-                end
+                if item.object.Anchored and isAnchoredByScript(item.object) then hayAnclados = true break end
             end
-            
             local ancladosCount = 0
             local desancladosCount = 0
-            
             if hayAnclados then
-                -- DESANCLAR todos los que fueron anclados por el script
                 for _, item in pairs(totalObjects) do
                     local obj = item.object
                     if obj.Anchored and isAnchoredByScript(obj) then
                         obj.Anchored = false
                         removeFromAnchoredList(obj)
                         desancladosCount = desancladosCount + 1
-                        
                         if toolEquipped then
                             if item.isMain then
-                                -- Reactivar física para objeto principal
                                 applyUltraForce(obj)
                             elseif item.data then
-                                -- Reactivar física para objeto magnetizado con datos
                                 if item.data.alignPosition then item.data.alignPosition:Destroy() end
                                 if item.data.torque then item.data.torque:Destroy() end
                                 if item.data.attachment then item.data.attachment:Destroy() end
-                                
                                 obj.CanCollide = collisionsEnabled
                                 obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
                                 Network.RetainPart(obj)
-                                
                                 local mTorque = Instance.new("Torque", obj)
                                 mTorque.Torque = Vector3.new(0, 0, 0)
-                                
                                 local mAlign = Instance.new("AlignPosition", obj)
                                 local mAttach = Instance.new("Attachment", obj)
-                                
                                 mTorque.Attachment0 = mAttach
-                                mAlign.MaxForce = math.huge
-                                mAlign.MaxVelocity = math.huge
-                                mAlign.Responsiveness = 150
-                                mAlign.Attachment0 = mAttach
-                                mAlign.Attachment1 = CentralAttachment
-                                
-                                item.data.alignPosition = mAlign
-                                item.data.torque = mTorque
-                                item.data.attachment = mAttach
+                                mAlign.MaxForce = math.huge mAlign.MaxVelocity = math.huge mAlign.Responsiveness = 150
+                                mAlign.Attachment0 = mAttach mAlign.Attachment1 = CentralAttachment
+                                item.data.alignPosition = mAlign item.data.torque = mTorque item.data.attachment = mAttach
                             elseif item.wasOnlyAnchored then
-                                -- Objeto que solo estaba anclado, agregarlo a magnetizados
                                 obj.CanCollide = collisionsEnabled
                                 obj.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
                                 Network.RetainPart(obj)
-                                
                                 local mTorque = Instance.new("Torque", obj)
                                 mTorque.Torque = Vector3.new(0, 0, 0)
-                                
                                 local mAlign = Instance.new("AlignPosition", obj)
                                 local mAttach = Instance.new("Attachment", obj)
-                                
                                 mTorque.Attachment0 = mAttach
-                                mAlign.MaxForce = math.huge
-                                mAlign.MaxVelocity = math.huge
-                                mAlign.Responsiveness = 150
-                                mAlign.Attachment0 = mAttach
-                                mAlign.Attachment1 = CentralAttachment
-                                
-                                table.insert(magnetizedObjects, {
-                                    object = obj,
-                                    alignPosition = mAlign,
-                                    torque = mTorque,
-                                    attachment = mAttach
-                                })
+                                mAlign.MaxForce = math.huge mAlign.MaxVelocity = math.huge mAlign.Responsiveness = 150
+                                mAlign.Attachment0 = mAttach mAlign.Attachment1 = CentralAttachment
+                                table.insert(magnetizedObjects, {object = obj, alignPosition = mAlign, torque = mTorque, attachment = mAttach})
                             end
                         end
                     end
                 end
-                
-                if toolEquipped and currentObject then
-                    Network.Active = true
-                end
-                
-                Rayfield:Notify({
-                    Title = "🔓 Desanclados",
-                    Content = desancladosCount .. " objetos desanclados",
-                    Duration = 3
-                })
+                if toolEquipped and currentObject then Network.Active = true end
+                notify("🔓 Desanclados", desancladosCount .. " objetos desanclados", 3)
             else
-                -- ANCLAR todos (solo los no anclados originalmente)
-                -- IMPORTANTE: Primero anclar mientras tenemos network ownership, luego limpiar
                 for _, item in pairs(totalObjects) do
                     local obj = item.object
                     if not obj.Anchored then
-                        -- Detener velocidad primero
-                        obj.Velocity = Vector3.new(0, 0, 0)
-                        obj.RotVelocity = Vector3.new(0, 0, 0)
-                        
-                        -- Anclar MIENTRAS aún tenemos ownership (para que se sincronice)
-                        obj.Anchored = true
-                        addToAnchoredList(obj)
-                        ancladosCount = ancladosCount + 1
+                        obj.Velocity = Vector3.new(0, 0, 0) obj.RotVelocity = Vector3.new(0, 0, 0)
+                        obj.Anchored = true addToAnchoredList(obj) ancladosCount = ancladosCount + 1
                     end
                 end
-                
-                -- Pequeña espera para que se sincronice el anchor
                 task.wait(0.1)
-                
-                -- AHORA limpiar la física después de que el anchor se sincronizó
                 for _, item in pairs(totalObjects) do
                     local obj = item.object
                     if obj.Anchored and isAnchoredByScript(obj) then
@@ -746,21 +514,11 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                         end
                     end
                 end
-                
-                Rayfield:Notify({
-                    Title = "📌 Anclados",
-                    Content = ancladosCount .. " objetos anclados",
-                    Duration = 3
-                })
+                notify("📌 Anclados", ancladosCount .. " objetos anclados", 3)
             end
-            
-            -- Actualizar contador
             local anchorCount = updateAnchorCounter()
-            local magCount = #magnetizedObjects
-            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+            StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", #magnetizedObjects, anchorCount)
         end
-
 
         function isValidObject(obj)
             if not obj then return false end
@@ -770,26 +528,17 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
             return true
         end
 
-
         function selectObject(obj)
             if not isValidObject(obj) then return false end
             if not toolEquipped then return false end
-            
             currentObject = obj
-            
-            selectionBox.Adornee = obj
-            selectionBox.Visible = true
-            highlight.Adornee = obj
-            highlight.Enabled = true
-            
+            selectionBox.Adornee = obj selectionBox.Visible = true
+            highlight.Adornee = obj highlight.Enabled = true
             local cameraPosition = workspace.CurrentCamera.CFrame.Position
             distance = (obj.Position - cameraPosition).Magnitude
-            
             rotationEnabled = false
-            
             return true
         end
-
 
         function deselectObject()
             pcall(function()
@@ -797,7 +546,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                 if torque then torque:Destroy() torque = nil end
                 if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
             end)
-            
             if currentObject then
                 pcall(function()
                     if currentObject.Parent then
@@ -805,246 +553,107 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                         currentObject.CustomPhysicalProperties = nil
                         currentObject.Velocity = Vector3.new(0, 0, 0)
                         currentObject.RotVelocity = Vector3.new(0, 0, 0)
-                        
-                        if currentObject:FindFirstChild("TelekinesisParticle") then
-                            currentObject.TelekinesisParticle:Destroy()
-                        end
-                        
+                        if currentObject:FindFirstChild("TelekinesisParticle") then currentObject.TelekinesisParticle:Destroy() end
                         currentObject:SetNetworkOwnershipAuto()
                     end
-                    
                     Network.ClearPart(currentObject)
                 end)
             end
-            
-            if magnetMode or #magnetizedObjects > 0 then
-                releaseMagnetizedObjects()
-            end
-            
+            if magnetMode or #magnetizedObjects > 0 then releaseMagnetizedObjects() end
             Network.ClearAll()
-            
-            if CentralPart and CentralPart.Parent then
-                CentralPart.CFrame = CFrame.new(0, 0, 0)
-            end
-            
-            currentObject = nil
-            rotationEnabled = false
-            savedRotation = nil
-            
-            if selectionBox then
-                selectionBox.Adornee = nil
-                selectionBox.Visible = false
-            end
-            
-            if highlight then
-                highlight.Adornee = nil
-                highlight.Enabled = false
-            end
+            if CentralPart and CentralPart.Parent then CentralPart.CFrame = CFrame.new(0, 0, 0) end
+            currentObject = nil rotationEnabled = false savedRotation = nil
+            if selectionBox then selectionBox.Adornee = nil selectionBox.Visible = false end
+            if highlight then highlight.Adornee = nil highlight.Enabled = false end
         end
 
+        function acercarObjeto() distance = math.max(5, distance - 10) end
+        function alejarObjeto() distance = distance + 10 end
 
-        function acercarObjeto()
-            distance = math.max(5, distance - 10)
-        end
-        
-        function alejarObjeto()
-            distance = distance + 10
-        end
-        
         function toggleRotation()
             if currentObject and torque then
-                if collisionsEnabled then
-                    Rayfield:Notify({
-                        Title = "⚠️ Error",
-                        Content = "Desactiva colisiones primero (tecla C)",
-                        Duration = 3
-                    })
-                    return
-                end
-                
+                if collisionsEnabled then notify("⚠️ Error", "Desactiva colisiones primero (tecla C)", 3) return end
                 rotationEnabled = not rotationEnabled
                 if rotationEnabled then
                     torque.Torque = Vector3.new(100000, 100000, 100000)
-                    if currentObject and currentObject.Parent then
-                        currentObject.Velocity = Vector3.new(0, 0.1, 0)
-                    end
-                    Rayfield:Notify({
-                        Title = "🔄 Rotación ON",
-                        Content = "Objeto girando",
-                        Duration = 2
-                    })
+                    if currentObject and currentObject.Parent then currentObject.Velocity = Vector3.new(0, 0.1, 0) end
+                    notify("🔄 Rotación ON", "Objeto girando", 2)
                 else
                     torque.Torque = Vector3.new(0, 0, 0)
                     if currentObject and currentObject.Parent then
                         currentObject.Velocity = Vector3.new(0, 0, 0)
                         currentObject.RotVelocity = Vector3.new(0, 0, 0)
                     end
-                    Rayfield:Notify({
-                        Title = "⏸️ Rotación OFF",
-                        Content = "Rotación detenida",
-                        Duration = 2
-                    })
+                    notify("⏸️ Rotación OFF", "Rotación detenida", 2)
                 end
             end
         end
-        
+
         function lanzarObjeto()
             if currentObject and currentObject.Parent then
                 local objToLaunch = currentObject
-                
-                -- Calcular dirección: desde la cámara hacia donde apunta el mouse en el espacio 3D
                 local camera = workspace.CurrentCamera
                 local mousePos = UserInputService:GetMouseLocation()
                 local ray = camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-                
-                -- La dirección del ray es hacia donde apunta el mouse en el mundo 3D
                 local launchDirection = ray.Direction.Unit
-                
-                -- Quitar partículas
-                if objToLaunch:FindFirstChild("TelekinesisParticle") then
-                    objToLaunch.TelekinesisParticle:Destroy()
-                end
-                
-                -- Destruir física PERO mantener ownership temporalmente
+                if objToLaunch:FindFirstChild("TelekinesisParticle") then objToLaunch.TelekinesisParticle:Destroy() end
                 if alignPosition then alignPosition:Destroy() alignPosition = nil end
                 if torque then torque:Destroy() torque = nil end
                 if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
-                
-                -- Aplicar velocidad de lanzamiento MIENTRAS tenemos ownership
                 objToLaunch.Velocity = launchDirection * 250
                 objToLaunch.RotVelocity = Vector3.new(0, 0, 0)
                 objToLaunch.CanCollide = true
-                
-                -- Quitar de la lista del Network sin limpiar velocidad
                 for i = #Network.BaseParts, 1, -1 do
-                    if Network.BaseParts[i] == objToLaunch then
-                        table.remove(Network.BaseParts, i)
-                        break
-                    end
+                    if Network.BaseParts[i] == objToLaunch then table.remove(Network.BaseParts, i) break end
                 end
-                
-                -- Liberar magnetizados si hay
-                if magnetMode or #magnetizedObjects > 0 then
-                    releaseMagnetizedObjects()
-                end
-                
-                -- Limpiar referencias
-                currentObject = nil
-                rotationEnabled = false
-                savedRotation = nil
-                mouseDown = false
-                
-                if selectionBox then
-                    selectionBox.Adornee = nil
-                    selectionBox.Visible = false
-                end
-                
-                if highlight then
-                    highlight.Adornee = nil
-                    highlight.Enabled = false
-                end
-                
-                if CentralPart and CentralPart.Parent then
-                    CentralPart.CFrame = CFrame.new(0, 0, 0)
-                end
-                
-                -- Esperar un momento y LUEGO devolver ownership y limpiar propiedades
+                if magnetMode or #magnetizedObjects > 0 then releaseMagnetizedObjects() end
+                currentObject = nil rotationEnabled = false savedRotation = nil mouseDown = false
+                if selectionBox then selectionBox.Adornee = nil selectionBox.Visible = false end
+                if highlight then highlight.Adornee = nil highlight.Enabled = false end
+                if CentralPart and CentralPart.Parent then CentralPart.CFrame = CFrame.new(0, 0, 0) end
                 task.spawn(function()
                     task.wait(0.15)
                     if objToLaunch and objToLaunch.Parent then
                         objToLaunch.CustomPhysicalProperties = nil
-                        pcall(function()
-                            objToLaunch:SetNetworkOwnershipAuto()
-                        end)
+                        pcall(function() objToLaunch:SetNetworkOwnershipAuto() end)
                     end
                 end)
-                
-                Rayfield:Notify({
-                    Title = "🚀 Lanzado",
-                    Content = "Objeto lanzado con fuerza",
-                    Duration = 2
-                })
+                notify("🚀 Lanzado", "Objeto lanzado con fuerza", 2)
             end
         end
-        
+
         function arrojarObjeto()
             if currentObject and currentObject.Parent then
                 local objToThrow = currentObject
-                
-                -- Destruir física
                 if alignPosition then alignPosition:Destroy() alignPosition = nil end
                 if torque then torque:Destroy() torque = nil end
                 if objectAttachment then objectAttachment:Destroy() objectAttachment = nil end
-                
-                -- Quitar partículas
-                if objToThrow:FindFirstChild("TelekinesisParticle") then
-                    objToThrow.TelekinesisParticle:Destroy()
-                end
-                
-                -- Arrojar hacia adelante - usar dirección del personaje
+                if objToThrow:FindFirstChild("TelekinesisParticle") then objToThrow.TelekinesisParticle:Destroy() end
                 local throwDirection = Vector3.new(0, 0, 1)
                 local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-                if humanoidRootPart then
-                    throwDirection = humanoidRootPart.CFrame.LookVector
-                end
-                
-                -- Aplicar velocidad hacia adelante
+                if humanoidRootPart then throwDirection = humanoidRootPart.CFrame.LookVector end
                 objToThrow.Velocity = throwDirection * 150
                 objToThrow.RotVelocity = Vector3.new(0, 0, 0)
                 objToThrow.CanCollide = true
-                
-                -- Quitar de Network
                 for i = #Network.BaseParts, 1, -1 do
-                    if Network.BaseParts[i] == objToThrow then
-                        table.remove(Network.BaseParts, i)
-                        break
-                    end
+                    if Network.BaseParts[i] == objToThrow then table.remove(Network.BaseParts, i) break end
                 end
-                
-                -- Liberar magnetizados
-                if magnetMode or #magnetizedObjects > 0 then
-                    releaseMagnetizedObjects()
-                end
-                
-                -- Limpiar referencias
-                currentObject = nil
-                rotationEnabled = false
-                savedRotation = nil
-                mouseDown = false
-                
-                if selectionBox then
-                    selectionBox.Adornee = nil
-                    selectionBox.Visible = false
-                end
-                
-                if highlight then
-                    highlight.Adornee = nil
-                    highlight.Enabled = false
-                end
-                
-                if CentralPart and CentralPart.Parent then
-                    CentralPart.CFrame = CFrame.new(0, 0, 0)
-                end
-                
-                -- Esperar y limpiar
+                if magnetMode or #magnetizedObjects > 0 then releaseMagnetizedObjects() end
+                currentObject = nil rotationEnabled = false savedRotation = nil mouseDown = false
+                if selectionBox then selectionBox.Adornee = nil selectionBox.Visible = false end
+                if highlight then highlight.Adornee = nil highlight.Enabled = false end
+                if CentralPart and CentralPart.Parent then CentralPart.CFrame = CFrame.new(0, 0, 0) end
                 task.spawn(function()
                     task.wait(0.15)
                     if objToThrow and objToThrow.Parent then
                         objToThrow.CustomPhysicalProperties = nil
-                        pcall(function()
-                            objToThrow:SetNetworkOwnershipAuto()
-                        end)
+                        pcall(function() objToThrow:SetNetworkOwnershipAuto() end)
                     end
                 end)
-                
-                Rayfield:Notify({
-                    Title = "💨 Arrojado",
-                    Content = "Objeto arrojado hacia adelante",
-                    Duration = 2
-                })
+                notify("💨 Arrojado", "Objeto arrojado hacia adelante", 2)
             end
         end
-        
+
         function soltarObjeto()
             if currentObject then
                 currentObject.Velocity = Vector3.new(0, 0, 0)
@@ -1053,25 +662,16 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
             end
         end
 
-
         BtnMantener.MouseButton1Click:Connect(function()
             mantenerActivo = not mantenerActivo
             if mantenerActivo then
                 BtnMantener.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
                 BtnMantener.Text = "📌 MANTENER: ON"
-                Rayfield:Notify({
-                    Title = "✅ Mantener ON",
-                    Content = "Los objetos se mantendrán seleccionados",
-                    Duration = 3
-                })
+                notify("✅ Mantener ON", "Los objetos se mantendrán seleccionados", 3)
             else
                 BtnMantener.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
                 BtnMantener.Text = "📌 MANTENER: OFF"
-                Rayfield:Notify({
-                    Title = "❌ Mantener OFF",
-                    Content = "Modo normal de selección",
-                    Duration = 3
-                })
+                notify("❌ Mantener OFF", "Modo normal de selección", 3)
             end
         end)
 
@@ -1086,137 +686,75 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         BtnAnclarTodos.MouseButton1Click:Connect(toggleAnchorAll)
         BtnMagnetico.MouseButton1Click:Connect(function()
             if currentObject then
-                if not magnetMode then
-                    magnetizeAllObjects()
-                else
-                    releaseMagnetizedObjects()
-                end
-            else
-                Rayfield:Notify({
-                    Title = "⚠️ Error",
-                    Content = "Primero agarra un objeto",
-                    Duration = 3
-                })
-            end
+                if not magnetMode then magnetizeAllObjects() else releaseMagnetizedObjects() end
+            else notify("⚠️ Error", "Primero agarra un objeto", 3) end
         end)
         BtnLiberar.MouseButton1Click:Connect(releaseMagnetizedObjects)
 
         tool.Equipped:Connect(function(mouse)
             toolEquipped = true
-            
-            if isMobile then
-                MobileControlsGui.Enabled = true
-            end
-            
+            if isMobile then MobileControlsGui.Enabled = true end
             if not mouse then return end
-            
-            if CentralPart then
-                CentralPart.Parent = workspace
-            end
-            
+            if CentralPart then CentralPart.Parent = workspace end
             local anchorCount = updateAnchorCounter()
-            StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", 
-                collisionsEnabled and "ON" or "OFF", anchorCount)
-            
+            StatusLabel.Text = string.format("💥%s | 🧲0 | 📌%d", collisionsEnabled and "ON" or "OFF", anchorCount)
+
             local mouseButton1DownConnection
             local mouseButton1UpConnection
             local keyDownConnection
-            
+
             mouseButton1DownConnection = mouse.Button1Down:Connect(function()
-                if not mouse then return end
                 if not toolEquipped then return end
-                
                 mouseDown = true
-                
                 local target = mouse.Target
-                
                 if not target or not isValidObject(target) then
                     local camera = workspace.CurrentCamera
                     local rayOrigin = camera.CFrame.Position
                     local rayDirection = (mouse.Hit.Position - rayOrigin).Unit * 50000
-                    
                     local raycastParams = RaycastParams.new()
                     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
                     raycastParams.FilterDescendantsInstances = {character}
                     raycastParams.IgnoreWater = true
-                    
                     local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                    
                     if rayResult and rayResult.Instance then
                         target = rayResult.Instance
-                        
                         local currentPart = target
                         local attempts = 0
                         while currentPart and not isValidObject(currentPart) and attempts < 10 do
                             currentPart = currentPart.Parent
-                            if currentPart and currentPart:IsA("BasePart") then
-                                target = currentPart
-                                break
-                            end
+                            if currentPart and currentPart:IsA("BasePart") then target = currentPart break end
                             attempts = attempts + 1
                         end
                     end
                 end
-                
                 if target and isValidObject(target) then
                     if selectObject(target) then
-                        Rayfield:Notify({
-                            Title = "🎯 Seleccionado",
-                            Content = target.Name .. " - " .. math.floor(target:GetMass()) .. "kg",
-                            Duration = 2
-                        })
+                        notify("🎯 Seleccionado", target.Name .. " - " .. math.floor(target:GetMass()) .. "kg", 2)
                     end
                 end
             end)
 
             mouseButton1UpConnection = mouse.Button1Up:Connect(function()
-                if not mantenerActivo then
-                    mouseDown = false
-                    deselectObject()
-                end
+                if not mantenerActivo then mouseDown = false deselectObject() end
             end)
 
             keyDownConnection = mouse.KeyDown:Connect(function(key)
-                if not mouse then return end
                 if not toolEquipped then return end
-                
                 key = key:lower()
-                
-                if key == "q" then
-                    acercarObjeto()
-                elseif key == "e" then
-                    alejarObjeto()
-                elseif key == "r" then
-                    toggleRotation()
-                elseif key == "f" then
-                    lanzarObjeto()
-                elseif key == "t" then
-                    toggleAnchor()
-                elseif key == "y" then
-                    toggleAnchorAll()
-                elseif key == "c" then
-                    toggleCollisions()
+                if key == "q" then acercarObjeto()
+                elseif key == "e" then alejarObjeto()
+                elseif key == "r" then toggleRotation()
+                elseif key == "f" then lanzarObjeto()
+                elseif key == "t" then toggleAnchor()
+                elseif key == "y" then toggleAnchorAll()
+                elseif key == "c" then toggleCollisions()
                 elseif key == "z" then
                     if currentObject then
-                        if not magnetMode then
-                            magnetizeAllObjects()
-                        else
-                            releaseMagnetizedObjects()
-                        end
-                    else
-                        Rayfield:Notify({
-                            Title = "⚠️ Error",
-                            Content = "Primero agarra un objeto",
-                            Duration = 3
-                        })
-                    end
+                        if not magnetMode then magnetizeAllObjects() else releaseMagnetizedObjects() end
+                    else notify("⚠️ Error", "Primero agarra un objeto", 3) end
                 elseif key == "g" then
-                    if magnetMode or #magnetizedObjects > 0 then
-                        releaseMagnetizedObjects()
-                    end
-                elseif key == "x" then
-                    soltarObjeto()
-                end
+                    if magnetMode or #magnetizedObjects > 0 then releaseMagnetizedObjects() end
+                elseif key == "x" then soltarObjeto() end
             end)
 
             local connection
@@ -1229,60 +767,29 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                     if keyDownConnection then keyDownConnection:Disconnect() end
                     return
                 end
-                
-                local mouseIsValid = pcall(function()
-                    return mouse.Hit
-                end)
-                
-                if not mouseIsValid then 
-                    connection:Disconnect()
-                    return 
-                end
+                local mouseIsValid = pcall(function() return mouse.Hit end)
+                if not mouseIsValid then connection:Disconnect() return end
 
                 if mouseDown and currentObject and toolEquipped then
-                    if not alignPosition or not alignPosition.Parent then
-                        applyUltraForce(currentObject)
-                    end
-                    
-                    if not currentObject.Parent then
-                        deselectObject()
-                        mouseDown = false
-                        return
-                    end
-
+                    if not alignPosition or not alignPosition.Parent then applyUltraForce(currentObject) end
+                    if not currentObject.Parent then deselectObject() mouseDown = false return end
                     local rootPart = character:FindFirstChild("HumanoidRootPart")
-                    if not rootPart then
-                        deselectObject()
-                        return
-                    end
-
-                    local success, mouseHit = pcall(function()
-                        return mouse.Hit.Position
-                    end)
-                    
-                    if not success then
-                        return
-                    end
-
+                    if not rootPart then deselectObject() return end
+                    local success, mouseHit = pcall(function() return mouse.Hit.Position end)
+                    if not success then return end
                     if currentObject and currentObject.Parent and not rotationEnabled then
                         currentObject.Velocity = Vector3.new(0, 0, 0)
                         currentObject.RotVelocity = Vector3.new(0, 0, 0)
                     end
-                    
                     if collisionsEnabled and savedRotation and currentObject and currentObject.Parent then
                         currentObject.RotVelocity = Vector3.new(0, 0, 0)
                         local currentPos = currentObject.Position
                         currentObject.CFrame = CFrame.new(currentPos) * savedRotation
                     end
-
                     local cameraPosition = workspace.CurrentCamera.CFrame.Position
                     local mouseDirection = (mouseHit - cameraPosition).Unit
                     local targetPosition = cameraPosition + (mouseDirection * distance)
-                    
-                    if CentralPart and CentralPart.Parent then
-                        CentralPart.CFrame = CFrame.new(targetPosition)
-                    end
-                    
+                    if CentralPart and CentralPart.Parent then CentralPart.CFrame = CFrame.new(targetPosition) end
                     if magnetMode and #magnetizedObjects > 0 then
                         for i = #magnetizedObjects, 1, -1 do
                             local data = magnetizedObjects[i]
@@ -1299,23 +806,17 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                                 end
                             end
                         end
-                        
                         local magCount = #magnetizedObjects
                         local anchorCount = updateAnchorCounter()
-                        StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", 
-                            collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
+                        StatusLabel.Text = string.format("💥%s | 🧲%d | 📌%d", collisionsEnabled and "ON" or "OFF", magCount, anchorCount)
                     end
-                    
                     if not currentObject:FindFirstChild("TelekinesisParticle") then
                         local particle = Instance.new("ParticleEmitter")
                         particle.Name = "TelekinesisParticle"
                         particle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
                         particle.Color = ColorSequence.new(selectionBox.Color3)
                         particle.Size = NumberSequence.new(0.5)
-                        particle.Transparency = NumberSequence.new({
-                            NumberSequenceKeypoint.new(0, 0.5),
-                            NumberSequenceKeypoint.new(1, 1)
-                        })
+                        particle.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1)})
                         particle.Lifetime = NumberRange.new(0.3, 0.6)
                         particle.Rate = 50
                         particle.Speed = NumberRange.new(2, 5)
@@ -1330,22 +831,11 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         end)
 
         tool.Unequipped:Connect(function()
-            toolEquipped = false
-            mouseDown = false
-            mantenerActivo = false
-            
+            toolEquipped = false mouseDown = false mantenerActivo = false
             pcall(function()
                 deselectObject()
-                
-                if MobileControlsGui then
-                    MobileControlsGui.Enabled = false
-                end
-                
-                if CentralPart then
-                    CentralPart.Parent = nil
-                    CentralPart.CFrame = CFrame.new(0, 0, 0)
-                end
-                
+                if MobileControlsGui then MobileControlsGui.Enabled = false end
+                if CentralPart then CentralPart.Parent = nil CentralPart.CFrame = CFrame.new(0, 0, 0) end
                 wait(0.1)
                 Network.ClearAll()
             end)
@@ -1366,7 +856,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
         if humanoid then
             humanoid.Died:Connect(function()
                 toolEquipped = false
-                
                 pcall(function()
                     if magnetMode or #magnetizedObjects > 0 then
                         for _, data in pairs(magnetizedObjects) do
@@ -1381,18 +870,14 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
                                 end
                             end)
                         end
-                        magnetizedObjects = {}
-                        magnetMode = false
+                        magnetizedObjects = {} magnetMode = false
                     end
-                    
                     deselectObject()
-                    
                     if tool then tool:Destroy() end
                     if selectionBox then selectionBox:Destroy() end
                     if highlight then highlight:Destroy() end
                     if CentralPart then CentralPart:Destroy() end
                     if MobileControlsGui then MobileControlsGui.Enabled = false end
-                    
                     Network.ClearAll()
                 end)
             end)
@@ -1405,7 +890,6 @@ MobileControlsGui.Parent = (gethui and gethui()) or CoreGui
     end
 })
 
-
 TelekinesisTab:CreateSection("Personalización")
 
 TelekinesisTab:CreateColorPicker({
@@ -1415,33 +899,16 @@ TelekinesisTab:CreateColorPicker({
         for _, obj in pairs(workspace:GetChildren()) do
             if obj:IsA("SelectionBox") and obj.Name ~= "SelectionBox" then
                 obj.Color3 = color
-                obj.SurfaceColor3 = Color3.new(
-                    math.min(color.R + 0.2, 1),
-                    math.min(color.G + 0.2, 1),
-                    math.min(color.B + 0.2, 1)
-                )
+                obj.SurfaceColor3 = Color3.new(math.min(color.R+0.2,1), math.min(color.G+0.2,1), math.min(color.B+0.2,1))
             end
         end
-        
         for _, obj in pairs(workspace:GetChildren()) do
             if obj:IsA("Highlight") then
                 obj.FillColor = color
-                obj.OutlineColor = Color3.new(
-                    math.min(color.R + 0.2, 1),
-                    math.min(color.G + 0.2, 1),
-                    math.min(color.B + 0.2, 1)
-                )
+                obj.OutlineColor = Color3.new(math.min(color.R+0.2,1), math.min(color.G+0.2,1), math.min(color.B+0.2,1))
             end
         end
-        
-        Rayfield:Notify({
-            Title = "Color",
-            Content = string.format("RGB(%d, %d, %d)", 
-                math.floor(color.R*255), 
-                math.floor(color.G*255), 
-                math.floor(color.B*255)),
-            Duration = 3
-        })
+        notify("Color", string.format("RGB(%d, %d, %d)", math.floor(color.R*255), math.floor(color.G*255), math.floor(color.B*255)), 3)
     end
 })
 
@@ -1454,41 +921,30 @@ TelekinesisTab:CreateColorPicker({
                 obj.Color = ColorSequence.new(color)
             end
         end
-        
-        Rayfield:Notify({
-            Title = "Partículas",
-            Content = string.format("Color: RGB(%d, %d, %d)", 
-                math.floor(color.R*255), 
-                math.floor(color.G*255), 
-                math.floor(color.B*255)),
-            Duration = 3
-        })
+        notify("Partículas", string.format("Color: RGB(%d, %d, %d)", math.floor(color.R*255), math.floor(color.G*255), math.floor(color.B*255)), 3)
     end
 })
 
-
 TelekinesisTab:CreateSection("Informacion")
-
-
 
 TelekinesisTab:CreateParagraph({
     Title = "Controles PC",
     Content = [[• Click: Agarrar objeto
-• Q/E: Acercar/Alejar
-• R: Toggle Rotación
-• F: Lanzar objeto
-• T: Anclar/Desanclar (1 objeto)
-• Y: Anclar/Desanclar TODOS
-• C: Toggle Colisiones
-• Z: Modo Magnético
-• G: Liberar magnetizados
-• X: Soltar objeto]]
+- Q/E: Acercar/Alejar
+- R: Toggle Rotación
+- F: Lanzar objeto
+- T: Anclar/Desanclar (1 objeto)
+- Y: Anclar/Desanclar TODOS
+- C: Toggle Colisiones
+- Z: Modo Magnético
+- G: Liberar magnetizados
+- X: Soltar objeto]]
 })
 
 TelekinesisTab:CreateParagraph({
     Title = "Controles Móvil",
     Content = [[• Tap: Agarrar objeto
-• Botones en pantalla:
+- Botones en pantalla:
   - ⬆️⬇️: Acercar/Alejar
   - 🔄: Rotar
   - 🚀: Lanzar
@@ -1502,25 +958,16 @@ TelekinesisTab:CreateParagraph({
   - MANTENER: Mantener selección]]
 })
 
-
-
 TelekinesisTab:CreateParagraph({
     Title = "Informacion",
     Content = [[Este apartado esta actualmente en fase beta, tiene muchos errores, asi que usenlo sabiendo eso.
     las personas se pueden seleccionar pero no las puedes arrastrar.]]
 })
 
-
-
-
 TelekinesisTab:CreateButton({
     Name = "🗑️ Limpiar Todo",
     Callback = function()
         Network.ClearAll()
-        Rayfield:Notify({
-            Title = "🗑️ Limpieza Completa",
-            Content = "Todos los objetos fueron liberados",
-            Duration = 3
-        })
+        notify("🗑️ Limpieza Completa", "Todos los objetos fueron liberados", 3)
     end
 })
