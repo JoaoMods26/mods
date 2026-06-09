@@ -3005,150 +3005,138 @@ AimbotTab:CreateButton({
 
 
 
+--VC
 
+local VCTab = Window:CreateTab("VC")
 
+VCTab:CreateSection("Voice Chat Tools")
 
+VCTab:CreateParagraph({
+    Title = "VC Unmute Bypass",
+    Content = "Este script permite gestionar el estado del micrófono en Voice Chat de Roblox."
+})
 
+VCTab:CreateButton({
+    Name = "Ejecutar VC Script",
+    Callback = function()
+        JmodsLib:Notify({
+            Title = "VC Script",
+            Content = "Ejecutando script de Voice Chat...",
+            Duration = 3
+        })
 
---[[
-----Hitbox Espander---- 
----- Hitbox Expander Optimizado sin Noclip ----
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local PhysicsService = game:GetService("PhysicsService")
+        local identifyexecutorname = (identifyexecutor and identifyexecutor()) or "Unknown"
+        local clonereference = cloneref or function(...) return ... end
+        local clonefunction = clonefunction or function(...) return ... end
 
-local HitboxTab = Window:CreateTab("Hitbox", nil)
+        local voicechatservice = clonereference(game:GetService("VoiceChatService"))
+        local voicechatinternal = clonereference(game:GetService("VoiceChatInternal"))
+        local coregui = game:GetService("CoreGui")
+        local startergui = game:GetService("StarterGui")
+        local players = game:GetService("Players")
+        local localplayer = players.LocalPlayer
+        local getconnectionsfunc = clonefunction(getconnections)
 
-getgenv().HitboxSize = 15
-getgenv().HitboxTransparency = 0.9
-getgenv().HitboxStatus = false
-getgenv().TeamCheck = false
+        local mutedimage = "rbxasset://textures/ui/VoiceChat/MicLight/Muted.png"
+        local ismuted = true
+        local hiddenfolder = Instance.new("Folder", game:GetService("RobloxReplicatedStorage"))
 
--- Crear grupo de colisión sin colisiones
-pcall(function()
-    PhysicsService:RegisterCollisionGroup("NoCollision")
-    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
-end)
+        local topbarapp = coregui:WaitForChild("TopBarApp", 15):WaitForChild("TopBarApp", 15)
+        local unibarleft = topbarapp:WaitForChild("UnibarLeftFrame", 15)
+        local unibarmenu = unibarleft:WaitForChild("UnibarMenu", 15) or unibarleft:WaitForChild("ChromeMenu", 15)
+        local unibarcontainer
 
-local function applyNoCollision(part)
-    if part and part:IsA("BasePart") then
-        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
-    end
-end
+        pcall(function()
+            unibarcontainer = unibarmenu:WaitForChild("2", 15):WaitForChild("3", 15)
+        end)
 
-local function applyNoCollisionToCharacter(character)
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            applyNoCollision(part)
+        local micmutebutton = unibarcontainer and unibarcontainer:FindFirstChild("toggle_mic_mute", true)
+
+        local function geticonlabel(button)
+            button = button or micmutebutton
+            return button:WaitForChild("IntegrationIconFrame", 15):WaitForChild("IntegrationIcon", 15)["1"]
         end
-    end
-end
 
-local function updateHitboxes()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            local isEnemy = not getgenv().TeamCheck or (v.Team ~= Players.LocalPlayer.Team)
-
-            local size = isEnemy and Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or Vector3.new(2, 2, 1)
-            local transparency = isEnemy and getgenv().HitboxTransparency or 1
-            local color = isEnemy and BrickColor.new("Really black") or BrickColor.new("Medium stone grey")
-            local material = isEnemy and Enum.Material.Neon or Enum.Material.Plastic
-
-            -- Solo cambia si es necesario
-            if hrp.Size ~= size then hrp.Size = size end
-            if hrp.Transparency ~= transparency then hrp.Transparency = transparency end
-            if hrp.BrickColor ~= color then hrp.BrickColor = color end
-            if hrp.Material ~= material then hrp.Material = material end
-            if hrp.CanCollide then hrp.CanCollide = false end
-
-            applyNoCollisionToCharacter(v.Character)
+        local function setmutestate(state)
+            local audiodereviceinput = localplayer:FindFirstChildWhichIsA("AudioDeviceInput", true)
+            if audiodereviceinput then
+                audiodereviceinput.Active = not state
+            else
+                voicechatinternal:PublishPause(state)
+            end
         end
-    end
-end
 
-local function resetHitboxes()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Players.LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            if hrp.Size ~= Vector3.new(2, 2, 1) then hrp.Size = Vector3.new(2, 2, 1) end
-            if hrp.Transparency ~= 1 then hrp.Transparency = 1 end
-            if hrp.BrickColor ~= BrickColor.new("Medium stone grey") then hrp.BrickColor = BrickColor.new("Medium stone grey") end
-            if hrp.Material ~= Enum.Material.Plastic then hrp.Material = Enum.Material.Plastic end
-            if hrp.CanCollide then hrp.CanCollide = false end
-
-            applyNoCollisionToCharacter(v.Character)
+        if not micmutebutton then
+            voicechatservice:joinVoice()
+            pcall(function()
+                unibarcontainer = unibarmenu:WaitForChild("2", 15):WaitForChild("3", 15)
+                micmutebutton = unibarcontainer:WaitForChild("toggle_mic_mute", 15)
+            end)
         end
-    end
-end
 
--- Toggle principal de Hitbox
-local hitboxConnection
-HitboxTab:CreateToggle({
-    Name = "Hitbox Expander",
-    CurrentValue = false,
-    Flag = "HitboxToggle",
-    Callback = function(state)
-        getgenv().HitboxStatus = state
+        if not micmutebutton then return print("Mic button not found - UI path changed.") end
 
-        if state then
-            updateHitboxes()
-            hitboxConnection = RunService.Heartbeat:Connect(function()
-                if getgenv().HitboxStatus then
-                    updateHitboxes()
-                    task.wait(0.2) -- Ajusta la frecuencia según necesidad
+        startergui:SetCore("SendNotification", {Title = "SEXOOO", Text = "Activa el micro antes recuerda", Duration = 5})
+
+        repeat task.wait(2) until geticonlabel().Image ~= mutedimage
+
+        voicechatservice:leaveVoice()
+        task.wait(2)
+
+        local connections = getconnectionsfunc(voicechatinternal.StateChanged)
+        for i = 7, #connections do
+            if connections[i] then connections[i]:Disable() end
+        end
+
+        task.wait(2)
+        voicechatservice:joinVoice()
+
+        pcall(function()
+            unibarcontainer = unibarmenu:WaitForChild("2", 15):WaitForChild("3", 15)
+            micmutebutton = unibarcontainer:WaitForChild("toggle_mic_mute", 15)
+        end)
+
+        if micmutebutton and unibarcontainer then
+            local clonedmutebutton = micmutebutton:Clone()
+            micmutebutton.Parent = hiddenfolder
+            clonedmutebutton.Name = "toggle_mic_mute_new"
+            clonedmutebutton.Parent = unibarcontainer
+
+            local clonedicon = geticonlabel(clonedmutebutton)
+            local originalicon = geticonlabel(micmutebutton)
+
+            setmutestate(true)
+            clonedmutebutton:WaitForChild("IconHitArea_toggle_mic_mute", 15).Activated:Connect(function()
+                ismuted = not ismuted
+                setmutestate(ismuted)
+                if ismuted then
+                    clonedicon.Image = mutedimage
+                else
+                    clonedicon.Image = originalicon.Image
                 end
             end)
-        else
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-                hitboxConnection = nil
-            end
-            resetHitboxes()
+
+            JmodsLib:Notify({
+                Title = "VC Listo",
+                Content = "Voice Chat script aplicado correctamente.",
+                Duration = 4
+            })
         end
-    end,
+    end
 })
 
--- Toggle de Team Check
-HitboxTab:CreateToggle({
-    Name = "Team Checker",
-    CurrentValue = false,
-    Flag = "TeamCheckToggle",
-    Callback = function(state)
-        getgenv().TeamCheck = state
-        if getgenv().HitboxStatus then
-            updateHitboxes()
-        end
-    end,
-})
+VCTab:CreateSection("Info")
 
--- Slider de tamaño del Hitbox
-HitboxTab:CreateSlider({
-    Name = "Tamaño del Hitbox",
-    Range = {2, 500},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = getgenv().HitboxSize,
-    Flag = "HitboxSizeSlider",
-    Callback = function(val)
-        getgenv().HitboxSize = val
-    end,
-})
+VCTab:CreateParagraph({ Title = "Instrucciones", Content = "Para que el script funcione correctamente, primero activa el chat de voz de Roblox y asegúrate de que tu micrófono esté habilitado. Después presiona el botón de abajo y espera unos segundos mientras el proceso termina. No cierres el juego ni cambies de servidor durante el proceso." })
 
--- Slider de transparencia del Hitbox
-HitboxTab:CreateSlider({
-    Name = "Transparencia",
-    Range = {0, 1},
-    Increment = 0.05,
-    CurrentValue = getgenv().HitboxTransparency,
-    Flag = "HitboxTransparencySlider",
-    Callback = function(val)
-        getgenv().HitboxTransparency = val
-    end,
-})
+---VC
 
---vieja
-]]
+
+
+
+
+
+
 --hitbox nuevo
 ----Hitbox Espander---- 
 local Players = game:GetService("Players")
