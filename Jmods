@@ -3072,7 +3072,7 @@ VCTab:CreateButton({
             end
 
             startergui:SetCore("SendNotification", {
-                Title = "mask say hiii",
+                Title = "sex",
                 Text = "Unmute to continue.",
                 Duration = 5
             })
