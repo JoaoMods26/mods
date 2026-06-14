@@ -3009,7 +3009,7 @@ AimbotTab:CreateButton({
 
 local VCTab = Window:CreateTab("VC")
 
-VCTab:CreateSection("Anti ban")
+VCTab:CreateSection("Voice Chat Tools")
 
 VCTab:CreateParagraph({
     Title = "VC Unmute Bypass",
@@ -3072,7 +3072,7 @@ VCTab:CreateButton({
             end
 
             startergui:SetCore("SendNotification", {
-                Title = "sex",
+                Title = "mask say hiii",
                 Text = "Unmute to continue.",
                 Duration = 5
             })
@@ -3131,7 +3131,6 @@ VCTab:CreateParagraph({
     Title = "Instrucciones",
     Content = "Para que el script funcione correctamente, primero activa el chat de voz de Roblox y asegúrate de que tu micrófono esté habilitado. Después presiona el botón y espera unos segundos. No cierres el juego ni cambies de servidor durante el proceso."
 })
----VC
 ---VC
 
 
