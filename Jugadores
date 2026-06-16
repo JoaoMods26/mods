@@ -780,60 +780,103 @@ end
 
 
 
-function startFollowingPlayer(targetPlayer)
+
+
+----
+
+
+local followConnection
+local characterAddedConnection
+local localCharacterAddedConnection
+local followPlayerOn = false
+
+function stopFollowingPlayer()
+    followPlayerOn = false
+
     if followConnection then
         followConnection:Disconnect()
         followConnection = nil
     end
 
-    if not targetPlayer then return end
-
     if characterAddedConnection then
         characterAddedConnection:Disconnect()
+        characterAddedConnection = nil
     end
+
+    if localCharacterAddedConnection then
+        localCharacterAddedConnection:Disconnect()
+        localCharacterAddedConnection = nil
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+
+        if hum and hrp then
+            hum:MoveTo(hrp.Position)
+        end
+    end
+end
+
+function startFollowingPlayer(targetPlayer)
+    stopFollowingPlayer()
+
+    if not targetPlayer then
+        return
+    end
+
+    followPlayerOn = true
+
     characterAddedConnection = targetPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
+
         if followPlayerOn then
             startFollowingPlayer(targetPlayer)
         end
     end)
 
-    LocalPlayer.CharacterAdded:Connect(function()
+    localCharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
+
         if followPlayerOn then
             startFollowingPlayer(targetPlayer)
         end
     end)
 
-    followConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        if not followPlayerOn then return end
+    followConnection = RunService.Heartbeat:Connect(function()
+        if not followPlayerOn then
+            return
+        end
 
-        pcall(function()
-            local localChar = LocalPlayer.Character
-            if not localChar then return end
+        local localChar = LocalPlayer.Character
+        local targetChar = targetPlayer.Character
 
-            local targetChar = targetPlayer.Character
-            if not targetChar then return end
+        if not localChar or not targetChar then
+            return
+        end
 
-            local localHRP = localChar:FindFirstChild("HumanoidRootPart")
-            local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        local localHRP = localChar:FindFirstChild("HumanoidRootPart")
+        local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
 
-            if not localHRP or not targetHRP or not humanoid then return end
+        if not localHRP or not targetHRP or not humanoid then
+            return
+        end
 
-            humanoid.PlatformStand = false
+        humanoid.PlatformStand = false
 
-            local distance = (targetHRP.Position - localHRP.Position).Magnitude
+        local distance = (targetHRP.Position - localHRP.Position).Magnitude
 
-            if distance > 3 then
-                local direction = (targetHRP.Position - localHRP.Position).Unit
-                local targetPos = targetHRP.Position - direction * 3
-                humanoid:MoveTo(targetPos)
-                humanoid.WalkSpeed = 16
-            else
-                humanoid:MoveTo(localHRP.Position)
-            end
-        end)
+        if distance > 3 then
+            local direction = (targetHRP.Position - localHRP.Position).Unit
+            local targetPos = targetHRP.Position - direction * 3
+
+            humanoid:MoveTo(targetPos)
+            humanoid.WalkSpeed = 16
+        else
+            humanoid:MoveTo(localHRP.Position)
+        end
     end)
 end
 
@@ -841,22 +884,40 @@ JugadoresTab:CreateToggle({
     Name = "Seguir",
     CurrentValue = false,
     Callback = function(state)
-        if not selectedPlayer then
-            Rayfield:Notify({Title = "Error", Content = "Selecciona un jugador primero!", Duration = 2, Image = 4483362458})
-            return
-        end
         if state then
-            followPlayerOn = true
+            if not selectedPlayer then
+                Rayfield:Notify({
+                    Title = "Error",
+                    Content = "Selecciona un jugador primero!",
+                    Duration = 2,
+                    Image = 4483362458
+                })
+                return
+            end
+
             startFollowingPlayer(selectedPlayer)
-            Rayfield:Notify({Title = "Siguiendo", Content = "Siguiendo a " .. selectedPlayer.Name, Duration = 2, Image = 4483362458})
+
+            Rayfield:Notify({
+                Title = "Siguiendo",
+                Content = "Siguiendo a " .. selectedPlayer.Name,
+                Duration = 2,
+                Image = 4483362458
+            })
         else
             stopFollowingPlayer()
-            Rayfield:Notify({Title = "Seguimiento", Content = "Detenido", Duration = 2, Image = 4483362458})
+
+            Rayfield:Notify({
+                Title = "Seguimiento",
+                Content = "Detenido",
+                Duration = 2,
+                Image = 4483362458
+            })
         end
     end
 })
 
 
+----
 
 
 
