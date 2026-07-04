@@ -2182,21 +2182,27 @@ MainTab:CreateSlider({
     end,
 })
 
-----Camara libre---
 
 
+
+
+
+
+----Camara libre
 
 -- Servicios
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 local freecamEnabled = false
-local camRotation = Vector2.new()
+local camRotation = Vector2.new() -- (pitch, yaw) controlado con mouse/dedo
+local camRoll = 0                 -- rotación tipo "aspa de ventilador"
 local camPosition = Vector3.new()
 local speed = 15
 local sensitivity = 0.005
@@ -2204,18 +2210,41 @@ local keysHeld = {}
 
 local lastTouchPosition = nil
 local guiFrames = nil
-local toggleActive = false  -- **AÑADIDO: estado del toggle**
+local toggleActive = false
 
--- Variables para movimiento móvil nativo
+-- Movimiento móvil nativo (stick)
 local MobileMove = {
     Up = false,
     Down = false,
 }
 
--- Función para obtener el movimiento del stick móvil nativo
+local advancedMode = false
+local hubHidden = false
+local rollSpeed = 3 -- radianes por segundo, ajusta si lo quieres más rápido/lento
+
+
+local RollButtons = {
+    Left = false,
+    Right = false,
+}
+
+local MobileDirButtons = {
+    Forward = false,
+    Back = false,
+    Left = false,
+    Right = false,
+}
+
+local AdvancedMobileButtons = nil -- botones táctiles "hold" (roll + movimiento)
+
+local BtnHideHUB = nil
+local BtnAdvancedToggle = nil
+local BtnResetCamMobile = nil
+
+
 local function getMobileMovement()
     local moveDirection = Vector3.zero
- 
+
     pcall(function()
         local playerModule = player.PlayerScripts:WaitForChild("PlayerModule")
         local controls = require(playerModule:WaitForChild("ControlModule"))
@@ -2223,42 +2252,28 @@ local function getMobileMovement()
             moveDirection = controls:GetMoveVector()
         end
     end)
- 
+
     return moveDirection
 end
 
 
--- Manejar cuando muere el humanoid para desactivar freecam
 local function SetupCharacter(char)
 	local humanoid = char:WaitForChild("Humanoid")
-	-- Cuando muere, desactivar freecam para evitar bugs
-	humanoid.Died:Connect(function()
-		if freecamEnabled then
-			DisableFreecam()
-		end
-	end)
 end
 
--- Cuando el personaje respawnea
 player.CharacterAdded:Connect(function(char)
 	SetupCharacter(char)
-	
-	local humanoid = char:WaitForChild("Humanoid")
-	
+
 	if freecamEnabled then
 		FreezeCharacter()
 	end
 end)
 
-
--- Si ya hay personaje, hacer setup
 if player.Character then
 	SetupCharacter(player.Character)
 end
 
 
-
--- Congelar / descongelar personaje
 local function FreezeCharacter()
 	local char = player.Character
 	if char then
@@ -2271,8 +2286,7 @@ local function FreezeCharacter()
 	end
 end
 
-
- function UnfreezeCharacter()
+function UnfreezeCharacter()
 	local char = player.Character
 	if char then
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -2284,15 +2298,51 @@ end
 	end
 end
 
--- Crear GUI táctil (móvil)
- function CreateTouchGui()
+
+-- ============================================================
+function ResetCameraView()
+	if not freecamEnabled then return end
+
+	camRotation = Vector2.new(0, camRotation.Y) -- pitch a 0, yaw se mantiene
+	camRoll = 0 -- limpia el roll atascado
+
+	-- Por seguridad también soltamos cualquier bind de roll que haya
+	-- quedado pegado en true (blindaje extra ante el bug original)
+	RollButtons.Left = false
+	RollButtons.Right = false
+end
+
+
+function CreateTouchGui()
 	if guiFrames then return end
 	guiFrames = Instance.new("ScreenGui")
 	guiFrames.Name = "FreecamMobileGui"
 	guiFrames.ResetOnSpawn = false
-guiFrames.Parent = (gethui and gethui()) or CoreGui
+	guiFrames.Parent = (gethui and gethui()) or CoreGui
 
-	 function CreateButton(name, pos, keycode, text)
+	local function SetActionState(action, value)
+		if action == "Up" then
+			MobileMove.Up = value
+		elseif action == "Down" then
+			MobileMove.Down = value
+		elseif action == "RollLeft" then
+			RollButtons.Left = value
+		elseif action == "RollRight" then
+			RollButtons.Right = value
+		elseif action == "MoveF" then
+			MobileDirButtons.Forward = value
+		elseif action == "MoveB" then
+			MobileDirButtons.Back = value
+		elseif action == "MoveL" then
+			MobileDirButtons.Left = value
+		elseif action == "MoveR" then
+			MobileDirButtons.Right = value
+		else
+			keysHeld[action] = value
+		end
+	end
+
+	local function CreateButton(name, pos, action, text)
 		local btn = Instance.new("TextButton")
 		btn.Name = name
 		btn.Size = UDim2.new(0, 60, 0, 60)
@@ -2309,37 +2359,44 @@ guiFrames.Parent = (gethui and gethui()) or CoreGui
 		corner.CornerRadius = UDim.new(0.2, 0)
 		corner.Parent = btn
 
-		btn.MouseButton1Down:Connect(function()
-			if keycode == "Up" then
-				MobileMove.Up = true
-			elseif keycode == "Down" then
-				MobileMove.Down = true
-			else
-				keysHeld[keycode] = true
+		-- InputBegan/InputEnded soporta multitouch real (varios dedos
+		-- a la vez), a diferencia de MouseButton1Down/Up.
+		btn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch
+				or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				SetActionState(action, true)
+				btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 			end
-			btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 		end)
-		btn.MouseButton1Up:Connect(function()
-			if keycode == "Up" then
-				MobileMove.Up = false
-			elseif keycode == "Down" then
-				MobileMove.Down = false
-			else
-				keysHeld[keycode] = false
+		btn.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch
+				or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				SetActionState(action, false)
+				btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 			end
-			btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 		end)
+
+		return btn
 	end
 
-	-- Botones de movimiento horizontal (ya no necesarios con stick nativo, pero los dejamos por compatibilidad)
-	-- CreateButton("W", UDim2.new(0, 100, 1, -200), Enum.KeyCode.W)
-	-- CreateButton("A", UDim2.new(0, 40, 1, -140), Enum.KeyCode.A)
-	-- CreateButton("S", UDim2.new(0, 100, 1, -140), Enum.KeyCode.S)
-	-- CreateButton("D", UDim2.new(0, 160, 1, -140), Enum.KeyCode.D)
-	
-	-- Solo botones de subir/bajar (E/Q)
+	-- Botones básicos: subir / bajar
 	CreateButton("Up", UDim2.new(1, -100, 1, -200), "Up", "▲")
 	CreateButton("Down", UDim2.new(1, -100, 1, -100), "Down", "▼")
+
+	-- Botones del Modo Avanzado (ocultos hasta activarlo)
+	local rollL = CreateButton("RollLeft", UDim2.new(0, 20, 0.5, -70), "RollLeft", "⟲")
+	local rollR = CreateButton("RollRight", UDim2.new(0, 20, 0.5, 10), "RollRight", "⟳")
+
+	local moveF = CreateButton("MoveF", UDim2.new(0, 160, 1, -280), "MoveF", "▲")
+	local moveB = CreateButton("MoveB", UDim2.new(0, 160, 1, -140), "MoveB", "▼")
+	local moveL = CreateButton("MoveL", UDim2.new(0, 100, 1, -210), "MoveL", "◀")
+	local moveR = CreateButton("MoveR", UDim2.new(0, 220, 1, -210), "MoveR", "▶")
+
+	AdvancedMobileButtons = { rollL, rollR, moveF, moveB, moveL, moveR }
+
+	for _, b in ipairs(AdvancedMobileButtons) do
+		b.Visible = false
+	end
 end
 
 function RemoveTouchGui()
@@ -2347,49 +2404,149 @@ function RemoveTouchGui()
 		guiFrames:Destroy()
 		guiFrames = nil
 	end
-	-- Limpiar estados de MobileMove
+
 	for key in pairs(MobileMove) do
 		MobileMove[key] = false
 	end
+	for key in pairs(MobileDirButtons) do
+		MobileDirButtons[key] = false
+	end
+	RollButtons.Left = false
+	RollButtons.Right = false
+	AdvancedMobileButtons = nil
 end
 
--- Calcular vector de movimiento
- function CalculateMoveVector()
+
+function SetAdvancedButtonsVisible(state)
+	if AdvancedMobileButtons then
+		for _, b in ipairs(AdvancedMobileButtons) do
+			b.Visible = state
+		end
+	end
+
+	if BtnResetCamMobile then
+		if state then
+			BtnResetCamMobile:Show()
+		else
+			BtnResetCamMobile:Hide()
+		end
+	end
+end
+
+
+-- ============================================================
+function CreateMobileFreecamPanel()
+	if BtnHideHUB then return end
+
+	BtnHideHUB = MainTab:CreateButtonFloat({
+		Name = "👁",
+		Width = 44,
+		Height = 44,
+		X = 0.5,
+		Y = 0.04,
+		CornerRadius = 22,
+		MobileOnly = true,
+		Draggable = true,
+		Callback = function()
+			hubHidden = not hubHidden
+
+			pcall(function()
+				StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, not hubHidden)
+			end)
+
+			if guiFrames then
+				guiFrames.Enabled = not hubHidden
+			end
+
+			if hubHidden then
+				if BtnAdvancedToggle then BtnAdvancedToggle:Hide() end
+				if BtnResetCamMobile then BtnResetCamMobile:Hide() end
+				advancedMode = false
+			else
+				if BtnAdvancedToggle then BtnAdvancedToggle:Show() end
+			end
+		end,
+	})
+	BtnHideHUB:Hide()
+
+	BtnAdvancedToggle = MainTab:CreateButtonFloat({
+		Name = "⚙",
+		Width = 44,
+		Height = 44,
+		X = 0.5,
+		Y = 0.11,
+		CornerRadius = 22,
+		MobileOnly = true,
+		Draggable = true,
+		CustomColor = {60, 60, 60},
+		Callback = function()
+			advancedMode = not advancedMode
+			SetAdvancedButtonsVisible(advancedMode)
+
+			if advancedMode then
+				BtnAdvancedToggle:SetColor(80, 200, 120)
+			else
+				BtnAdvancedToggle:SetColor(60, 60, 60)
+			end
+		end,
+	})
+	BtnAdvancedToggle:Hide()
+
+	BtnResetCamMobile = MainTab:CreateButtonFloat({
+		Name = "🎯",
+		Width = 44,
+		Height = 44,
+		X = 0.5,
+		Y = 0.18,
+		CornerRadius = 22,
+		MobileOnly = true,
+		Draggable = true,
+		CustomColor = {220, 150, 40},
+		Callback = function()
+			ResetCameraView()
+		end,
+	})
+	BtnResetCamMobile:Hide()
+end
+
+
+-- ============================================================
+function CalculateMoveVector()
 	local moveVec = Vector3.zero
-	
-	-- Si es dispositivo móvil, usar el stick nativo
+
 	if UserInputService.TouchEnabled then
 		local mobileMove = getMobileMovement()
-		if mobileMove.Magnitude > 0 then
-			-- Igual que en el script de vuelo: usar lookVector y rightVector de la cámara
+
+		local dirX, dirZ = mobileMove.X, mobileMove.Z
+		if MobileDirButtons.Forward then dirZ -= 1 end
+		if MobileDirButtons.Back then dirZ += 1 end
+		if MobileDirButtons.Left then dirX -= 1 end
+		if MobileDirButtons.Right then dirX += 1 end
+
+		if dirX ~= 0 or dirZ ~= 0 then
 			local lookVector = camera.CFrame.LookVector
 			local rightVector = camera.CFrame.RightVector
-			
-			-- Combinar vectores correctamente
-			local worldDirection = (rightVector * mobileMove.X) + (lookVector * -mobileMove.Z)
+			local worldDirection = (rightVector * dirX) + (lookVector * -dirZ)
 			moveVec += worldDirection
 		end
 	else
-		-- Controles de teclado (PC)
 		if keysHeld[Enum.KeyCode.W] then moveVec += Vector3.new(0, 0, -1) end
 		if keysHeld[Enum.KeyCode.S] then moveVec += Vector3.new(0, 0, 1) end
 		if keysHeld[Enum.KeyCode.A] then moveVec += Vector3.new(-1, 0, 0) end
 		if keysHeld[Enum.KeyCode.D] then moveVec += Vector3.new(1, 0, 0) end
 	end
-	
-	-- Subir/bajar funciona igual en ambas plataformas
+
 	if keysHeld[Enum.KeyCode.E] or MobileMove.Up then moveVec += Vector3.new(0, 1, 0) end
 	if keysHeld[Enum.KeyCode.Q] or MobileMove.Down then moveVec += Vector3.new(0, -1, 0) end
-	
+
 	return moveVec
 end
 
 local renderConn = nil
 
- function EnableFreecam()
+function EnableFreecam()
 	if freecamEnabled then return end
 	freecamEnabled = true
-    
 
 	camera = workspace.CurrentCamera or camera
 	camera.CameraType = Enum.CameraType.Scriptable
@@ -2398,6 +2555,13 @@ local renderConn = nil
 	local _, yaw = camera.CFrame:ToOrientation()
 	local pitch = math.asin(-camera.CFrame.LookVector.Y)
 	camRotation = Vector2.new(pitch, yaw)
+	camRoll = 0
+
+	-- FIX: blindaje extra, por si quedó algo pegado de una sesión anterior
+	RollButtons.Left = false
+	RollButtons.Right = false
+	keysHeld[Enum.KeyCode.Z] = false
+	keysHeld[Enum.KeyCode.X] = false
 
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 	UserInputService.MouseIconEnabled = false
@@ -2406,6 +2570,9 @@ local renderConn = nil
 
 	if UserInputService.TouchEnabled then
 		CreateTouchGui()
+		CreateMobileFreecamPanel()
+		BtnHideHUB:Show()
+		BtnAdvancedToggle:Show()
 	end
 
 	renderConn = RunService.RenderStepped:Connect(function(dt)
@@ -2417,13 +2584,25 @@ local renderConn = nil
 			camRotation = Vector2.new(math.clamp(camRotation.X, -math.pi/2, math.pi/2), camRotation.Y)
 		end
 
+		-- ROLL tipo hélice: gira sin parar mientras mantienes la tecla/botón.
+		-- En PC ahora lee keysHeld[Z]/keysHeld[X] (input crudo, confiable).
+		-- En móvil sigue leyendo RollButtons desde los botones táctiles.
+		local rollLeftActive = RollButtons.Left or keysHeld[Enum.KeyCode.Z]
+		local rollRightActive = RollButtons.Right or keysHeld[Enum.KeyCode.X]
+
+		if rollLeftActive then
+			camRoll = camRoll + rollSpeed * dt
+		end
+		if rollRightActive then
+			camRoll = camRoll - rollSpeed * dt
+		end
+
 		local yawCF = CFrame.Angles(0, camRotation.Y, 0)
 		local pitchCF = CFrame.Angles(camRotation.X, 0, 0)
+		local rollCF = CFrame.Angles(0, 0, camRoll)
 		local moveVec = CalculateMoveVector()
 
 		if moveVec.Magnitude > 0 then
-			-- En móvil, el vector ya viene en coordenadas del mundo
-			-- En PC, necesitamos transformarlo con yawCF
 			if not UserInputService.TouchEnabled then
 				moveVec = yawCF:VectorToWorldSpace(moveVec.Unit) * speed
 			else
@@ -2432,11 +2611,11 @@ local renderConn = nil
 			camPosition += moveVec * dt
 		end
 
-		camera.CFrame = CFrame.new(camPosition) * yawCF * pitchCF
+		camera.CFrame = CFrame.new(camPosition) * yawCF * pitchCF * rollCF
 	end)
 end
 
- function DisableFreecam()
+function DisableFreecam()
     if not freecamEnabled then return end
     freecamEnabled = false
 
@@ -2453,7 +2632,24 @@ end
     RemoveTouchGui()
     keysHeld = {}
 
-    -- Forzar cámara para seguir al personaje actual (para evitar quedar estancada)
+    -- FIX: aseguramos que el roll no quede pegado para la próxima vez
+    RollButtons.Left = false
+    RollButtons.Right = false
+
+    if UserInputService.TouchEnabled then
+        if BtnHideHUB then BtnHideHUB:Hide() end
+        if BtnAdvancedToggle then BtnAdvancedToggle:Hide() end
+        if BtnResetCamMobile then BtnResetCamMobile:Hide() end
+        advancedMode = false
+
+        if hubHidden then
+            hubHidden = false
+            pcall(function()
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+            end)
+        end
+    end
+
     local char = player.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -2464,28 +2660,36 @@ end
 end
 
 
--- Eventos de entrada para teclas de movimiento
+-- ============================================================
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if not gpe and freecamEnabled then
-		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or
-		   input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or
-		   input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
-			keysHeld[input.KeyCode] = true
+		local kc = input.KeyCode
+		if kc == Enum.KeyCode.W or kc == Enum.KeyCode.A or
+		   kc == Enum.KeyCode.S or kc == Enum.KeyCode.D or
+		   kc == Enum.KeyCode.E or kc == Enum.KeyCode.Q or
+		   kc == Enum.KeyCode.Z or kc == Enum.KeyCode.X then
+			keysHeld[kc] = true
+		end
+
+		if kc == Enum.KeyCode.R then
+			ResetCameraView()
 		end
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
 	if freecamEnabled then
-		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or
-		   input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or
-		   input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
-			keysHeld[input.KeyCode] = false
+		local kc = input.KeyCode
+		if kc == Enum.KeyCode.W or kc == Enum.KeyCode.A or
+		   kc == Enum.KeyCode.S or kc == Enum.KeyCode.D or
+		   kc == Enum.KeyCode.E or kc == Enum.KeyCode.Q or
+		   kc == Enum.KeyCode.Z or kc == Enum.KeyCode.X then
+			keysHeld[kc] = false
 		end
 	end
 end)
 
--- Eventos Touch para móvil
+-- Rotación con el dedo (pitch/yaw), esto no cambió
 UserInputService.TouchMoved:Connect(function(input, gpe)
 	if freecamEnabled and not gpe then
 		if lastTouchPosition then
@@ -2503,7 +2707,10 @@ UserInputService.TouchEnded:Connect(function(input, gpe)
 	end
 end)
 
--- Integración Rayfield (solo llamamos funciones, no lógica interna)
+
+-- ============================================================
+-- Integración con la UI
+-- ============================================================
 MainTab:CreateToggle({
 	Name = "Camara libre",
 	CurrentValue = false,
@@ -2518,14 +2725,13 @@ MainTab:CreateToggle({
 	end,
 })
 
-
 MainTab:CreateKeybind({
 	Name = "Bind Camara Libre",
 	CurrentKeybind = "P",
 	HoldToInteract = false,
 	Flag = "CamaraLKeybind",
 	Callback = function()
-		if toggleActive then -- solo si toggle visible está activo
+		if toggleActive then
 			if freecamEnabled then
 				DisableFreecam()
 			else
@@ -2534,8 +2740,6 @@ MainTab:CreateKeybind({
 		end
 	end,
 })
-
-
 
 MainTab:CreateSlider({
 	Name = "Sensibilidad de cámara",
@@ -2560,6 +2764,7 @@ MainTab:CreateSlider({
 		speed = Value
 	end,
 })
+
 
 
 
