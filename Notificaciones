@@ -118,9 +118,9 @@ local function construirNotifFrame(parent, data, zBase)
 	local cb    = (data.color and data.color[3]) or 255
 
 	-- Ancho disponible para texto: frame(340) - margenIzq(46) - margenDer(10)
-	local LABEL_W  = 284
+	local LABEL_W = esMobil and 228 or 284
 	local FONT     = Enum.Font.Gotham
-	local FSIZE    = 13
+	local FSIZE = esMobil and 12 or 13
 	local LINE_PAD = 3  -- separacion entre lineas de texto
 
 	local function nombreAmigable(url)
@@ -182,14 +182,16 @@ local function construirNotifFrame(parent, data, zBase)
 
 	-- ── Crear el frame ───────────────────────────────────────
 	local nFrame = Instance.new("Frame", parent)
-	nFrame.Size = UDim2.new(0, 340, 0, altH)
+local FRAME_W = esMobil and 285 or 340
+
+nFrame.Size = UDim2.new(0, FRAME_W, 0, altH)
 	nFrame.BackgroundTransparency = 0.08
 	nFrame.BorderSizePixel = 0
 	nFrame.ZIndex = zBase
 	addCorner(nFrame, 10)
 
-	local posInicial = getPosUDim2(posId, 340, altH)
-	nFrame.Position  = posInicial
+local posInicial = getPosUDim2(posId, FRAME_W, altH)
+nFrame.Position  = posInicial
 
 	nFrame.BackgroundColor3 = Color3.fromRGB(
 		math.clamp(cr-25,0,255), math.clamp(cg-25,0,255), math.clamp(cb-25,0,255)
@@ -202,18 +204,18 @@ local function construirNotifFrame(parent, data, zBase)
 	accent.BorderSizePixel = 0; accent.ZIndex = zBase+1; addCorner(accent, 4)
 
 	local icon = Instance.new("TextLabel", nFrame)
-	icon.Size = UDim2.new(0,26,0,26); icon.Position = UDim2.new(0,12,0,8)
+	icon.Size = UDim2.new(0, esMobil and 22 or 26, 0, esMobil and 22 or 26); icon.Position = UDim2.new(0,8,0,7)
 	icon.BackgroundTransparency = 1; icon.Text = "*"
-	icon.TextSize = 18; icon.Font = Enum.Font.GothamBold
+	icon.TextSize = esMobil and 16 or 18; icon.Font = Enum.Font.GothamBold
 	icon.TextColor3 = Color3.fromRGB(cr,cg,cb); icon.ZIndex = zBase+2
 
 	-- Encabezado con wrap si es largo
 	local encLbl = Instance.new("TextLabel", nFrame)
-	encLbl.Size = UDim2.new(1,-52,0,encH)
-	encLbl.Position = UDim2.new(0,46,0,8)
+	encLbl.Size = UDim2.new(1, -(esMobil and 44 or 52), 0, encH)
+	encLbl.Position = UDim2.new(0, esMobil and 36 or 46, 0, 7)
 	encLbl.Text = enc
 	encLbl.TextColor3 = Color3.fromRGB(255,255,255)
-	encLbl.Font = Enum.Font.GothamBold; encLbl.TextSize = 14
+	encLbl.Font = Enum.Font.GothamBold; encLbl.TextSize = esMobil and 13 or 14
 	encLbl.BackgroundTransparency = 1
 	encLbl.TextXAlignment = Enum.TextXAlignment.Left
 	encLbl.TextWrapped = true
@@ -221,8 +223,8 @@ local function construirNotifFrame(parent, data, zBase)
 	encLbl.ZIndex = zBase+2
 
 	local sep = Instance.new("Frame", nFrame)
-	sep.Size = UDim2.new(1,-52,0,1)
-	sep.Position = UDim2.new(0,46,0, 8 + encH + 2)
+	sep.Size = UDim2.new(1, -(esMobil and 44 or 52), 0, 1)
+	sep.Position = UDim2.new(0, esMobil and 36 or 46, 0, 7 + encH + 2)
 	sep.BackgroundColor3 = Color3.fromRGB(cr,cg,cb)
 	sep.BackgroundTransparency = 0.7
 	sep.BorderSizePixel = 0; sep.ZIndex = zBase+1
@@ -249,8 +251,10 @@ local function construirNotifFrame(parent, data, zBase)
 			lbl.TextColor3 = Color3.fromRGB(215,215,230)
 			lbl.BackgroundTransparency = 1
 		end
-		lbl.Size = UDim2.new(1,-56, 0, seg.h)
-		lbl.Position = UDim2.new(0,46,0,yOff)
+local textX = esMobil and 36 or 46
+
+lbl.Size = UDim2.new(1, -(textX + 10), 0, seg.h)
+lbl.Position = UDim2.new(0, textX, 0, yOff)
 		lbl.Font = FONT; lbl.TextSize = FSIZE
 		lbl.TextXAlignment = Enum.TextXAlignment.Left
 		lbl.TextWrapped = true                         -- texto con wrap
