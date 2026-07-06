@@ -631,3 +631,100 @@ ProteTab:CreateToggle({
         end
     end
 })
+
+
+ProteSection = ProteTab:CreateSection("Visual")
+
+local Lighting = game:GetService("Lighting")
+
+local VisualEffectsEnabled = false
+local visualConn = nil
+local savedEffects = {}
+
+local function IsVisualEffect(obj)
+    return obj:IsA("BlurEffect")
+        or obj:IsA("BloomEffect")
+        or obj:IsA("ColorCorrectionEffect")
+        or obj:IsA("DepthOfFieldEffect")
+        or obj:IsA("SunRaysEffect")
+end
+
+-- Aplica el "apagado" de efectos existentes (solo si el toggle está ON)
+local function applyVisualProtection()
+    if VisualEffectsEnabled ~= true then
+        return
+    end
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if VisualEffectsEnabled ~= true then
+            return -- se desactivó a mitad del loop, cortamos de inmediato
+        end
+        if IsVisualEffect(obj) then
+            if savedEffects[obj] == nil then
+                savedEffects[obj] = obj.Enabled
+            end
+            obj.Enabled = false
+        end
+    end
+end
+
+-- Restaura todo a su estado original y limpia memoria
+local function restoreVisualEffects()
+    for effect, enabled in pairs(savedEffects) do
+        if effect and effect.Parent then
+            effect.Enabled = enabled
+        end
+    end
+    table.clear(savedEffects)
+end
+
+-- Se asegura de que solo exista UNA conexión activa, y solo si el toggle está ON
+local function ensureConnection()
+    if visualConn then
+        visualConn:Disconnect()
+        visualConn = nil
+    end
+
+    if VisualEffectsEnabled ~= true then
+        return -- nunca conectamos nada si el toggle sigue apagado
+    end
+
+    visualConn = Lighting.ChildAdded:Connect(function(obj)
+        -- doble chequeo: si el toggle se apagó entre el evento y este callback, salimos
+        if VisualEffectsEnabled ~= true then
+            return
+        end
+        if not IsVisualEffect(obj) then
+            return
+        end
+        task.wait()
+        if VisualEffectsEnabled ~= true then
+            return
+        end
+        if not obj.Parent then
+            return
+        end
+        if savedEffects[obj] == nil then
+            savedEffects[obj] = obj.Enabled
+        end
+        obj.Enabled = false
+    end)
+end
+
+ProteTab:CreateToggle({
+    Name = "Anti Efectos Visuales",
+    CurrentValue = false, -- arranca apagado explícitamente
+    Callback = function(state)
+        VisualEffectsEnabled = (state == true) -- normaliza cualquier valor raro a boolean estricto
+
+        if VisualEffectsEnabled then
+            ensureConnection()
+            applyVisualProtection()
+        else
+            if visualConn then
+                visualConn:Disconnect()
+                visualConn = nil
+            end
+            restoreVisualEffects()
+        end
+    end
+})
