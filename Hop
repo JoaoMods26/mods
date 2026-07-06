@@ -208,3 +208,1039 @@ Hop:CreateButton({
     end,
 })
 
+
+
+---Toggle serfer finder 
+
+
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- ✅ gethui() si existe, si no CoreGui (igual que tu segundo script)
+local guiParent = (typeof(gethui) == "function" and gethui()) or CoreGui
+
+local requestFunc = nil
+if syn and syn.request then
+    requestFunc = syn.request
+elseif http and http.request then
+    requestFunc = http.request
+elseif http_request then
+    requestFunc = http_request
+elseif fluxus and fluxus.request then
+    requestFunc = fluxus.request
+elseif request then
+    requestFunc = request
+else
+    error("No supported HTTP request function found! 😢")
+end
+
+------------------------------------------------------------
+-- Referencia global de la GUI para poder destruirla desde el toggle
+------------------------------------------------------------
+local ServerFinderGui = nil
+
+------------------------------------------------------------
+-- FUNCIÓN PRINCIPAL: crea toda la interfaz del Server Finder
+-- (esto es exactamente tu script original, solo que ahora vive
+-- dentro de una función para poder llamarla/destruirla con el toggle)
+------------------------------------------------------------
+local function CreateServerFinderGUI()
+
+    local gameName = "Unknown"
+    pcall(function()
+        local info = MarketplaceService:GetProductInfo(game.PlaceId)
+        gameName = info.Name or gameName
+    end)
+
+    ------------------------------------------------------------
+    -- Detección de dispositivo (móvil vs PC)
+    ------------------------------------------------------------
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+
+    ------------------------------------------------------------
+    -- Constantes de layout según el dispositivo
+    ------------------------------------------------------------
+    local LAYOUT
+    if isMobile then
+        LAYOUT = {
+            TOPBAR_H       = 46,
+            TITLE_SIZE     = 14,
+            SUBTITLE_SIZE  = 11,
+            TOPBTN_SIZE    = 26,
+            STATUSBAR_Y    = 54,
+            STATUS_SIZE    = 12,
+            FILTERBAR_Y    = 80,
+            FILTERBAR_H    = 84,
+            FILTERBTN_SIZE = 11,
+            LIST_Y         = 174,
+            ENTRY_H        = 46,
+            ENTRY_TITLE    = 13,
+            ENTRY_SUB      = 11,
+            JOIN_W         = 78,
+            JOIN_H         = 30,
+            JOIN_SIZE      = 12,
+            FLOAT_SIZE     = 40,
+            FLOAT_EDGE     = 14,
+        }
+    else
+        LAYOUT = {
+            TOPBAR_H       = 54,
+            TITLE_SIZE     = 16,
+            SUBTITLE_SIZE  = 12,
+            TOPBTN_SIZE    = 30,
+            STATUSBAR_Y    = 64,
+            STATUS_SIZE    = 13,
+            FILTERBAR_Y    = 92,
+            FILTERBAR_H    = 42,
+            FILTERBTN_SIZE = 12,
+            LIST_Y         = 142,
+            ENTRY_H        = 52,
+            ENTRY_TITLE    = 14,
+            ENTRY_SUB      = 12,
+            JOIN_W         = 96,
+            JOIN_H         = 34,
+            JOIN_SIZE      = 13,
+            FLOAT_SIZE     = 48,
+            FLOAT_EDGE     = 20,
+        }
+    end
+
+    ------------------------------------------------------------
+    -- Utilidades
+    ------------------------------------------------------------
+    local function MakeDraggable(guiObject, dragHandle)
+        dragHandle = dragHandle or guiObject
+        local dragging, dragInput, dragStart, startPos
+        dragHandle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = guiObject.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        dragHandle.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+    end
+
+    local function tween(obj, props, time, style, dir)
+        local t = TweenService:Create(obj, TweenInfo.new(time or 0.25, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), props)
+        t:Play()
+        return t
+    end
+
+    ------------------------------------------------------------
+    -- Paleta de colores (tema oscuro moderno)
+    ------------------------------------------------------------
+    local Theme = {
+        Background   = Color3.fromRGB(24, 25, 31),
+        Panel        = Color3.fromRGB(30, 32, 39),
+        PanelAlt     = Color3.fromRGB(36, 38, 46),
+        PanelAlt2    = Color3.fromRGB(42, 45, 54),
+        Stroke       = Color3.fromRGB(52, 55, 66),
+        Accent       = Color3.fromRGB(99, 102, 241),
+        AccentDark   = Color3.fromRGB(79, 82, 221),
+        Good         = Color3.fromRGB(52, 199, 123),
+        Warn         = Color3.fromRGB(240, 180, 60),
+        Danger       = Color3.fromRGB(239, 68, 68),
+        Text         = Color3.fromRGB(235, 236, 240),
+        SubText      = Color3.fromRGB(150, 153, 165),
+    }
+
+    ------------------------------------------------------------
+    -- Raíz de la interfaz
+    ------------------------------------------------------------
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "LowServerFinder"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = guiParent
+
+    -- Guardamos la referencia global para poder destruirla desde el toggle
+    ServerFinderGui = ScreenGui
+
+    -- Botón flotante (aparece cuando la ventana está oculta)
+    local FloatButton = Instance.new("TextButton")
+    FloatButton.Name = "FloatButton"
+    FloatButton.Parent = ScreenGui
+    FloatButton.AnchorPoint = Vector2.new(0, 0.5)
+    FloatButton.Position = UDim2.new(0, LAYOUT.FLOAT_EDGE, 0.5, 0)
+    FloatButton.Size = UDim2.new(0, LAYOUT.FLOAT_SIZE, 0, LAYOUT.FLOAT_SIZE)
+    FloatButton.BackgroundColor3 = Theme.Accent
+    FloatButton.Text = "🛰️"
+    FloatButton.TextScaled = true
+    FloatButton.AutoButtonColor = false
+    FloatButton.Visible = false
+    FloatButton.ZIndex = 10
+
+    local FloatCorner = Instance.new("UICorner", FloatButton)
+    FloatCorner.CornerRadius = UDim.new(1, 0)
+
+    local FloatStroke = Instance.new("UIStroke", FloatButton)
+    FloatStroke.Color = Color3.fromRGB(255,255,255)
+    FloatStroke.Transparency = 0.85
+    FloatStroke.Thickness = 1
+
+    -- Ventana principal
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Parent = ScreenGui
+    MainFrame.BackgroundColor3 = Theme.Background
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+
+    if isMobile then
+        MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        MainFrame.Size = UDim2.new(0.88, 0, 0.62, 0)
+    else
+        MainFrame.Position = UDim2.new(0.5, -320, 0.5, -235)
+        MainFrame.Size = UDim2.new(0, 640, 0, 470)
+    end
+
+    local MainCorner = Instance.new("UICorner", MainFrame)
+    MainCorner.CornerRadius = UDim.new(0, 14)
+
+    local MainStroke = Instance.new("UIStroke", MainFrame)
+    MainStroke.Color = Theme.Stroke
+    MainStroke.Thickness = 1
+
+    local MainShadow = Instance.new("ImageLabel")
+    MainShadow.Name = "Shadow"
+    MainShadow.Parent = MainFrame
+    MainShadow.BackgroundTransparency = 1
+    MainShadow.Image = "rbxassetid://1316045217"
+    MainShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    MainShadow.ImageTransparency = 0.45
+    MainShadow.ScaleType = Enum.ScaleType.Slice
+    MainShadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    MainShadow.Size = UDim2.new(1, 60, 1, 60)
+    MainShadow.Position = UDim2.new(0, -30, 0, -30)
+    MainShadow.ZIndex = -1
+
+    ------------------------------------------------------------
+    -- Barra superior
+    ------------------------------------------------------------
+    local TopBar = Instance.new("Frame")
+    TopBar.Name = "TopBar"
+    TopBar.Parent = MainFrame
+    TopBar.BackgroundColor3 = Theme.Panel
+    TopBar.BorderSizePixel = 0
+    TopBar.Size = UDim2.new(1, 0, 0, LAYOUT.TOPBAR_H)
+
+    local TopBarCorner = Instance.new("UICorner", TopBar)
+    TopBarCorner.CornerRadius = UDim.new(0, 14)
+
+    local TopBarPatch = Instance.new("Frame")
+    TopBarPatch.Parent = TopBar
+    TopBarPatch.BackgroundColor3 = Theme.Panel
+    TopBarPatch.BorderSizePixel = 0
+    TopBarPatch.Position = UDim2.new(0, 0, 1, -14)
+    TopBarPatch.Size = UDim2.new(1, 0, 0, 14)
+
+    local LogoDot = Instance.new("Frame")
+    LogoDot.Parent = TopBar
+    LogoDot.AnchorPoint = Vector2.new(0, 0.5)
+    LogoDot.Position = UDim2.new(0, 18, 0.5, 0)
+    LogoDot.Size = UDim2.new(0, 10, 0, 10)
+    LogoDot.BackgroundColor3 = Theme.Good
+    local LogoDotCorner = Instance.new("UICorner", LogoDot)
+    LogoDotCorner.CornerRadius = UDim.new(1, 0)
+
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Parent = TopBar
+    Title.BackgroundTransparency = 1
+    Title.AnchorPoint = Vector2.new(0, 0.5)
+    Title.Position = UDim2.new(0, 38, 0.5, -8)
+    Title.Size = UDim2.new(1, -80, 0, 20)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "Server Finder"
+    Title.TextColor3 = Theme.Text
+    Title.TextSize = LAYOUT.TITLE_SIZE
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local SubTitle = Instance.new("TextLabel")
+    SubTitle.Name = "SubTitle"
+    SubTitle.Parent = TopBar
+    SubTitle.BackgroundTransparency = 1
+    SubTitle.AnchorPoint = Vector2.new(0, 0.5)
+    SubTitle.Position = UDim2.new(0, 38, 0.5, 10)
+    SubTitle.Size = UDim2.new(1, -80, 0, 16)
+    SubTitle.Font = Enum.Font.Gotham
+    SubTitle.Text = gameName .. "  •  ID " .. tostring(game.PlaceId)
+    SubTitle.TextColor3 = Theme.SubText
+    SubTitle.TextSize = LAYOUT.SUBTITLE_SIZE
+    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SubTitle.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local Close = Instance.new("TextButton")
+    Close.Name = "Close"
+    Close.Parent = TopBar
+    Close.AnchorPoint = Vector2.new(1, 0.5)
+    Close.Position = UDim2.new(1, -14, 0.5, 0)
+    Close.Size = UDim2.new(0, LAYOUT.TOPBTN_SIZE, 0, LAYOUT.TOPBTN_SIZE)
+    Close.BackgroundColor3 = Theme.PanelAlt
+    Close.Text = "X"
+    Close.TextColor3 = Theme.SubText
+    Close.TextSize = 14
+    Close.Font = Enum.Font.GothamBold
+    Close.AutoButtonColor = false
+    local CloseCorner = Instance.new("UICorner", Close)
+    CloseCorner.CornerRadius = UDim.new(0, 8)
+
+    Close.MouseEnter:Connect(function()
+        tween(Close, {BackgroundColor3 = Theme.Danger, TextColor3 = Color3.fromRGB(255,255,255)}, 0.15)
+    end)
+    Close.MouseLeave:Connect(function()
+        tween(Close, {BackgroundColor3 = Theme.PanelAlt, TextColor3 = Theme.SubText}, 0.15)
+    end)
+
+    local HideBtn = Instance.new("TextButton")
+    HideBtn.Name = "HideBtn"
+    HideBtn.Parent = TopBar
+    HideBtn.AnchorPoint = Vector2.new(1, 0.5)
+    HideBtn.Position = UDim2.new(1, -14 - (LAYOUT.TOPBTN_SIZE + 8), 0.5, 0)
+    HideBtn.Size = UDim2.new(0, LAYOUT.TOPBTN_SIZE, 0, LAYOUT.TOPBTN_SIZE)
+    HideBtn.BackgroundColor3 = Theme.PanelAlt
+    HideBtn.Text = "—"
+    HideBtn.TextColor3 = Theme.SubText
+    HideBtn.TextSize = 16
+    HideBtn.Font = Enum.Font.GothamBold
+    HideBtn.AutoButtonColor = false
+    local HideBtnCorner = Instance.new("UICorner", HideBtn)
+    HideBtnCorner.CornerRadius = UDim.new(0, 8)
+
+    HideBtn.MouseEnter:Connect(function()
+        tween(HideBtn, {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(255,255,255)}, 0.15)
+    end)
+    HideBtn.MouseLeave:Connect(function()
+        tween(HideBtn, {BackgroundColor3 = Theme.PanelAlt, TextColor3 = Theme.SubText}, 0.15)
+    end)
+
+    local RefreshBtn = Instance.new("TextButton")
+    RefreshBtn.Name = "RefreshBtn"
+    RefreshBtn.Parent = TopBar
+    RefreshBtn.AnchorPoint = Vector2.new(1, 0.5)
+    RefreshBtn.Position = UDim2.new(1, -14 - 2 * (LAYOUT.TOPBTN_SIZE + 8), 0.5, 0)
+    RefreshBtn.Size = UDim2.new(0, LAYOUT.TOPBTN_SIZE, 0, LAYOUT.TOPBTN_SIZE)
+    RefreshBtn.BackgroundColor3 = Theme.PanelAlt
+    RefreshBtn.Text = "R"
+    RefreshBtn.TextColor3 = Theme.SubText
+    RefreshBtn.TextSize = 18
+    RefreshBtn.Font = Enum.Font.GothamBold
+    RefreshBtn.AutoButtonColor = false
+    local RefreshBtnCorner = Instance.new("UICorner", RefreshBtn)
+    RefreshBtnCorner.CornerRadius = UDim.new(0, 8)
+
+    RefreshBtn.MouseEnter:Connect(function()
+        tween(RefreshBtn, {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(255,255,255)}, 0.15)
+    end)
+    RefreshBtn.MouseLeave:Connect(function()
+        tween(RefreshBtn, {BackgroundColor3 = Theme.PanelAlt, TextColor3 = Theme.SubText}, 0.15)
+    end)
+
+    ------------------------------------------------------------
+    -- Barra de estado / resumen
+    ------------------------------------------------------------
+    local StatusBar = Instance.new("Frame")
+    StatusBar.Name = "StatusBar"
+    StatusBar.Parent = MainFrame
+    StatusBar.BackgroundTransparency = 1
+    StatusBar.Position = UDim2.new(0, 18, 0, LAYOUT.STATUSBAR_Y)
+    StatusBar.Size = UDim2.new(1, -36, 0, 24)
+
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Parent = StatusBar
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Size = UDim2.new(1, 0, 1, 0)
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.Text = "🔄 Buscando servidores..."
+    StatusLabel.TextColor3 = Theme.SubText
+    StatusLabel.TextSize = LAYOUT.STATUS_SIZE
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    ------------------------------------------------------------
+    -- Barra de filtros
+    ------------------------------------------------------------
+    local FilterBar = Instance.new("Frame")
+    FilterBar.Name = "FilterBar"
+    FilterBar.Parent = MainFrame
+    FilterBar.BackgroundColor3 = Theme.Panel
+    FilterBar.BorderSizePixel = 0
+    FilterBar.Position = UDim2.new(0, 18, 0, LAYOUT.FILTERBAR_Y)
+    FilterBar.Size = UDim2.new(1, -36, 0, LAYOUT.FILTERBAR_H)
+
+    local FilterBarCorner = Instance.new("UICorner", FilterBar)
+    FilterBarCorner.CornerRadius = UDim.new(0, 10)
+
+    local FilterBarStroke = Instance.new("UIStroke", FilterBar)
+    FilterBarStroke.Color = Theme.Stroke
+    FilterBarStroke.Thickness = 1
+
+    local FilterLayout = Instance.new("UIListLayout")
+    FilterLayout.Parent = FilterBar
+    FilterLayout.FillDirection = isMobile and Enum.FillDirection.Vertical or Enum.FillDirection.Horizontal
+    FilterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    FilterLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    FilterLayout.Padding = UDim.new(0, 8)
+    FilterLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local FilterPadding = Instance.new("UIPadding")
+    FilterPadding.Parent = FilterBar
+    FilterPadding.PaddingLeft = UDim.new(0, 10)
+    FilterPadding.PaddingRight = UDim.new(0, 10)
+    FilterPadding.PaddingTop = UDim.new(0, 8)
+    FilterPadding.PaddingBottom = UDim.new(0, 8)
+
+    local function makeFilterButton(parent, text, order, size)
+        local btn = Instance.new("TextButton")
+        btn.Name = "FilterBtn_" .. text
+        btn.Parent = parent
+        btn.LayoutOrder = order
+        btn.Size = size
+        btn.BackgroundColor3 = Theme.PanelAlt
+        btn.Text = text
+        btn.TextColor3 = Theme.SubText
+        btn.TextSize = LAYOUT.FILTERBTN_SIZE
+        btn.Font = Enum.Font.GothamBold
+        btn.AutoButtonColor = false
+        local c = Instance.new("UICorner", btn)
+        c.CornerRadius = UDim.new(0, 8)
+        return btn
+    end
+
+    local FewestBtn, MostBtn
+
+    if isMobile then
+        local FilterRow1 = Instance.new("Frame")
+        FilterRow1.Name = "FilterRow1"
+        FilterRow1.Parent = FilterBar
+        FilterRow1.BackgroundTransparency = 1
+        FilterRow1.LayoutOrder = 1
+        FilterRow1.Size = UDim2.new(1, 0, 0, 30)
+
+        local Row1Layout = Instance.new("UIListLayout", FilterRow1)
+        Row1Layout.FillDirection = Enum.FillDirection.Horizontal
+        Row1Layout.Padding = UDim.new(0, 8)
+        Row1Layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+        FewestBtn = makeFilterButton(FilterRow1, "🔻 Menos", 1, UDim2.new(0.5, -4, 1, 0))
+        MostBtn = makeFilterButton(FilterRow1, "🔺 Más", 2, UDim2.new(0.5, -4, 1, 0))
+    else
+        FewestBtn = makeFilterButton(FilterBar, "🔻 Menos jugadores", 1, UDim2.new(0, 150, 0, 30))
+        MostBtn = makeFilterButton(FilterBar, "🔺 Más jugadores", 2, UDim2.new(0, 150, 0, 30))
+    end
+
+    local ExactBox = Instance.new("Frame")
+    ExactBox.Name = "ExactBox"
+    ExactBox.Parent = FilterBar
+    ExactBox.LayoutOrder = isMobile and 2 or 3
+    ExactBox.Size = isMobile and UDim2.new(1, 0, 0, 30) or UDim2.new(0, 190, 0, 30)
+    ExactBox.BackgroundColor3 = Theme.PanelAlt
+    local ExactBoxCorner = Instance.new("UICorner", ExactBox)
+    ExactBoxCorner.CornerRadius = UDim.new(0, 8)
+
+    local ExactBoxLayout = Instance.new("UIListLayout", ExactBox)
+    ExactBoxLayout.FillDirection = Enum.FillDirection.Horizontal
+    ExactBoxLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    ExactBoxLayout.Padding = UDim.new(0, 6)
+    ExactBoxLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local ExactBoxPadding = Instance.new("UIPadding", ExactBox)
+    ExactBoxPadding.PaddingLeft = UDim.new(0, 10)
+    ExactBoxPadding.PaddingRight = UDim.new(0, 10)
+
+    local ExactLabel = Instance.new("TextLabel")
+    ExactLabel.Parent = ExactBox
+    ExactLabel.LayoutOrder = 1
+    ExactLabel.BackgroundTransparency = 1
+    ExactLabel.Size = UDim2.new(0, 46, 1, 0)
+    ExactLabel.Font = Enum.Font.Gotham
+    ExactLabel.Text = "Exacto:"
+    ExactLabel.TextColor3 = Theme.SubText
+    ExactLabel.TextSize = LAYOUT.FILTERBTN_SIZE
+    ExactLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local ExactInput = Instance.new("TextBox")
+    ExactInput.Parent = ExactBox
+    ExactInput.LayoutOrder = 2
+    ExactInput.Size = UDim2.new(0, 0, 1, -6)
+    ExactInput.BackgroundColor3 = Theme.PanelAlt2
+    ExactInput.Text = ""
+    ExactInput.PlaceholderText = "Ej: 5"
+    ExactInput.PlaceholderColor3 = Theme.SubText
+    ExactInput.TextColor3 = Theme.Text
+    ExactInput.TextSize = LAYOUT.FILTERBTN_SIZE
+    ExactInput.Font = Enum.Font.Gotham
+    ExactInput.ClearTextOnFocus = false
+    local ExactInputCorner = Instance.new("UICorner", ExactInput)
+    ExactInputCorner.CornerRadius = UDim.new(0, 6)
+
+    local ExactInputFlex = Instance.new("UIFlexItem", ExactInput)
+    ExactInputFlex.FlexMode = Enum.UIFlexMode.Fill
+
+    local ExactApply = Instance.new("TextButton")
+    ExactApply.Parent = ExactBox
+    ExactApply.LayoutOrder = 3
+    ExactApply.Size = UDim2.new(0, 44, 1, -6)
+    ExactApply.BackgroundColor3 = Theme.Accent
+    ExactApply.Text = "OK"
+    ExactApply.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ExactApply.TextSize = LAYOUT.FILTERBTN_SIZE
+    ExactApply.Font = Enum.Font.GothamBold
+    ExactApply.AutoButtonColor = false
+    local ExactApplyCorner = Instance.new("UICorner", ExactApply)
+    ExactApplyCorner.CornerRadius = UDim.new(0, 6)
+
+    ------------------------------------------------------------
+    -- Lista de servidores
+    ------------------------------------------------------------
+    local ListContainer = Instance.new("Frame")
+    ListContainer.Name = "ListContainer"
+    ListContainer.Parent = MainFrame
+    ListContainer.BackgroundColor3 = Theme.Panel
+    ListContainer.BorderSizePixel = 0
+    ListContainer.Position = UDim2.new(0, 18, 0, LAYOUT.LIST_Y)
+    ListContainer.Size = UDim2.new(1, -36, 1, -(LAYOUT.LIST_Y + 18))
+
+    local ListContainerCorner = Instance.new("UICorner", ListContainer)
+    ListContainerCorner.CornerRadius = UDim.new(0, 12)
+
+    local ListContainerStroke = Instance.new("UIStroke", ListContainer)
+    ListContainerStroke.Color = Theme.Stroke
+    ListContainerStroke.Thickness = 1
+
+    local ServerListFrame = Instance.new("ScrollingFrame")
+    ServerListFrame.Name = "ServerListFrame"
+    ServerListFrame.Parent = ListContainer
+    ServerListFrame.Active = true
+    ServerListFrame.BackgroundTransparency = 1
+    ServerListFrame.BorderSizePixel = 0
+    ServerListFrame.Position = UDim2.new(0, 8, 0, 8)
+    ServerListFrame.Size = UDim2.new(1, -16, 1, -16)
+    ServerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ServerListFrame.ScrollBarThickness = 3
+    ServerListFrame.ScrollBarImageColor3 = Theme.Accent
+    ServerListFrame.ScrollBarImageTransparency = 0.3
+
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Parent = ServerListFrame
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout.Padding = UDim.new(0, 8)
+
+    UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        ServerListFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+    end)
+
+    local EmptyState = Instance.new("TextLabel")
+    EmptyState.Name = "EmptyState"
+    EmptyState.Parent = ServerListFrame
+    EmptyState.BackgroundTransparency = 1
+    EmptyState.Size = UDim2.new(1, 0, 0, 60)
+    EmptyState.Font = Enum.Font.Gotham
+    EmptyState.Text = "Cargando lista de servidores..."
+    EmptyState.TextColor3 = Theme.SubText
+    EmptyState.TextSize = LAYOUT.ENTRY_SUB
+    EmptyState.LayoutOrder = -1
+
+    local ServerFrameTemplate = Instance.new("Frame")
+    ServerFrameTemplate.Name = "ServerFrameTemplate"
+    ServerFrameTemplate.Parent = ListContainer
+    ServerFrameTemplate.BackgroundColor3 = Theme.PanelAlt
+    ServerFrameTemplate.BorderSizePixel = 0
+    ServerFrameTemplate.Size = UDim2.new(1, 0, 0, LAYOUT.ENTRY_H)
+    ServerFrameTemplate.Visible = false
+
+    local ServerCorner = Instance.new("UICorner", ServerFrameTemplate)
+    ServerCorner.CornerRadius = UDim.new(0, 10)
+
+    local ServerStroke = Instance.new("UIStroke", ServerFrameTemplate)
+    ServerStroke.Color = Theme.Stroke
+    ServerStroke.Thickness = 1
+    ServerStroke.Transparency = 0.5
+
+    local LoadBar = Instance.new("Frame")
+    LoadBar.Name = "LoadBar"
+    LoadBar.Parent = ServerFrameTemplate
+    LoadBar.BorderSizePixel = 0
+    LoadBar.Position = UDim2.new(0, 0, 0, 0)
+    LoadBar.Size = UDim2.new(0, 4, 1, 0)
+    LoadBar.BackgroundColor3 = Theme.Good
+    local LoadBarCorner = Instance.new("UICorner", LoadBar)
+    LoadBarCorner.CornerRadius = UDim.new(1, 0)
+
+    local ServerInfo = Instance.new("TextLabel")
+    ServerInfo.Name = "ServerInfo"
+    ServerInfo.Parent = ServerFrameTemplate
+    ServerInfo.BackgroundTransparency = 1
+    ServerInfo.Position = UDim2.new(0, 18, 0, isMobile and 5 or 6)
+    ServerInfo.Size = UDim2.new(1, -(LAYOUT.JOIN_W + 40), 0, 18)
+    ServerInfo.Font = Enum.Font.GothamBold
+    ServerInfo.Text = "Servidor"
+    ServerInfo.TextColor3 = Theme.Text
+    ServerInfo.TextSize = LAYOUT.ENTRY_TITLE
+    ServerInfo.TextXAlignment = Enum.TextXAlignment.Left
+    ServerInfo.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local ServerSub = Instance.new("TextLabel")
+    ServerSub.Name = "ServerSub"
+    ServerSub.Parent = ServerFrameTemplate
+    ServerSub.BackgroundTransparency = 1
+    ServerSub.Position = UDim2.new(0, 18, 0, isMobile and 23 or 26)
+    ServerSub.Size = UDim2.new(1, -(LAYOUT.JOIN_W + 40), 0, 16)
+    ServerSub.Font = Enum.Font.Gotham
+    ServerSub.Text = "👥 0 / 0 jugadores"
+    ServerSub.TextColor3 = Theme.SubText
+    ServerSub.TextSize = LAYOUT.ENTRY_SUB
+    ServerSub.TextXAlignment = Enum.TextXAlignment.Left
+
+    local Join = Instance.new("TextButton")
+    Join.Name = "Join"
+    Join.Parent = ServerFrameTemplate
+    Join.AnchorPoint = Vector2.new(1, 0.5)
+    Join.Position = UDim2.new(1, -12, 0.5, 0)
+    Join.Size = UDim2.new(0, LAYOUT.JOIN_W, 0, LAYOUT.JOIN_H)
+    Join.BackgroundColor3 = Theme.Accent
+    Join.Text = "Unirse"
+    Join.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Join.TextSize = LAYOUT.JOIN_SIZE
+    Join.Font = Enum.Font.GothamBold
+    Join.AutoButtonColor = false
+
+    local JoinCorner = Instance.new("UICorner", Join)
+    JoinCorner.CornerRadius = UDim.new(0, 8)
+
+    Join.MouseEnter:Connect(function()
+        tween(Join, {BackgroundColor3 = Theme.AccentDark}, 0.15)
+    end)
+    Join.MouseLeave:Connect(function()
+        tween(Join, {BackgroundColor3 = Theme.Accent}, 0.15)
+    end)
+
+    ------------------------------------------------------------
+    -- Interacciones de ventana (arrastrar, ocultar, cerrar)
+    ------------------------------------------------------------
+    MakeDraggable(MainFrame, TopBar)
+
+    local isHidden = false
+    HideBtn.MouseButton1Click:Connect(function()
+        if not isHidden then
+            local savedSize = MainFrame.Size
+            tween(MainFrame, {Size = UDim2.new(savedSize.X.Scale, savedSize.X.Offset, 0, 0)}, 0.25)
+            task.delay(0.25, function()
+                MainFrame.Visible = false
+                MainFrame.Size = savedSize
+                FloatButton.Visible = true
+                FloatButton.Size = UDim2.new(0, 0, 0, 0)
+                tween(FloatButton, {Size = UDim2.new(0, LAYOUT.FLOAT_SIZE, 0, LAYOUT.FLOAT_SIZE)}, 0.2, Enum.EasingStyle.Back)
+            end)
+            isHidden = true
+        end
+    end)
+
+    FloatButton.MouseButton1Click:Connect(function()
+        FloatButton.Visible = false
+        MainFrame.Visible = true
+        isHidden = false
+    end)
+
+    Close.MouseButton1Click:Connect(function()
+        tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.delay(0.25, function()
+            ScreenGui:Destroy()
+            if ServerFinderGui == ScreenGui then
+                ServerFinderGui = nil
+            end
+        end)
+    end)
+
+    ------------------------------------------------------------
+    -- Estado y lógica de datos
+    ------------------------------------------------------------
+    local allServers = {}
+    local currentMode = "asc"
+    local exactValue = nil
+    local isFetching = false
+
+    local function setActiveButton(active)
+        for _, btn in ipairs({FewestBtn, MostBtn}) do
+            if btn == active then
+                btn.BackgroundColor3 = Theme.Accent
+                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                btn.BackgroundColor3 = Theme.PanelAlt
+                btn.TextColor3 = Theme.SubText
+            end
+        end
+        if active == "exact" then
+            ExactBox.BackgroundColor3 = Theme.AccentDark
+        else
+            ExactBox.BackgroundColor3 = Theme.PanelAlt
+        end
+    end
+
+    local function loadColorFor(ratio)
+        if ratio < 0.5 then
+            return Theme.Good
+        elseif ratio < 0.85 then
+            return Theme.Warn
+        else
+            return Theme.Danger
+        end
+    end
+
+    local function clearList()
+        for _, child in ipairs(ServerListFrame:GetChildren()) do
+            if child.Name == "ServerFrameClone" then
+                child:Destroy()
+            end
+        end
+    end
+
+    local function createServerEntry(serverData, index)
+        local clone = ServerFrameTemplate:Clone()
+        clone.Name = "ServerFrameClone"
+        clone.Visible = true
+        clone.LayoutOrder = index
+        clone.Parent = ServerListFrame
+
+        local ratio = serverData.maxPlayers > 0 and (serverData.playing / serverData.maxPlayers) or 0
+
+        local infoLabel = clone:FindFirstChild("ServerInfo")
+        infoLabel.Text = "Servidor #" .. index .. "  •  ID " .. tostring(serverData.id):sub(1, 8) .. "..."
+
+        local subLabel = clone:FindFirstChild("ServerSub")
+        subLabel.Text = string.format("👥 %d / %d jugadores", serverData.playing, serverData.maxPlayers)
+
+        local loadBar = clone:FindFirstChild("LoadBar")
+        loadBar.BackgroundColor3 = loadColorFor(ratio)
+
+        local isFull = serverData.playing >= serverData.maxPlayers
+
+        local joinButton = clone:FindFirstChild("Join")
+        if isFull then
+            joinButton.Text = "Lleno"
+            joinButton.BackgroundColor3 = Theme.Danger
+        else
+            joinButton.Text = "Unirse"
+            joinButton.BackgroundColor3 = Theme.Accent
+        end
+
+        joinButton.MouseButton1Click:Connect(function()
+            joinButton.Text = "..."
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, serverData.id, LocalPlayer)
+        end)
+    end
+
+    local function renderList()
+        clearList()
+
+        local filtered = {}
+
+        if currentMode == "exact" and exactValue then
+            for _, s in ipairs(allServers) do
+                if s.playing == exactValue then
+                    table.insert(filtered, s)
+                end
+            end
+            table.sort(filtered, function(a, b) return a.playing < b.playing end)
+        else
+            for _, s in ipairs(allServers) do
+                table.insert(filtered, s)
+            end
+            if currentMode == "desc" then
+                table.sort(filtered, function(a, b) return a.playing > b.playing end)
+            else
+                table.sort(filtered, function(a, b) return a.playing < b.playing end)
+            end
+        end
+
+        if #filtered == 0 then
+            EmptyState.Visible = true
+            if currentMode == "exact" then
+                EmptyState.Text = "No hay servidores con exactamente " .. tostring(exactValue) .. " jugadores."
+            else
+                EmptyState.Text = "No se encontraron servidores disponibles."
+            end
+            StatusLabel.Text = "⚠️ Sin resultados"
+            StatusLabel.TextColor3 = Theme.Danger
+        else
+            EmptyState.Visible = false
+            for i, s in ipairs(filtered) do
+                createServerEntry(s, i)
+            end
+            StatusLabel.Text = string.format("✅ %d servidores mostrados  (de %d totales)", #filtered, #allServers)
+            StatusLabel.TextColor3 = Theme.Good
+        end
+    end
+
+    local MAX_ATTEMPTS_PER_PAGE = 6
+
+    local function fetchServersPage(cursor, sortOrder)
+        sortOrder = sortOrder or "Asc"
+        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=%s&limit=100", game.PlaceId, sortOrder)
+        if cursor then
+            url = url .. "&cursor=" .. cursor
+        end
+
+        for attempt = 1, MAX_ATTEMPTS_PER_PAGE do
+            local ok, response = pcall(requestFunc, {
+                Url = url,
+                Method = "GET"
+            })
+
+            local statusOk = ok and response and response.Body
+                and (response.StatusCode == nil or response.StatusCode == 200)
+
+            if statusOk then
+                local success, decoded = pcall(HttpService.JSONDecode, HttpService, response.Body)
+                if success and decoded then
+                    return decoded
+                end
+            end
+
+            if attempt < MAX_ATTEMPTS_PER_PAGE then
+                local isRateLimited = ok and response and response.StatusCode == 429
+                local baseWait = isRateLimited and (1.5 * attempt) or (0.35 * attempt)
+                local jitter = math.random() * 0.25
+                task.wait(baseWait + jitter)
+            end
+        end
+
+        return nil
+    end
+
+    local function setRefreshEnabled(enabled)
+        RefreshBtn.Active = enabled
+        if enabled then
+            tween(RefreshBtn, {BackgroundTransparency = 0, TextTransparency = 0}, 0.15)
+        else
+            tween(RefreshBtn, {BackgroundTransparency = 0.5, TextTransparency = 0.5}, 0.15)
+        end
+    end
+
+    local function runFetch(onBatch)
+        local servers = {}
+        local seenIds = {}
+        local hadFailure = false
+
+        local function ingestPage(data)
+            local newCount = 0
+            if data and data.data then
+                for _, server in ipairs(data.data) do
+                    if not seenIds[server.id] then
+                        seenIds[server.id] = true
+                        table.insert(servers, server)
+                        newCount += 1
+                    end
+                end
+            end
+            return newCount
+        end
+
+        local function paginate(sortOrder)
+            local cursor = nil
+            local pages = 0
+            repeat
+                local data = fetchServersPage(cursor, sortOrder)
+                pages += 1
+
+                if data then
+                    local newCount = ingestPage(data)
+                    cursor = data.nextPageCursor
+
+                    if onBatch and newCount > 0 then
+                        onBatch(servers)
+                    end
+                else
+                    hadFailure = true
+                    cursor = nil
+                end
+
+                task.wait(0.05)
+            until not cursor or cursor == "" or pages > 200
+        end
+
+        paginate("Asc")
+        paginate("Desc")
+
+        return servers, hadFailure
+    end
+
+    local MAX_FULL_RETRIES = 3
+
+    local function refreshServers()
+        if isFetching then return end
+        isFetching = true
+        setRefreshEnabled(false)
+
+        tween(RefreshBtn, {Rotation = RefreshBtn.Rotation + 360}, 0.6, Enum.EasingStyle.Quad)
+
+        StatusLabel.Text = "🔄 Buscando servidores..."
+        StatusLabel.TextColor3 = Theme.SubText
+        EmptyState.Visible = true
+        EmptyState.Text = "Cargando lista de servidores..."
+        allServers = {}
+        clearList()
+
+        local function onBatch(cumulativeServers)
+            allServers = cumulativeServers
+            renderList()
+        end
+
+        task.spawn(function()
+            local bestServers, bestHadFailure = {}, true
+
+            local ok, errMsg = pcall(function()
+                for attempt = 1, MAX_FULL_RETRIES do
+                    if attempt > 1 then
+                        StatusLabel.Text = string.format("🔄 Reintentando carga completa (%d/%d)...", attempt, MAX_FULL_RETRIES)
+                        allServers = {}
+                        clearList()
+                    end
+
+                    local servers, hadFailure = runFetch(onBatch)
+
+                    if (not hadFailure and bestHadFailure) or (#servers > #bestServers) then
+                        bestServers, bestHadFailure = servers, hadFailure
+                    end
+
+                    if not hadFailure then
+                        break
+                    end
+
+                    if attempt < MAX_FULL_RETRIES then
+                        task.wait(0.5 * attempt)
+                    end
+                end
+            end)
+
+            isFetching = false
+            setRefreshEnabled(true)
+
+            if ok then
+                allServers = bestServers
+                renderList()
+                if bestHadFailure then
+                    StatusLabel.Text = StatusLabel.Text .. string.format("  (⚠️ carga parcial tras %d intentos, hubo fallos de red)", MAX_FULL_RETRIES)
+                end
+            else
+                warn("[ServerFinder] Error durante la búsqueda: " .. tostring(errMsg))
+                if #allServers == 0 then
+                    StatusLabel.Text = "❌ Error al buscar servidores (mirá la consola de tu executor)"
+                    StatusLabel.TextColor3 = Theme.Danger
+                    EmptyState.Visible = true
+                    EmptyState.Text = "Ocurrió un error. Probá darle a Refresh de nuevo."
+                else
+                    renderList()
+                    StatusLabel.Text = StatusLabel.Text .. "  (⚠️ se cortó por un error, dale Refresh para reintentar)"
+                end
+            end
+        end)
+    end
+
+    ------------------------------------------------------------
+    -- Conexiones de filtros y refresco
+    ------------------------------------------------------------
+    FewestBtn.MouseButton1Click:Connect(function()
+        currentMode = "asc"
+        exactValue = nil
+        ExactInput.Text = ""
+        setActiveButton(FewestBtn)
+        renderList()
+    end)
+
+    MostBtn.MouseButton1Click:Connect(function()
+        currentMode = "desc"
+        exactValue = nil
+        ExactInput.Text = ""
+        setActiveButton(MostBtn)
+        renderList()
+    end)
+
+    local function applyExactFilter()
+        local num = tonumber(ExactInput.Text)
+        if num then
+            currentMode = "exact"
+            exactValue = math.floor(num)
+            setActiveButton("exact")
+            renderList()
+        else
+            tween(ExactBox, {BackgroundColor3 = Theme.Danger}, 0.15)
+            task.delay(0.4, function()
+                tween(ExactBox, {BackgroundColor3 = currentMode == "exact" and Theme.AccentDark or Theme.PanelAlt}, 0.15)
+            end)
+        end
+    end
+
+    ExactApply.MouseButton1Click:Connect(applyExactFilter)
+
+    ExactInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            applyExactFilter()
+        end
+    end)
+
+    RefreshBtn.MouseButton1Click:Connect(function()
+        refreshServers()
+    end)
+
+    setActiveButton(FewestBtn)
+
+    ------------------------------------------------------------
+    -- Primera carga
+    ------------------------------------------------------------
+    refreshServers()
+end
+
+------------------------------------------------------------
+-- TAB + TOGGLE ("Sever Hop")
+-- Al activar: crea el Server Finder. Al desactivar: lo destruye.
+------------------------------------------------------------
+
+Hop:CreateToggle({
+    Name = "Server Finder",
+    CurrentValue = false,
+    Flag = "ServerFinderToggle",
+    Callback = function(state)
+        if state then
+            -- Si ya había una instancia abierta, la limpiamos antes de crear otra
+            if ServerFinderGui and ServerFinderGui.Parent then
+                ServerFinderGui:Destroy()
+                ServerFinderGui = nil
+            end
+
+            local ok, err = pcall(CreateServerFinderGUI)
+            if not ok then
+                warn("❌ Error al crear Server Finder:", err)
+            end
+        else
+            if ServerFinderGui and ServerFinderGui.Parent then
+                ServerFinderGui:Destroy()
+            end
+            ServerFinderGui = nil
+        end
+    end
+})
