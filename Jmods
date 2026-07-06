@@ -3217,8 +3217,8 @@ local VCTab = Window:CreateTab("VC")
 VCTab:CreateSection("Voice Chat Tools")
 
 VCTab:CreateParagraph({
-    Title = "VC Unmute Bypass",
-    Content = "Este script permite gestionar el estado del micrófono en Voice Chat de Roblox."
+    Title = "VC Bypass",
+    Content = "Esto te permite decir lo que quieras sin que te baneen el Voice Chat"
 })
 
 local Button65 = VCTab:CreateButton({
@@ -3232,7 +3232,7 @@ VCTab:CreateSection("Info")
 
 VCTab:CreateParagraph({
     Title = "Instrucciones",
-    Content = "Para que el script funcione correctamente, primero activa el chat de voz de Roblox y asegúrate de que tu micrófono esté habilitado. Después presiona el botón y espera unos segundos. No cierres el juego ni cambies de servidor durante el proceso."
+    Content = "Para que el script funcione correctamente, primero activa el chat de voz de Roblox. Después presiona el botón de VC y espera unos segundos. y cuando se quede en gris ya podrias usarlo, depende mucho de que si tu exploit lo soporta."
 })
 ---VC
 
