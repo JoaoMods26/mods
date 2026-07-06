@@ -210,7 +210,7 @@ Hop:CreateButton({
 
 
 
----Toggle serfer finder 
+---Toggle server finder 
 
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
@@ -989,13 +989,22 @@ local function CreateServerFinderGUI()
 
         if #filtered == 0 then
             EmptyState.Visible = true
-            if currentMode == "exact" then
+            if isFetching then
+                -- Todavía está buscando en segundo plano: esto NO es
+                -- un error, solo no llegaron resultados (para este
+                -- filtro) todavía. No lo mostramos en rojo.
+                EmptyState.Text = "🔄 Buscando servidores, esperá un momento..."
+                StatusLabel.Text = "🔄 Buscando servidores..."
+                StatusLabel.TextColor3 = Theme.SubText
+            elseif currentMode == "exact" then
                 EmptyState.Text = "No hay servidores con exactamente " .. tostring(exactValue) .. " jugadores."
+                StatusLabel.Text = "⚠️ Sin resultados"
+                StatusLabel.TextColor3 = Theme.Danger
             else
                 EmptyState.Text = "No se encontraron servidores disponibles."
+                StatusLabel.Text = "⚠️ Sin resultados"
+                StatusLabel.TextColor3 = Theme.Danger
             end
-            StatusLabel.Text = "⚠️ Sin resultados"
-            StatusLabel.TextColor3 = Theme.Danger
         else
             EmptyState.Visible = false
             for i, s in ipairs(filtered) do
@@ -1091,14 +1100,16 @@ local function CreateServerFinderGUI()
                     cursor = nil
                 end
 
-                task.wait(0.05)
+                task.wait(0.08)
             until not cursor or cursor == "" or pages > 200 or not Session.Alive
         end
 
         paginate("Asc")
-        if Session.Alive then
-            paginate("Desc")
-        end
+        -- ⚠️ Se removió el segundo paginate("Desc") que había acá.
+        -- Pedía TODOS los servidores otra vez, solo en orden inverso,
+        -- duplicando cientos de requests sin aportar nada (igual
+        -- ordenamos del lado del cliente con table.sort). Esto era
+        -- la causa principal de los 429 / reintentos / lentitud.
 
         return servers, hadFailure
     end
@@ -1120,10 +1131,21 @@ local function CreateServerFinderGUI()
         allServers = {}
         clearList()
 
+        -- 'bestSoFar' asegura que la lista visible NUNCA retroceda
+        -- dentro de este refresh: si un reintento interno arranca de
+        -- cero y todavía no juntó tantos servidores como los que ya
+        -- se habían mostrado, no reemplazamos la lista visible hasta
+        -- que la alcance o supere. Esto elimina el "parpadeo a vacío"
+        -- que pasaba al reintentar.
+        local bestSoFar = {}
+
         local function onBatch(cumulativeServers)
             if not Session.Alive then return end
-            allServers = cumulativeServers
-            renderList()
+            if #cumulativeServers >= #bestSoFar then
+                bestSoFar = cumulativeServers
+                allServers = bestSoFar
+                renderList()
+            end
         end
 
         task.spawn(function()
@@ -1134,9 +1156,11 @@ local function CreateServerFinderGUI()
                     if not Session.Alive then break end
 
                     if attempt > 1 then
+                        -- Ya NO borramos la lista visible acá: el
+                        -- usuario sigue viendo los últimos resultados
+                        -- válidos mientras se reintenta en segundo plano.
                         StatusLabel.Text = string.format("🔄 Reintentando carga completa (%d/%d)...", attempt, MAX_FULL_RETRIES)
-                        allServers = {}
-                        clearList()
+                        StatusLabel.TextColor3 = Theme.SubText
                     end
 
                     local servers, hadFailure = runFetch(onBatch)
@@ -1161,7 +1185,9 @@ local function CreateServerFinderGUI()
             setRefreshEnabled(true)
 
             if ok then
-                allServers = bestServers
+                if #bestServers >= #allServers then
+                    allServers = bestServers
+                end
                 renderList()
                 if bestHadFailure then
                     StatusLabel.Text = StatusLabel.Text .. string.format("  (⚠️ carga parcial tras %d intentos, hubo fallos de red)", MAX_FULL_RETRIES)
