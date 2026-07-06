@@ -7,7 +7,7 @@ local player = Players.LocalPlayer
 local gameId = game.PlaceId
 
 
-Hop =  _G.Window:CreateTab("Sever Hop", nil)
+Hop =  _G.Window:CreateTab("Servidores", nil)
 
 
 local function getServers()
