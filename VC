@@ -49,7 +49,7 @@ end
 
 if not micmutebutton then return print("Mic button not found - UI path changed.") end
 
-startergui:SetCore("SendNotification", {Title = "mask say hiii", Text = "Unmute to continue.", Duration = 5})
+startergui:SetCore("SendNotification", {Title = "Hey", Text = "Activa el mic para continuar", Duration = 5})
 
 repeat task.wait(2) until geticonlabel().Image ~= mutedimage
 
