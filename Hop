@@ -213,16 +213,228 @@ Hop:CreateButton({
 ---Toggle serfer finder 
 
 
-local HttpService = game:GetService("HttpService")
-local TweenService = game:GetService("TweenService")
+------------------------------------------------------------
+-- SERVER HOP (botones simples) + SERVER FINDER (toggle con GUI)
+-- Corregido: al desactivar el toggle, el fetch de servidores se
+-- cancela de inmediato en vez de quedar corriendo en segundo plano
+-- (eso era lo que causaba la demora al reactivar: dos fetchs
+-- pegándole a la API de Roblox al mismo tiempo = rate limit 429).
+------------------------------------------------------------
+
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local gameId = game.PlaceId
+
+Hop = _G.Window:CreateTab("Sever Hop", nil)
+
+local function getServers()
+    local servers = {}
+
+    local success1, result1 = pcall(function()
+        local url = "https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?sortOrder=Desc&limit=100"
+        local response = game:HttpGet(url)
+        return HttpService:JSONDecode(response)
+    end)
+
+    if success1 and result1 and result1.data then
+        for _, server in pairs(result1.data) do
+            if server.id and server.playing and server.maxPlayers then
+                table.insert(servers, server)
+            end
+        end
+    end
+
+    if #servers == 0 then
+        local success2, result2 = pcall(function()
+            local url = "https://www.roblox.com/games/getgameinstancesjson?placeId=" .. gameId .. "&startindex=0"
+            local response = game:HttpGet(url)
+            return HttpService:JSONDecode(response)
+        end)
+
+        if success2 and result2 and result2.Collection then
+            for _, server in pairs(result2.Collection) do
+                if server.Guid and server.CurrentPlayers and server.MaxPlayers then
+                    table.insert(servers, {
+                        id = server.Guid,
+                        playing = server.CurrentPlayers[1],
+                        maxPlayers = server.MaxPlayers[1]
+                    })
+                end
+            end
+        end
+    end
+
+    return #servers > 0 and servers or nil
+end
+
+local function smartServerHop()
+    local servers = getServers()
+    if not servers then
+        wait(1)
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+        return
+    end
+
+    local availableServers = {}
+    local currentJobId = game.JobId
+
+    for _, server in pairs(servers) do
+        if server.id ~= currentJobId and server.playing < server.maxPlayers then
+            table.insert(availableServers, server)
+        end
+    end
+
+    if #availableServers == 0 then
+        wait(1)
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+        return
+    end
+
+    local randomServer = availableServers[math.random(1, #availableServers)]
+
+    local success = pcall(function()
+        TeleportService:TeleportToPlaceInstance(gameId, randomServer.id, player)
+    end)
+
+    if not success then
+        wait(1)
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+    end
+end
+
+local function serverHopHighPlayer()
+    local servers = getServers()
+    if not servers then
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+        return
+    end
+
+    local availableServers = {}
+    local currentJobId = game.JobId
+
+    for _, server in pairs(servers) do
+        if server.id ~= currentJobId and server.playing < server.maxPlayers then
+            table.insert(availableServers, server)
+        end
+    end
+
+    if #availableServers == 0 then
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+        return
+    end
+
+    table.sort(availableServers, function(a, b)
+        return a.playing > b.playing
+    end)
+
+    local targetServer = availableServers[1]
+
+    local success = pcall(function()
+        TeleportService:TeleportToPlaceInstance(gameId, targetServer.id, player)
+    end)
+
+    if not success then
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+    end
+end
+
+local function serverHopLowPlayer()
+    local servers = getServers()
+    if not servers then
+        return
+    end
+
+    local availableServers = {}
+    local currentJobId = game.JobId
+
+    for _, server in pairs(servers) do
+        if server.id ~= currentJobId and server.playing >= 1 and server.playing <= 5 and server.playing < server.maxPlayers then
+            table.insert(availableServers, server)
+        end
+    end
+
+    if #availableServers == 0 then
+        return
+    end
+
+    table.sort(availableServers, function(a, b)
+        return a.playing < b.playing
+    end)
+
+    local targetServer = availableServers[1]
+
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(gameId, targetServer.id, player)
+    end)
+end
+
+local function rejoinServer()
+    local success = pcall(function()
+        TeleportService:TeleportToPlaceInstance(gameId, game.JobId, player)
+    end)
+
+    if not success then
+        wait(1)
+        pcall(function()
+            TeleportService:Teleport(gameId, player)
+        end)
+    end
+end
+
+Hop:CreateButton({
+    Name = "Volver a unirte (Rejoin)",
+    Callback = function()
+        rejoinServer()
+    end,
+})
+
+Hop:CreateButton({
+    Name = "Server Hop (Cambiar de server)",
+    Callback = function()
+        smartServerHop()
+    end,
+})
+
+Hop:CreateButton({
+    Name = "Servidor con Pocas Personas",
+    Callback = function()
+        serverHopLowPlayer()
+    end,
+})
+
+Hop:CreateButton({
+    Name = "Servidor Lleno",
+    Callback = function()
+        serverHopHighPlayer()
+    end,
+})
+
+------------------------------------------------------------
+-- SERVER FINDER (con toggle) - gethui() con fallback a CoreGui
+------------------------------------------------------------
+
+local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- ✅ gethui() si existe, si no CoreGui (igual que tu segundo script)
+-- gethui() si existe, si no CoreGui
 local guiParent = (typeof(gethui) == "function" and gethui()) or CoreGui
 
 local requestFunc = nil
@@ -241,16 +453,26 @@ else
 end
 
 ------------------------------------------------------------
--- Referencia global de la GUI para poder destruirla desde el toggle
+-- Referencias globales para poder apagar TODO desde el toggle
 ------------------------------------------------------------
-local ServerFinderGui = nil
+local ServerFinderGui = nil      -- el ScreenGui actual (o nil si está cerrado)
+local ServerFinderCleanup = nil  -- función que corta el fetch y destruye la GUI
 
 ------------------------------------------------------------
 -- FUNCIÓN PRINCIPAL: crea toda la interfaz del Server Finder
--- (esto es exactamente tu script original, solo que ahora vive
--- dentro de una función para poder llamarla/destruirla con el toggle)
 ------------------------------------------------------------
 local function CreateServerFinderGUI()
+
+    -- FIX 1: bandera que se pone en true apenas se cierra esta
+    -- instancia de la GUI. Todos los loops (fetch, paginación) la
+    -- revisan para cortar de inmediato en vez de seguir corriendo
+    -- "huérfanos" en segundo plano.
+    local isDestroyed = false
+
+    -- FIX 2: acá guardamos conexiones que NO están atadas a una
+    -- instancia (como la de UserInputService en MakeDraggable) para
+    -- poder desconectarlas a mano al cerrar.
+    local activeConnections = {}
 
     local gameName = "Unknown"
     pcall(function()
@@ -314,6 +536,9 @@ local function CreateServerFinderGUI()
     ------------------------------------------------------------
     -- Utilidades
     ------------------------------------------------------------
+
+    -- FIX: MakeDraggable ahora guarda su conexión de
+    -- UserInputService en activeConnections para poder cortarla.
     local function MakeDraggable(guiObject, dragHandle)
         dragHandle = dragHandle or guiObject
         local dragging, dragInput, dragStart, startPos
@@ -334,12 +559,15 @@ local function CreateServerFinderGUI()
                 dragInput = input
             end
         end)
-        UserInputService.InputChanged:Connect(function(input)
+
+        local conn = UserInputService.InputChanged:Connect(function(input)
+            if isDestroyed then return end
             if input == dragInput and dragging then
                 local delta = input.Position - dragStart
                 guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
         end)
+        table.insert(activeConnections, conn)
     end
 
     local function tween(obj, props, time, style, dir)
@@ -375,7 +603,6 @@ local function CreateServerFinderGUI()
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.Parent = guiParent
 
-    -- Guardamos la referencia global para poder destruirla desde el toggle
     ServerFinderGui = ScreenGui
 
     -- Botón flotante (aparece cuando la ventana está oculta)
@@ -840,6 +1067,35 @@ local function CreateServerFinderGUI()
     end)
 
     ------------------------------------------------------------
+    -- Función de cierre/limpieza (usada por el botón Close Y por
+    -- el toggle en OFF). Corta el fetch, desconecta lo que no se
+    -- desconecta solo, y destruye la GUI.
+    ------------------------------------------------------------
+    local function DestroySelf()
+        if isDestroyed then return end
+        isDestroyed = true
+
+        for _, conn in ipairs(activeConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        activeConnections = {}
+
+        if ScreenGui and ScreenGui.Parent then
+            ScreenGui:Destroy()
+        end
+
+        if ServerFinderGui == ScreenGui then
+            ServerFinderGui = nil
+        end
+        if ServerFinderCleanup == DestroySelf then
+            ServerFinderCleanup = nil
+        end
+    end
+
+    -- Exponemos esta función globalmente para que el toggle la use.
+    ServerFinderCleanup = DestroySelf
+
+    ------------------------------------------------------------
     -- Interacciones de ventana (arrastrar, ocultar, cerrar)
     ------------------------------------------------------------
     MakeDraggable(MainFrame, TopBar)
@@ -850,6 +1106,7 @@ local function CreateServerFinderGUI()
             local savedSize = MainFrame.Size
             tween(MainFrame, {Size = UDim2.new(savedSize.X.Scale, savedSize.X.Offset, 0, 0)}, 0.25)
             task.delay(0.25, function()
+                if isDestroyed then return end
                 MainFrame.Visible = false
                 MainFrame.Size = savedSize
                 FloatButton.Visible = true
@@ -866,13 +1123,12 @@ local function CreateServerFinderGUI()
         isHidden = false
     end)
 
+    -- FIX: el botón "X" ahora llama a DestroySelf() (corta el
+    -- fetch) en vez de solo destruir el ScreenGui.
     Close.MouseButton1Click:Connect(function()
         tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         task.delay(0.25, function()
-            ScreenGui:Destroy()
-            if ServerFinderGui == ScreenGui then
-                ServerFinderGui = nil
-            end
+            DestroySelf()
         end)
     end)
 
@@ -955,6 +1211,7 @@ local function CreateServerFinderGUI()
     end
 
     local function renderList()
+        if isDestroyed then return end
         clearList()
 
         local filtered = {}
@@ -998,6 +1255,9 @@ local function CreateServerFinderGUI()
 
     local MAX_ATTEMPTS_PER_PAGE = 6
 
+    -- FIX: cada intento revisa isDestroyed antes de seguir
+    -- esperando/reintentando, así no sigue pegándole a la API
+    -- de Roblox después de que cerraste la ventana.
     local function fetchServersPage(cursor, sortOrder)
         sortOrder = sortOrder or "Asc"
         local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=%s&limit=100", game.PlaceId, sortOrder)
@@ -1006,6 +1266,8 @@ local function CreateServerFinderGUI()
         end
 
         for attempt = 1, MAX_ATTEMPTS_PER_PAGE do
+            if isDestroyed then return nil end
+
             local ok, response = pcall(requestFunc, {
                 Url = url,
                 Method = "GET"
@@ -1021,7 +1283,7 @@ local function CreateServerFinderGUI()
                 end
             end
 
-            if attempt < MAX_ATTEMPTS_PER_PAGE then
+            if attempt < MAX_ATTEMPTS_PER_PAGE and not isDestroyed then
                 local isRateLimited = ok and response and response.StatusCode == 429
                 local baseWait = isRateLimited and (1.5 * attempt) or (0.35 * attempt)
                 local jitter = math.random() * 0.25
@@ -1033,6 +1295,7 @@ local function CreateServerFinderGUI()
     end
 
     local function setRefreshEnabled(enabled)
+        if isDestroyed then return end
         RefreshBtn.Active = enabled
         if enabled then
             tween(RefreshBtn, {BackgroundTransparency = 0, TextTransparency = 0}, 0.15)
@@ -1041,6 +1304,9 @@ local function CreateServerFinderGUI()
         end
     end
 
+    -- FIX: paginate corta el loop apenas isDestroyed sea true,
+    -- en vez de seguir pidiendo páginas para una ventana que ya
+    -- no existe.
     local function runFetch(onBatch)
         local servers = {}
         local seenIds = {}
@@ -1064,6 +1330,8 @@ local function CreateServerFinderGUI()
             local cursor = nil
             local pages = 0
             repeat
+                if isDestroyed then break end
+
                 local data = fetchServersPage(cursor, sortOrder)
                 pages += 1
 
@@ -1071,7 +1339,7 @@ local function CreateServerFinderGUI()
                     local newCount = ingestPage(data)
                     cursor = data.nextPageCursor
 
-                    if onBatch and newCount > 0 then
+                    if onBatch and newCount > 0 and not isDestroyed then
                         onBatch(servers)
                     end
                 else
@@ -1079,12 +1347,16 @@ local function CreateServerFinderGUI()
                     cursor = nil
                 end
 
-                task.wait(0.05)
-            until not cursor or cursor == "" or pages > 200
+                if not isDestroyed then
+                    task.wait(0.05)
+                end
+            until not cursor or cursor == "" or pages > 200 or isDestroyed
         end
 
         paginate("Asc")
-        paginate("Desc")
+        if not isDestroyed then
+            paginate("Desc")
+        end
 
         return servers, hadFailure
     end
@@ -1092,7 +1364,7 @@ local function CreateServerFinderGUI()
     local MAX_FULL_RETRIES = 3
 
     local function refreshServers()
-        if isFetching then return end
+        if isFetching or isDestroyed then return end
         isFetching = true
         setRefreshEnabled(false)
 
@@ -1106,6 +1378,7 @@ local function CreateServerFinderGUI()
         clearList()
 
         local function onBatch(cumulativeServers)
+            if isDestroyed then return end
             allServers = cumulativeServers
             renderList()
         end
@@ -1115,6 +1388,8 @@ local function CreateServerFinderGUI()
 
             local ok, errMsg = pcall(function()
                 for attempt = 1, MAX_FULL_RETRIES do
+                    if isDestroyed then break end
+
                     if attempt > 1 then
                         StatusLabel.Text = string.format("🔄 Reintentando carga completa (%d/%d)...", attempt, MAX_FULL_RETRIES)
                         allServers = {}
@@ -1127,17 +1402,22 @@ local function CreateServerFinderGUI()
                         bestServers, bestHadFailure = servers, hadFailure
                     end
 
-                    if not hadFailure then
+                    if not hadFailure or isDestroyed then
                         break
                     end
 
-                    if attempt < MAX_FULL_RETRIES then
+                    if attempt < MAX_FULL_RETRIES and not isDestroyed then
                         task.wait(0.5 * attempt)
                     end
                 end
             end)
 
             isFetching = false
+
+            -- FIX: si ya se cerró la ventana mientras esto corría,
+            -- no tocamos ni un solo elemento de la UI (ya no existen).
+            if isDestroyed then return end
+
             setRefreshEnabled(true)
 
             if ok then
@@ -1190,6 +1470,7 @@ local function CreateServerFinderGUI()
         else
             tween(ExactBox, {BackgroundColor3 = Theme.Danger}, 0.15)
             task.delay(0.4, function()
+                if isDestroyed then return end
                 tween(ExactBox, {BackgroundColor3 = currentMode == "exact" and Theme.AccentDark or Theme.PanelAlt}, 0.15)
             end)
         end
@@ -1217,7 +1498,9 @@ end
 
 ------------------------------------------------------------
 -- TAB + TOGGLE ("Sever Hop")
--- Al activar: crea el Server Finder. Al desactivar: lo destruye.
+-- Al activar: crea el Server Finder.
+-- Al desactivar: corta el fetch YA MISMO (vía ServerFinderCleanup)
+-- en vez de solo destruir la GUI y dejar el loop huérfano.
 ------------------------------------------------------------
 
 Hop:CreateToggle({
@@ -1226,10 +1509,10 @@ Hop:CreateToggle({
     Flag = "ServerFinderToggle",
     Callback = function(state)
         if state then
-            -- Si ya había una instancia abierta, la limpiamos antes de crear otra
-            if ServerFinderGui and ServerFinderGui.Parent then
-                ServerFinderGui:Destroy()
-                ServerFinderGui = nil
+            -- Si por algún motivo quedó algo abierto de antes, lo
+            -- apagamos primero (corta su fetch) antes de crear uno nuevo.
+            if ServerFinderCleanup then
+                ServerFinderCleanup()
             end
 
             local ok, err = pcall(CreateServerFinderGUI)
@@ -1237,10 +1520,12 @@ Hop:CreateToggle({
                 warn("❌ Error al crear Server Finder:", err)
             end
         else
-            if ServerFinderGui and ServerFinderGui.Parent then
-                ServerFinderGui:Destroy()
+            -- Acá está el fix principal: llamamos a la función de
+            -- limpieza en vez de solo destruir el ScreenGui. Esto
+            -- pone isDestroyed = true y corta el fetch de inmediato.
+            if ServerFinderCleanup then
+                ServerFinderCleanup()
             end
-            ServerFinderGui = nil
         end
     end
 })
