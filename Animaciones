@@ -1562,3 +1562,186 @@ AnimacionesTab:CreateButton({
 		end
 	end
 })
+
+
+
+
+----UGC PAQUETES
+
+
+--[[
+
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local plr = Players.LocalPlayer
+ 
+-- URL con tu JSON (cámbiala si actualizas)
+local animsURL = "https://pastebin.com/raw/KGK2inGd"
+ 
+-- Variables internas
+local animData = nil
+local buttonsCreated = false
+ 
+--// Funciones base
+local function StopAnimForCharacter(char)
+	if not char then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+	for _, t in ipairs(hum:GetPlayingAnimationTracks()) do
+		pcall(function() t:Stop() end)
+	end
+end
+ 
+local function normAnimId(a)
+	if not a then return nil end
+	a = tostring(a)
+	if a:match("^%d+$") then
+		return "rbxassetid://"..a
+	end
+	return a
+end
+ 
+local function applySetSystemBroken(setName)
+	if not animData then
+		warn("⚠️ No hay datos cargados todavía.")
+		return
+	end
+ 
+	local char = plr.Character or plr.CharacterAdded:Wait()
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local animate = char:FindFirstChild("Animate")
+	if not hum or not animate then
+		warn("No se encontró Humanoid o Animate en el personaje.")
+		return
+	end
+ 
+	local data = animData[setName]
+	if not data then
+		warn("Set no encontrado:", setName)
+		return
+	end
+ 
+	animate.Disabled = true
+	StopAnimForCharacter(char)
+ 
+	-- Normalizar IDs
+	local idle1 = normAnimId(data.idle1)
+	local idle2 = normAnimId(data.idle2)
+	local walk = normAnimId(data.walk)
+	local run = normAnimId(data.run or data.walk)
+	local jump = normAnimId(data.jump)
+	local climb = normAnimId(data.climb)
+	local fall = normAnimId(data.fall)
+ 
+	-- Asignar animaciones
+	if animate:FindFirstChild("idle") then
+		local idle = animate.idle
+		if idle:FindFirstChild("Animation1") and idle1 then
+			idle.Animation1.AnimationId = idle1
+		end
+		if idle:FindFirstChild("Animation2") and idle2 then
+			idle.Animation2.AnimationId = idle2
+		end
+	end
+ 
+	if animate:FindFirstChild("walk") and walk then
+		local w = animate.walk:FindFirstChild("WalkAnim") or animate.walk:FindFirstChildWhichIsA("Animation")
+		if w then w.AnimationId = walk end
+	end
+ 
+	if animate:FindFirstChild("run") and run then
+		local r = animate.run:FindFirstChild("RunAnim")
+		if not r then
+			r = Instance.new("Animation")
+			r.Name = "RunAnim"
+			r.Parent = animate.run
+		end
+		r.AnimationId = run
+	end
+ 
+	if animate:FindFirstChild("jump") and jump then
+		local j = animate.jump:FindFirstChild("JumpAnim") or animate.jump:FindFirstChildWhichIsA("Animation")
+		if j then j.AnimationId = jump end
+	end
+ 
+	if animate:FindFirstChild("climb") and climb then
+		local c = animate.climb:FindFirstChild("ClimbAnim") or animate.climb:FindFirstChildWhichIsA("Animation")
+		if c then c.AnimationId = climb end
+	end
+ 
+	if animate:FindFirstChild("fall") and fall then
+		local f = animate.fall:FindFirstChild("FallAnim") or animate.fall:FindFirstChildWhichIsA("Animation")
+		if f then f.AnimationId = fall end
+	end
+ 
+	-- Recarga limpia
+	pcall(function()
+		hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+		task.wait(0.05)
+		hum:ChangeState(Enum.HumanoidStateType.Running)
+		StopAnimForCharacter(char)
+		hum:Move(Vector3.zero)
+	end)
+ 
+	animate.Disabled = false
+	print("✅ Animaciones aplicadas correctamente ->", setName)
+ 
+	if Rayfield and Rayfield.Notify then
+		Rayfield:Notify({
+			Title = "Animaciones Aplicadas",
+			Content = "Se aplicó el set: " .. setName,
+			Duration = 3,
+			Image = 4483362458
+		})
+	end
+end
+ 
+--// Interfaz Rayfield
+ 
+AnimacionesTab:CreateButton({
+	Name = "📦 Cargar Paquetes UGC",
+	Callback = function()
+		if buttonsCreated then return end
+		buttonsCreated = true
+ 
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(game:HttpGet(animsURL))
+		end)
+ 
+		if not success or type(data) ~= "table" then
+			warn("No se pudo cargar el JSON de animaciones.")
+			if Rayfield and Rayfield.Notify then
+				Rayfield:Notify({
+					Title = "Error",
+					Content = "No se pudo cargar el JSON.",
+					Duration = 4,
+					Image = 4483362458
+				})
+			end
+			return
+		end
+ 
+		animData = data
+ 
+		for setName, _ in pairs(animData) do
+			AnimacionesTab:CreateButton({
+				Name = setName,
+				Callback = function()
+					applySetSystemBroken(setName)
+				end
+			})
+		end
+ 
+		if Rayfield and Rayfield.Notify then
+			Rayfield:Notify({
+				Title = "Animaciones Cargadas",
+				Content = "Los botones fueron generados correctamente.",
+				Duration = 3,
+				Image = 4483362458
+			})
+		end
+	end
+})
+
+
+]]
