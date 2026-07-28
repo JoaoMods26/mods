@@ -1329,9 +1329,11 @@ AnimacionesTab:CreateButton({ Name = "Cargar Animaciones R15", Callback = setupU
 AnimacionesTab:CreateButton({ Name = "Cargar Animaciones R6",  Callback = setupUI_R6  })
 
 LocalPlayer.CharacterAdded:Connect(function()
+	-- Solo se limpia lo que depende del personaje anterior (el Track viejo
+	-- apunta a un Animator que ya no existe). NO se borra lastAnimationId ni
+	-- lastAnimationName: asi los binds Q/E y los botones moviles siguen
+	-- funcionando con la ultima animacion despues de reiniciar/respawnear.
 	currentTrack = nil
-	lastAnimationId = nil
-	lastAnimationName = nil
 	lastDetectedExternalId = nil
 	if isMobile and bindsEnabled then
 		removeMobileButtons()
