@@ -4590,6 +4590,7 @@ function JmodsLib:CreateFloatingFrame(options)
     local UserInputService = game:GetService("UserInputService")
     local TweenService = game:GetService("TweenService")
     local isMobile = UserInputService.TouchEnabled
+JmodsLib._FloatingFrames = JmodsLib._FloatingFrames or {}
 
     local MainFrame = self.MainFrame
     local ScreenGui = MainFrame and MainFrame.Parent or CONTAINER:FindFirstChildWhichIsA("ScreenGui")
@@ -4823,18 +4824,18 @@ function JmodsLib:CreateFloatingFrame(options)
         FloatFrame.Visible = not FloatFrame.Visible
         if FloatFrame.Visible then applyPosition() end
     end
-    function FloatingObj:Destroy()
-        for i, ff in ipairs(FloatingFrames) do
-            if ff == FloatingObj then table.remove(FloatingFrames, i) break end
-        end
-        FloatFrame:Destroy()
+function FloatingObj:Destroy()
+    for i, ff in ipairs(JmodsLib._FloatingFrames) do
+        if ff == FloatingObj then table.remove(JmodsLib._FloatingFrames, i) break end
     end
+    FloatFrame:Destroy()
+end
     function FloatingObj:SetPosition(newPos)
         options.CustomPosition = newPos
         applyPosition()
     end
 
-    table.insert(FloatingFrames, FloatingObj)
+table.insert(JmodsLib._FloatingFrames, FloatingObj)
 
     -- =========================================================
     -- CREADORES DE ELEMENTOS (misma estética que las Tabs)
