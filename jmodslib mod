@@ -6,7 +6,13 @@
 
 
 local JmodsLib = {}
+local function getContainer()
+    local ok, hid = pcall(function() return gethui() end)
+    return (ok and hid) or game:GetService("CoreGui")
+end
+local CONTAINER = getContainer()
 JmodsLib.__index = JmodsLib
+
 
 -- SISTEMA DE AUTO GUARDADO DE TEMAS
 local ThemeStorage = {
@@ -333,7 +339,7 @@ end
 local function translateInterface(targetLang)
     if not targetLang then return end
     
-    local coreGui = game:GetService("CoreGui")
+    local coreGui = CONTAINER
     local attempts = 0
     local maxAttempts = 10
     
@@ -548,7 +554,8 @@ end
 
 -- NUEVA FUNCIÓN: Aplicar tema a tabs específicamente
 local function applyThemeToTabs(baseColor, accentColor, inputColor)
-    local coreGui = game:GetService("CoreGui")
+    local coreGui = CONTAINER
+
     
     for _, gui in ipairs(coreGui:GetChildren()) do
         if gui:IsA("ScreenGui") then
@@ -593,7 +600,7 @@ local function applyColorsSmooth(baseColor, accentColor, inputColor)
     end
     
     -- Buscar elementos por nombre específico
-    local coreGui = game:GetService("CoreGui")
+    local coreGui = CONTAINER
     
     -- Buscar MainFrame y aplicar colores como en el original
     for _, gui in ipairs(coreGui:GetChildren()) do
@@ -1301,8 +1308,8 @@ function JmodsLib:CreateIntro(options)
     end
     -- Si no se especifica AnimationIntro, selectedAnimation queda nil (sin animación)
 
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Parent = game:GetService("CoreGui")
+local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Parent = CONTAINER
     ScreenGui.Name = "JmodsLibIntro"
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -1464,6 +1471,7 @@ end
 
 function JmodsLib:CreateWindow(options)
     options = options or {}
+    local FloatingFrames = {} -- Registro global de floating frames activos
     
     --CIERRE DE DUPLICADOS
 --CIERRE DE DUPLICADOS
@@ -1502,7 +1510,15 @@ if _G.JmodsLibLock[windowName] or (currentTime - lastExecution) < 2 then
     } end
     function DummyWindow:SetRestoreKey() end
     function DummyWindow:GetCurrentTheme() return CurrentTheme end
-    function DummyWindow:SetTheme() end
+function DummyWindow:SetTheme() end
+    function DummyWindow:CreateFloatingFrame() return {
+        Show = function() end, Hide = function() end, Toggle = function() end,
+        Destroy = function() end, SetPosition = function() end,
+        CreateSection = function() end, CreateParagraph = function() end,
+        CreateButton = function() end, CreateToggle = function() end,
+        CreateSlider = function() end, CreateInput = function() end,
+        Page = {GetChildren = function() return {} end}
+    } end
     
     return DummyWindow
 end
@@ -1512,7 +1528,7 @@ _G.JmodsLibLock[windowName] = true
 _G.JmodsLibTimestamp[windowName] = currentTime
 
 local function closePreviousWindow()
-    local CoreGui = game:GetService("CoreGui")
+    local CoreGui = CONTAINER
     
     -- 🔹 MÉTODO 1: Buscar por nombre exacto del ScreenGui
     local existingGui = CoreGui:FindFirstChild(windowName)
@@ -1690,8 +1706,8 @@ if options.Intro == true then
     })
 end
 
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Parent = game:GetService("CoreGui")
+local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Parent = CONTAINER
     ScreenGui.Name = options.Name or "JmodsLib"
 
     local UserInputService = game:GetService("UserInputService")
@@ -1803,8 +1819,8 @@ if not options.HideCloseButton then
         end
 
         -- Destruir notificaciones primero
-        local coreGui = game:GetService("CoreGui")
-        local notifyGui = coreGui:FindFirstChild("JmodsLibNotify")
+local notifyGui = CONTAINER:FindFirstChild("JmodsLibNotify")
+
         if notifyGui then
             notifyGui:Destroy()
         end
@@ -2847,8 +2863,7 @@ task.spawn(function()
     task.wait(0.5)
     
     -- ✅ PRIMERO: Guardar todos los textos originales en español
-    local coreGui = game:GetService("CoreGui")
-    for _, gui in ipairs(coreGui:GetChildren()) do
+for _, gui in ipairs(CONTAINER:GetChildren()) do
         if gui:IsA("ScreenGui") then
             local mainFrame = gui:FindFirstChild("MainFrame")
             if mainFrame then
@@ -4386,21 +4401,20 @@ end
         end
 
         -- Buscar el ScreenGui principal (el que tiene MainFrame)
-        local coreGui  = game:GetService("CoreGui")
+local targetGui = nil
+-- Buscar el ScreenGui principal (el que tiene MainFrame)
         local targetGui = nil
-        for _, g in ipairs(coreGui:GetChildren()) do
+        for _, g in ipairs(CONTAINER:GetChildren()) do
             if g:IsA("ScreenGui") and g:FindFirstChild("MainFrame") then
                 targetGui = g
                 break
             end
         end
         if not targetGui then
-            -- Fallback: primer ScreenGui disponible
-            for _, g in ipairs(coreGui:GetChildren()) do
+            for _, g in ipairs(CONTAINER:GetChildren()) do
                 if g:IsA("ScreenGui") then targetGui = g break end
             end
         end
-
         -- Crear el botón
         local hasImage = options.Image and options.Image ~= 0 and options.Image ~= ""
 
@@ -4546,7 +4560,546 @@ end
     return TabObj
 end
 
+-- ============================================================
+-- FLOATING FRAME — panel flotante independiente y personalizable
+-- ============================================================
+-- options:
+--   Name           = "PanelExtra"
+--   Title          = "Mi Panel"
+--   ShowTitleBar   = true/false          (default true)
+--   CloseButton    = true/false          (default true)
+--   StartVisible   = true/false          (default false)
+--   Size           = {X = 300, Y = 260}  (si no, tamaño auto PC/móvil)
+--   Position       = "left"|"right"|"top"|"bottom"  -- pegado al MainFrame
+--   ScreenAnchor   = "topleft"|"topright"|"bottomleft"|"bottomright"
+--                    |"top"|"bottom"|"left"|"right"|"center" -- pegado a la pantalla
+--   Gap            = 12                  -- separación en px
+--   AttachToMain   = true/false          (default true si usás Position)
+--   CustomPosition = UDim2.new(...)      -- posición fija manual, prioridad máxima
+--   Color          = false               -> sigue el tema dinámicamente
+--                  = {Base={r,g,b}, Accent={r,g,b}, Input={r,g,b}} -> color fijo propio
+-- ------------------------------------------------------------
+-- Devuelve:
+--   :Show() :Hide() :Toggle() :Destroy() :SetPosition(UDim2)
+--   :CreateSection(name) :CreateParagraph(opts) :CreateButton(opts)
+--   :CreateToggle(opts) :CreateSlider(opts) :CreateInput(opts)
+-- ============================================================
+function JmodsLib:CreateFloatingFrame(options)
+    options = options or {}
 
+    local UserInputService = game:GetService("UserInputService")
+    local TweenService = game:GetService("TweenService")
+    local isMobile = UserInputService.TouchEnabled
+
+    local MainFrame = self.MainFrame
+    local ScreenGui = MainFrame and MainFrame.Parent or CONTAINER:FindFirstChildWhichIsA("ScreenGui")
+
+    -- ---------- TAMAÑO (auto PC/móvil si no se especifica) ----------
+    local defaultW, defaultH
+    if isMobile then
+        defaultW, defaultH = 260, 220
+    else
+        defaultW, defaultH = 320, 280
+    end
+    local width  = (options.Size and options.Size.X) or defaultW
+    local height = (options.Size and options.Size.Y) or defaultH
+
+    -- ---------- COLOR (dinámico o fijo) ----------
+    local useCustomColor = options.Color ~= nil and options.Color ~= false
+    local customBase, customAccent, customInput
+    if useCustomColor then
+        local c = options.Color
+        customBase   = c.Base   and Color3.fromRGB(c.Base[1], c.Base[2], c.Base[3])     or Color3.fromRGB(25,25,35)
+        customAccent = c.Accent and Color3.fromRGB(c.Accent[1], c.Accent[2], c.Accent[3]) or Color3.fromRGB(70,70,120)
+        customInput  = c.Input  and Color3.fromRGB(c.Input[1], c.Input[2], c.Input[3])   or Color3.fromRGB(50,50,80)
+    end
+
+    local baseColor, accentColor, inputColor
+    if useCustomColor then
+        baseColor, accentColor, inputColor = customBase, customAccent, customInput
+    else
+        local t = JmodsLib.Theme or {Base=Color3.fromRGB(25,25,35), Accent=Color3.fromRGB(70,70,120), Input=Color3.fromRGB(50,50,80)}
+        baseColor, accentColor, inputColor = t.Base, t.Accent, t.Input
+    end
+
+    -- ---------- FRAME PRINCIPAL FLOTANTE ----------
+    local FloatFrame = Instance.new("Frame")
+    FloatFrame.Name = "FloatingFrame_" .. (options.Name or "Panel")
+    FloatFrame.Size = UDim2.new(0, width, 0, height)
+    FloatFrame.BackgroundColor3 = baseColor
+    FloatFrame.BorderSizePixel = 0
+    FloatFrame.Visible = options.StartVisible == true
+    FloatFrame.ZIndex = options.ZIndex or 60
+    FloatFrame.ClipsDescendants = false
+    FloatFrame.Parent = ScreenGui
+    Instance.new("UICorner", FloatFrame).CornerRadius = UDim.new(0, 14)
+
+    -- Sombra (misma estética que MainFrame)
+    local Shadow = Instance.new("ImageLabel", FloatFrame)
+    Shadow.Size = UDim2.new(1, 30, 1, 30)
+    Shadow.Position = UDim2.new(0, -15, 0, -15)
+    Shadow.BackgroundTransparency = 1
+    Shadow.Image = "rbxassetid://5028857084"
+    Shadow.ImageColor3 = Color3.fromRGB(0,0,0)
+    Shadow.ImageTransparency = 0.7
+    Shadow.ScaleType = Enum.ScaleType.Slice
+    Shadow.SliceCenter = Rect.new(24,24,276,276)
+    Shadow.ZIndex = FloatFrame.ZIndex - 1
+
+    -- ---------- TITLEBAR opcional ----------
+    local topOffset = 0
+    if options.ShowTitleBar ~= false then
+        local FTitleBar = Instance.new("Frame", FloatFrame)
+        FTitleBar.Name = "TitleBar"
+        FTitleBar.Size = UDim2.new(1, 0, 0, 34)
+        FTitleBar.BackgroundColor3 = accentColor
+        FTitleBar.BorderSizePixel = 0
+        FTitleBar.ZIndex = FloatFrame.ZIndex + 1
+        Instance.new("UICorner", FTitleBar).CornerRadius = UDim.new(0, 14)
+
+        local FTitle = Instance.new("TextLabel", FTitleBar)
+        FTitle.Size = UDim2.new(1, options.CloseButton == false and -16 or -46, 1, 0)
+        FTitle.Position = UDim2.new(0, 12, 0, 0)
+        FTitle.Text = options.Title or options.Name or "Panel"
+        FTitle.Font = Enum.Font.GothamBold
+        FTitle.TextSize = 15
+        FTitle.TextColor3 = Color3.fromRGB(255,255,255)
+        FTitle.BackgroundTransparency = 1
+        FTitle.TextXAlignment = Enum.TextXAlignment.Left
+        FTitle.ZIndex = FTitleBar.ZIndex + 1
+
+        if options.CloseButton ~= false then
+            local FClose = Instance.new("ImageButton", FTitleBar)
+            FClose.Size = UDim2.new(0, 26, 0, 26)
+            FClose.Position = UDim2.new(1, -32, 0.5, -13)
+            FClose.BackgroundTransparency = 1
+            FClose.Image = "rbxassetid://116517620289213"
+            FClose.ZIndex = FTitleBar.ZIndex + 1
+            FClose.MouseButton1Click:Connect(function()
+                FloatFrame.Visible = false
+            end)
+        end
+
+        -- Arrastre de la TitleBar
+        local dragging, dragStart, dragPos
+        FTitleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                dragPos = FloatFrame.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                FloatFrame.Position = UDim2.new(dragPos.X.Scale, dragPos.X.Offset + delta.X, dragPos.Y.Scale, dragPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        topOffset = 34
+    end
+
+    -- ---------- CONTENIDO (ScrollingFrame -> nada se corta) ----------
+    local FloatPage = Instance.new("ScrollingFrame", FloatFrame)
+    FloatPage.Name = "FloatingPage"
+    FloatPage.Size = UDim2.new(1, -12, 1, -(topOffset + 12))
+    FloatPage.Position = UDim2.new(0, 6, 0, topOffset + 6)
+    FloatPage.BackgroundTransparency = 1
+    FloatPage.BorderSizePixel = 0
+    FloatPage.ScrollBarThickness = 5
+    FloatPage.CanvasSize = UDim2.new(0,0,0,0)
+    FloatPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    FloatPage.ScrollingDirection = Enum.ScrollingDirection.Y
+    FloatPage.ClipsDescendants = true
+    FloatPage.ZIndex = FloatFrame.ZIndex + 1
+
+    local FloatLayout = Instance.new("UIListLayout", FloatPage)
+    FloatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    FloatLayout.Padding = UDim.new(0, 6)
+
+    local FloatPadding = Instance.new("UIPadding", FloatPage)
+    FloatPadding.PaddingRight = UDim.new(0, 4)
+
+    -- ---------- POSICIONAMIENTO ----------
+    -- Prioridad: CustomPosition > Position (pegado al MainFrame) > ScreenAnchor (pegado a pantalla) > default
+    local function getScreenAnchorPosition(anchor, gap)
+        local camera = workspace.CurrentCamera
+        local viewport = (camera and camera.ViewportSize) or Vector2.new(1280, 720)
+        anchor = (anchor or "topright"):lower()
+
+        if anchor == "topleft" then
+            return UDim2.new(0, gap, 0, gap)
+        elseif anchor == "topright" then
+            return UDim2.new(0, viewport.X - width - gap, 0, gap)
+        elseif anchor == "bottomleft" then
+            return UDim2.new(0, gap, 0, viewport.Y - height - gap)
+        elseif anchor == "bottomright" then
+            return UDim2.new(0, viewport.X - width - gap, 0, viewport.Y - height - gap)
+        elseif anchor == "top" then
+            return UDim2.new(0.5, -width/2, 0, gap)
+        elseif anchor == "bottom" then
+            return UDim2.new(0.5, -width/2, 0, viewport.Y - height - gap)
+        elseif anchor == "left" then
+            return UDim2.new(0, gap, 0.5, -height/2)
+        elseif anchor == "right" then
+            return UDim2.new(0, viewport.X - width - gap, 0.5, -height/2)
+        else -- "center"
+            return UDim2.new(0.5, -width/2, 0.5, -height/2)
+        end
+    end
+
+    local function applyPosition()
+        local gap = options.Gap or 12
+
+        -- 1) Posición manual absoluta: máxima prioridad
+        if options.CustomPosition then
+            FloatFrame.Position = options.CustomPosition
+            return
+        end
+
+        -- 2) Pegado al MainFrame (si existe MainFrame y se pidió Position)
+        if options.Position and MainFrame and MainFrame.Parent then
+            local pos = options.Position:lower()
+            if pos == "left" then
+                FloatFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X - width - gap, 0, MainFrame.AbsolutePosition.Y)
+            elseif pos == "top" then
+                FloatFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X, 0, MainFrame.AbsolutePosition.Y - height - gap)
+            elseif pos == "bottom" then
+                FloatFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X, 0, MainFrame.AbsolutePosition.Y + MainFrame.AbsoluteSize.Y + gap)
+            else -- "right" por defecto
+                FloatFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X + MainFrame.AbsoluteSize.X + gap, 0, MainFrame.AbsolutePosition.Y)
+            end
+            return
+        end
+
+        -- 3) Anclado a la pantalla (ScreenAnchor explícito, o fallback si no hay MainFrame)
+        if options.ScreenAnchor then
+            FloatFrame.Position = getScreenAnchorPosition(options.ScreenAnchor, gap)
+            return
+        end
+
+        -- 4) DEFAULT: si hay MainFrame, pegarse a la derecha; si no, esquina superior derecha de pantalla
+        if MainFrame and MainFrame.Parent then
+            FloatFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X + MainFrame.AbsoluteSize.X + gap, 0, MainFrame.AbsolutePosition.Y)
+        else
+            FloatFrame.Position = getScreenAnchorPosition("topright", gap)
+        end
+    end
+
+    task.defer(applyPosition)
+
+    -- Reposicionar en vivo si está "pegado" al MainFrame y este se mueve/redimensiona
+    if options.AttachToMain ~= false and not options.CustomPosition and options.Position and MainFrame then
+        MainFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(applyPosition)
+        MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyPosition)
+    end
+
+    -- Reposicionar si cambia el viewport y estamos usando ScreenAnchor
+    if options.ScreenAnchor or (not options.Position and not options.CustomPosition) then
+        workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+            local cam = workspace.CurrentCamera
+            if cam then
+                cam:GetPropertyChangedSignal("ViewportSize"):Connect(applyPosition)
+            end
+        end)
+    end
+
+    -- ---------- API PÚBLICA ----------
+    local FloatingObj = {Frame = FloatFrame, Page = FloatPage, UseCustomColor = useCustomColor}
+
+    function FloatingObj:Show()
+        FloatFrame.Visible = true
+        applyPosition()
+    end
+    function FloatingObj:Hide()
+        FloatFrame.Visible = false
+    end
+    function FloatingObj:Toggle()
+        FloatFrame.Visible = not FloatFrame.Visible
+        if FloatFrame.Visible then applyPosition() end
+    end
+    function FloatingObj:Destroy()
+        for i, ff in ipairs(FloatingFrames) do
+            if ff == FloatingObj then table.remove(FloatingFrames, i) break end
+        end
+        FloatFrame:Destroy()
+    end
+    function FloatingObj:SetPosition(newPos)
+        options.CustomPosition = newPos
+        applyPosition()
+    end
+
+    table.insert(FloatingFrames, FloatingObj)
+
+    -- =========================================================
+    -- CREADORES DE ELEMENTOS (misma estética que las Tabs)
+    -- =========================================================
+
+    function FloatingObj:CreateSection(name)
+        local Section = Instance.new("TextLabel", FloatPage)
+        Section.Name = "Section"
+        Section.Size = UDim2.new(1, -4, 0, 26)
+        Section.BackgroundColor3 = accentColor:Lerp(baseColor, 0.12)
+        Section.Text = "  " .. (name or "Sección")
+        Section.TextColor3 = Color3.fromRGB(255,255,255)
+        Section.Font = Enum.Font.GothamBold
+        Section.TextSize = 14
+        Section.TextXAlignment = Enum.TextXAlignment.Left
+        Instance.new("UICorner", Section).CornerRadius = UDim.new(0, 8)
+        return Section
+    end
+
+    function FloatingObj:CreateParagraph(opts)
+        opts = opts or {}
+        local Frame = Instance.new("Frame", FloatPage)
+        Frame.Name = "Paragraph"
+        Frame.Size = UDim2.new(1, -4, 0, 70)
+        Frame.BackgroundColor3 = accentColor:Lerp(baseColor, 0.6)
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+        local Title = Instance.new("TextLabel", Frame)
+        Title.Size = UDim2.new(1, -16, 0, 18)
+        Title.Position = UDim2.new(0, 8, 0, 6)
+        Title.Text = opts.Title or "Título"
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 13
+        Title.TextColor3 = Color3.fromRGB(245,245,245)
+        Title.BackgroundTransparency = 1
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local Content = Instance.new("TextLabel", Frame)
+        Content.Size = UDim2.new(1, -16, 1, -30)
+        Content.Position = UDim2.new(0, 8, 0, 26)
+        Content.Text = opts.Content or ""
+        Content.Font = Enum.Font.Gotham
+        Content.TextSize = 12
+        Content.TextColor3 = Color3.fromRGB(200,200,200)
+        Content.BackgroundTransparency = 1
+        Content.TextXAlignment = Enum.TextXAlignment.Left
+        Content.TextYAlignment = Enum.TextYAlignment.Top
+        Content.TextWrapped = true
+
+        task.defer(function()
+            local h = game:GetService("TextService"):GetTextSize(Content.Text, Content.TextSize, Content.Font, Vector2.new(Frame.AbsoluteSize.X - 16, math.huge)).Y
+            Frame.Size = UDim2.new(1, -4, 0, math.max(50, 34 + h))
+        end)
+
+        local ParagraphObj = {}
+        function ParagraphObj:UpdateContent(text)
+            Content.Text = text or ""
+        end
+        function ParagraphObj:UpdateTitle(text)
+            Title.Text = text or ""
+        end
+
+        return ParagraphObj, Frame
+    end
+
+    function FloatingObj:CreateButton(opts)
+        opts = opts or {}
+        local Button = Instance.new("TextButton", FloatPage)
+        Button.Size = UDim2.new(1, -4, 0, 32)
+        Button.BackgroundColor3 = accentColor
+        Button.Text = opts.Name or "Button"
+        Button.TextColor3 = Color3.fromRGB(255,255,255)
+        Button.Font = Enum.Font.Gotham
+        Button.TextSize = 13
+        Button.AutoButtonColor = false
+        Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 8)
+        Button.MouseButton1Click:Connect(function()
+            if opts.Callback then pcall(opts.Callback) end
+        end)
+        return Button
+    end
+
+    function FloatingObj:CreateToggle(opts)
+        opts = opts or {}
+        local ToggleFrame = Instance.new("Frame", FloatPage)
+        ToggleFrame.Name = "ToggleFrame"
+        ToggleFrame.Size = UDim2.new(1, -4, 0, 38)
+        ToggleFrame.BackgroundColor3 = inputColor
+        Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0, 8)
+
+        local Title = Instance.new("TextLabel", ToggleFrame)
+        Title.Size = UDim2.new(0.65, 0, 1, 0)
+        Title.Position = UDim2.new(0, 10, 0, 0)
+        Title.Text = opts.Name or "Toggle"
+        Title.TextColor3 = Color3.fromRGB(240,240,240)
+        Title.Font = Enum.Font.Gotham
+        Title.TextSize = 13
+        Title.BackgroundTransparency = 1
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local SwitchBack = Instance.new("Frame", ToggleFrame)
+        SwitchBack.Name = "SwitchBack"
+        SwitchBack.Size = UDim2.new(0, 44, 0, 18)
+        SwitchBack.Position = UDim2.new(1, -54, 0.5, -9)
+        SwitchBack.BackgroundColor3 = baseColor:Lerp(accentColor, 0.22)
+        Instance.new("UICorner", SwitchBack).CornerRadius = UDim.new(0, 6)
+
+        local Handle = Instance.new("Frame", SwitchBack)
+        Handle.Name = "Handle"
+        Handle.Size = UDim2.new(0, 16, 0, 16)
+        Handle.Position = UDim2.new(0, 1, 0.5, -8)
+        Handle.BackgroundColor3 = Color3.fromRGB(200,200,200)
+        Instance.new("UICorner", Handle).CornerRadius = UDim.new(0, 4)
+
+        local state = opts.CurrentValue or false
+        local function updateVisual()
+            if state then
+                TweenService:Create(Handle, TweenInfo.new(0.12), {Position = UDim2.new(1, -17, 0.5, -8)}):Play()
+                TweenService:Create(SwitchBack, TweenInfo.new(0.12), {BackgroundColor3 = accentColor}):Play()
+            else
+                TweenService:Create(Handle, TweenInfo.new(0.12), {Position = UDim2.new(0, 1, 0.5, -8)}):Play()
+                TweenService:Create(SwitchBack, TweenInfo.new(0.12), {BackgroundColor3 = baseColor:Lerp(accentColor, 0.22)}):Play()
+            end
+        end
+        updateVisual()
+
+        SwitchBack.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                state = not state
+                updateVisual()
+                if opts.Callback then pcall(opts.Callback, state) end
+            end
+        end)
+
+        return ToggleFrame
+    end
+
+    function FloatingObj:CreateSlider(opts)
+        opts = opts or {}
+        local Frame = Instance.new("Frame", FloatPage)
+        Frame.Name = "Slider"
+        Frame.Size = UDim2.new(1, -4, 0, 46)
+        Frame.BackgroundColor3 = inputColor
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+        local Title = Instance.new("TextLabel", Frame)
+        Title.Size = UDim2.new(1, -70, 0, 18)
+        Title.Position = UDim2.new(0, 10, 0, 4)
+        Title.Text = opts.Name or "Slider"
+        Title.TextColor3 = Color3.fromRGB(240,240,240)
+        Title.Font = Enum.Font.Gotham
+        Title.TextSize = 13
+        Title.BackgroundTransparency = 1
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local ValueLabel = Instance.new("TextLabel", Frame)
+        ValueLabel.Size = UDim2.new(0, 60, 0, 18)
+        ValueLabel.Position = UDim2.new(1, -68, 0, 4)
+        ValueLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        ValueLabel.Font = Enum.Font.Gotham
+        ValueLabel.TextSize = 12
+        ValueLabel.BackgroundTransparency = 1
+
+        local SliderBack = Instance.new("Frame", Frame)
+        SliderBack.Name = "SliderBack"
+        SliderBack.Size = UDim2.new(1, -20, 0, 8)
+        SliderBack.Position = UDim2.new(0, 10, 0, 28)
+        SliderBack.BackgroundColor3 = baseColor:Lerp(accentColor, 0.25)
+        Instance.new("UICorner", SliderBack).CornerRadius = UDim.new(1,0)
+
+        local Fill = Instance.new("Frame", SliderBack)
+        Fill.Name = "Fill"
+        Fill.Size = UDim2.new(0,0,1,0)
+        Fill.BackgroundColor3 = accentColor
+        Instance.new("UICorner", Fill).CornerRadius = UDim.new(1,0)
+
+        local Handle = Instance.new("Frame", SliderBack)
+        Handle.Name = "Handle"
+        Handle.Size = UDim2.new(0, 12, 0, 12)
+        Handle.AnchorPoint = Vector2.new(0.5, 0.5)
+        Handle.Position = UDim2.new(0, 0, 0.5, 0)
+        Handle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        Instance.new("UICorner", Handle).CornerRadius = UDim.new(1,0)
+        Handle.ZIndex = SliderBack.ZIndex + 1
+
+        local min = (opts.Range and opts.Range[1]) or 0
+        local max = (opts.Range and opts.Range[2]) or 100
+        local val = opts.CurrentValue or min
+
+        local function setValue(newVal)
+            local increment = opts.Increment or 1
+            newVal = math.clamp(newVal, min, max)
+            local stepped = math.floor(newVal / increment + 0.5) * increment
+            val = stepped
+            local percent = (val - min) / (max - min)
+            Fill.Size = UDim2.new(percent, 0, 1, 0)
+            Handle.Position = UDim2.new(percent, 0, 0.5, 0)
+            ValueLabel.Text = tostring(val) .. " " .. (opts.Suffix or "")
+            if opts.Callback then pcall(opts.Callback, val) end
+        end
+
+        local dragging = false
+        local function startDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                local pos = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+                setValue(min + (max-min)*pos)
+            end
+        end
+        SliderBack.InputBegan:Connect(startDrag)
+        Handle.InputBegan:Connect(startDrag)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local pos = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+                setValue(min + (max-min)*pos)
+            end
+        end)
+
+        setValue(val)
+        return Frame
+    end
+
+    function FloatingObj:CreateInput(opts)
+        opts = opts or {}
+        local hasLabel = opts.Name ~= nil
+        local InputFrame = Instance.new("Frame", FloatPage)
+        InputFrame.BackgroundTransparency = 1
+        InputFrame.Size = UDim2.new(1, -4, 0, hasLabel and 58 or 34)
+
+        local NameLabel
+        if hasLabel then
+            NameLabel = Instance.new("TextLabel", InputFrame)
+            NameLabel.Size = UDim2.new(1, 0, 0, 18)
+            NameLabel.Text = opts.Name
+            NameLabel.TextColor3 = Color3.fromRGB(240,240,240)
+            NameLabel.Font = Enum.Font.Gotham
+            NameLabel.TextSize = 13
+            NameLabel.BackgroundTransparency = 1
+            NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        end
+
+        local InputBox = Instance.new("TextBox", InputFrame)
+        InputBox.Size = hasLabel and UDim2.new(1, 0, 0, 32) or UDim2.new(1, 0, 1, 0)
+        InputBox.Position = hasLabel and UDim2.new(0, 0, 0, 22) or UDim2.new(0,0,0,0)
+        InputBox.BackgroundColor3 = inputColor
+        InputBox.TextColor3 = Color3.fromRGB(255,255,255)
+        InputBox.Font = Enum.Font.Gotham
+        InputBox.TextSize = 13
+        InputBox.ClearTextOnFocus = false
+        InputBox.PlaceholderText = opts.PlaceholderText or ""
+        InputBox.Text = opts.Text or ""
+        Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 8)
+
+        InputBox.FocusLost:Connect(function()
+            if opts.Callback then pcall(opts.Callback, InputBox.Text) end
+        end)
+
+        return InputBox
+    end
+
+    return FloatingObj
+end
 
 -- Función mejorada de notificaciones con links clickeables
 local LastNotification = nil
@@ -4555,10 +5108,10 @@ local LastNotification = nil
 
 function JmodsLib:Notify(options)
     options = options or {}
-    local CoreGui = game:GetService("CoreGui")
-    local ScreenGui = CoreGui:FindFirstChild("JmodsLibNotify")
-    if not ScreenGui then
-        ScreenGui = Instance.new("ScreenGui", CoreGui)
+local ScreenGui = CONTAINER:FindFirstChild("JmodsLibNotify")
+if not ScreenGui then
+    ScreenGui = Instance.new("ScreenGui", CONTAINER)
+
         ScreenGui.Name = "JmodsLibNotify"
         ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     end
@@ -4939,12 +5492,9 @@ local LocalPlayer = Players.LocalPlayer
 -- ✅ SISTEMA DE PERSISTENCIA INDEPENDIENTE DEL PERSONAJE
 local function ensureInterfaceStability()
     task.spawn(function()
-        local CoreGui = game:GetService("CoreGui")
-        
         while task.wait(3) do
-            pcall(function()
-                -- Verificar que las interfaces sigan montadas
-                for _, gui in ipairs(CoreGui:GetChildren()) do
+    pcall(function()
+        for _, gui in ipairs(CONTAINER:GetChildren()) do
                     if gui:IsA("ScreenGui") and gui.Name:find("JmodsLib") then
                         local mainFrame = gui:FindFirstChild("MainFrame")
                         if mainFrame and not mainFrame.Parent then
