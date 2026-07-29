@@ -4813,6 +4813,16 @@ JmodsLib._FloatingFrames = JmodsLib._FloatingFrames or {}
     -- ---------- API PÚBLICA ----------
     local FloatingObj = {Frame = FloatFrame, Page = FloatPage, UseCustomColor = useCustomColor}
 
+function FloatingObj:SyncTheme()
+    if self.UseCustomColor then return end -- si tiene color fijo, no lo tocamos
+    local t = JmodsLib.Theme or {Base=Color3.fromRGB(25,25,35), Accent=Color3.fromRGB(70,70,120), Input=Color3.fromRGB(50,50,80)}
+    baseColor, accentColor, inputColor = t.Base, t.Accent, t.Input
+    FloatFrame.BackgroundColor3 = baseColor
+    local tb = FloatFrame:FindFirstChild("TitleBar")
+    if tb then tb.BackgroundColor3 = accentColor end
+    applyThemeToDescendants(FloatFrame, baseColor, accentColor, inputColor)
+end
+
     function FloatingObj:Show()
         FloatFrame.Visible = true
         applyPosition()
