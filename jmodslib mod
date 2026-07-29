@@ -81,7 +81,9 @@ local RunService = game:GetService("RunService")
 local function applyColorsSmooth(baseColor, accentColor, inputColor)
     -- Aplicar inmediatamente a elementos principales
     applyColorsSmooth(baseColor, accentColor, inputColor)
-
+for _, ff in ipairs(JmodsLib._FloatingFrames or {}) do
+    pcall(function() ff:SyncTheme() end)
+end
     -- Repartir el repintado del resto de elementos en varios frames
     spawn(function()
         for i, element in ipairs(ElementsToTheme) do
@@ -2269,6 +2271,7 @@ local function createThemeButton(name, displayName, baseColor, accentColor, inpu
         ThemeButtonItem.MouseButton1Click:Connect(function()
             CurrentTheme = name
             applyColorsSmooth(baseColor, accentColor, inputColor)
+
             saveTheme(name) -- AUTO GUARDADO
             ThemeFrame.Visible = false
             
@@ -2851,6 +2854,9 @@ end)
             CurrentTheme = themeName
             local config = ThemeConfigs[themeName]
             applyColorsSmooth(config[1], config[2], config[3])
+for _, ff in ipairs(JmodsLib._FloatingFrames or {}) do
+    pcall(function() ff:SyncTheme() end)
+end
             saveTheme(themeName)
         end
     end
