@@ -3212,7 +3212,7 @@ AimbotTab:CreateButton({
 
 --VC
 
-local VCTab = Window:CreateTab("VC")
+local VCTab = Window:CreateTab("Voice Chat")
 
 VCTab:CreateSection("Voice Chat Tools")
 
