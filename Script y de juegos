@@ -528,6 +528,13 @@ boton= Juegostab:CreateButton({
 })
 
 boton= Juegostab:CreateButton({
+   Name = "Guayabitos RP (JGuayavitosMods)",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/guayavos'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
    Name = "Veneyork / Plazayork (JVenecofarMods)",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/veko'))()
