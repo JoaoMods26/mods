@@ -268,8 +268,8 @@ local function CreateServerFinderGUI()
     ------------------------------------------------------------
     -- Detección de dispositivo (móvil vs PC)
     ------------------------------------------------------------
-    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-
+local viewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+local isMobile = UserInputService.TouchEnabled or viewportSize.X < 700
     ------------------------------------------------------------
     -- Constantes de layout según el dispositivo
     ------------------------------------------------------------
@@ -283,9 +283,9 @@ local function CreateServerFinderGUI()
             STATUSBAR_Y    = 54,
             STATUS_SIZE    = 12,
             FILTERBAR_Y    = 80,
-            FILTERBAR_H    = 84,
+            FILTERBAR_H    = 76,
             FILTERBTN_SIZE = 11,
-            LIST_Y         = 174,
+            LIST_Y         = 164,
             ENTRY_H        = 46,
             ENTRY_TITLE    = 13,
             ENTRY_SUB      = 11,
@@ -406,20 +406,27 @@ local function CreateServerFinderGUI()
 
     -- Ventana principal
     local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Theme.Background
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-
-    if isMobile then
-        MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-        MainFrame.Size = UDim2.new(0.88, 0, 0.62, 0)
-    else
-        MainFrame.Position = UDim2.new(0.5, -320, 0.5, -235)
-        MainFrame.Size = UDim2.new(0, 640, 0, 470)
-    end
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Theme.Background
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+ 
+-- 🆕 FIX: SIEMPRE en escala + centrado, nunca píxeles fijos.
+-- Esto es lo que evita que se salga de la pantalla sin importar
+-- si isMobile se detectó bien o mal.
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.Size = UDim2.new(0.9, 0, 0.85, 0)
+ 
+-- 🆕 FIX: Min/Max en píxeles reales para que no quede gigante en
+-- pantallas grandes ni diminuta en pantallas chicas. Esta es la
+-- red de seguridad que reemplaza al "640x470 fijo" de antes.
+local MainSizeConstraint = Instance.new("UISizeConstraint")
+MainSizeConstraint.Parent = MainFrame
+MainSizeConstraint.MinSize = Vector2.new(320, 380)
+MainSizeConstraint.MaxSize = Vector2.new(640, 470)
+ 
 
     local MainCorner = Instance.new("UICorner", MainFrame)
     MainCorner.CornerRadius = UDim.new(0, 14)
@@ -658,11 +665,14 @@ local function CreateServerFinderGUI()
     end
 
     local ExactBox = Instance.new("Frame")
-    ExactBox.Name = "ExactBox"
-    ExactBox.Parent = FilterBar
-    ExactBox.LayoutOrder = isMobile and 2 or 3
-    ExactBox.Size = isMobile and UDim2.new(1, 0, 0, 30) or UDim2.new(0, 190, 0, 30)
-    ExactBox.BackgroundColor3 = Theme.PanelAlt
+ExactBox.Name = "ExactBox"
+ExactBox.Parent = FilterBar
+ExactBox.LayoutOrder = isMobile and 2 or 3
+-- 🆕 FIX: antes en móvil ocupaba TODO el ancho (1,0,0,30), lo que
+-- hacía que el input de texto se estirara gigante y feo. Ahora
+-- usa un ancho razonable también en móvil.
+ExactBox.Size = isMobile and UDim2.new(0.85, 0, 0, 30) or UDim2.new(0, 190, 0, 30)
+ExactBox.BackgroundColor3 = Theme.PanelAlt
     local ExactBoxCorner = Instance.new("UICorner", ExactBox)
     ExactBoxCorner.CornerRadius = UDim.new(0, 8)
 
@@ -702,8 +712,9 @@ local function CreateServerFinderGUI()
     local ExactInputCorner = Instance.new("UICorner", ExactInput)
     ExactInputCorner.CornerRadius = UDim.new(0, 6)
 
-    local ExactInputFlex = Instance.new("UIFlexItem", ExactInput)
-    ExactInputFlex.FlexMode = Enum.UIFlexMode.Fill
+local ExactInputSizeConstraint = Instance.new("UISizeConstraint")
+ExactInputSizeConstraint.Parent = ExactInput
+ExactInputSizeConstraint.MaxSize = Vector2.new(120, math.huge)
 
     local ExactApply = Instance.new("TextButton")
     ExactApply.Parent = ExactBox
