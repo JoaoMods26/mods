@@ -1391,20 +1391,19 @@ end)
 
 
 
---// Interfaz de animaciones (estilo SystemBroken con carga diferida para Rayfield)
-
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local plr = Players.LocalPlayer
-
--- URL con tu JSON (cámbiala si actualizas)
+ 
 local animsURL = "https://pastebin.com/raw/14q07TEP"
-
--- Variables internas
+ 
 local animData = nil
 local buttonsCreated = false
-
---// Funciones base
+ 
+local keepOnDeath = true      -- arranca activado por defecto
+local lastAppliedSet = nil    -- guarda el ultimo set aplicado para reaplicarlo al respawnear
+local characterAddedConn = nil
+ 
 local function StopAnimForCharacter(char)
 	if not char then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1413,7 +1412,7 @@ local function StopAnimForCharacter(char)
 		pcall(function() t:Stop() end)
 	end
 end
-
+ 
 local function normAnimId(a)
 	if not a then return nil end
 	a = tostring(a)
@@ -1422,31 +1421,33 @@ local function normAnimId(a)
 	end
 	return a
 end
-
-local function applySetSystemBroken(setName)
+ 
+local function applySetSystemBroken(setName, char)
 	if not animData then
 		warn("⚠️ No hay datos cargados todavía.")
 		return
 	end
-
-	local char = plr.Character or plr.CharacterAdded:Wait()
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local animate = char:FindFirstChild("Animate")
+ 
+	-- pasa usa el actual/espera a que exista, igual que antes.
+	char = char or plr.Character or plr.CharacterAdded:Wait()
+ 
+	local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+	local animate = char:FindFirstChild("Animate") or char:WaitForChild("Animate", 5)
 	if not hum or not animate then
 		warn("No se encontró Humanoid o Animate en el personaje.")
 		return
 	end
-
+ 
 	local data = animData[setName]
 	if not data then
 		warn("Set no encontrado:", setName)
 		return
 	end
-
+ 
 	animate.Disabled = true
 	StopAnimForCharacter(char)
-
-	-- Normalizar IDs
+ 
+ 
 	local idle1 = normAnimId(data.idle1)
 	local idle2 = normAnimId(data.idle2)
 	local walk = normAnimId(data.walk)
@@ -1454,8 +1455,7 @@ local function applySetSystemBroken(setName)
 	local jump = normAnimId(data.jump)
 	local climb = normAnimId(data.climb)
 	local fall = normAnimId(data.fall)
-
-	-- Asignar animaciones
+ 
 	if animate:FindFirstChild("idle") then
 		local idle = animate.idle
 		if idle:FindFirstChild("Animation1") and idle1 then
@@ -1465,12 +1465,12 @@ local function applySetSystemBroken(setName)
 			idle.Animation2.AnimationId = idle2
 		end
 	end
-
+ 
 	if animate:FindFirstChild("walk") and walk then
 		local w = animate.walk:FindFirstChild("WalkAnim") or animate.walk:FindFirstChildWhichIsA("Animation")
 		if w then w.AnimationId = walk end
 	end
-
+ 
 	if animate:FindFirstChild("run") and run then
 		local r = animate.run:FindFirstChild("RunAnim")
 		if not r then
@@ -1480,22 +1480,22 @@ local function applySetSystemBroken(setName)
 		end
 		r.AnimationId = run
 	end
-
+ 
 	if animate:FindFirstChild("jump") and jump then
 		local j = animate.jump:FindFirstChild("JumpAnim") or animate.jump:FindFirstChildWhichIsA("Animation")
 		if j then j.AnimationId = jump end
 	end
-
+ 
 	if animate:FindFirstChild("climb") and climb then
 		local c = animate.climb:FindFirstChild("ClimbAnim") or animate.climb:FindFirstChildWhichIsA("Animation")
 		if c then c.AnimationId = climb end
 	end
-
+ 
 	if animate:FindFirstChild("fall") and fall then
 		local f = animate.fall:FindFirstChild("FallAnim") or animate.fall:FindFirstChildWhichIsA("Animation")
 		if f then f.AnimationId = fall end
 	end
-
+ 
 	-- Recarga limpia
 	pcall(function()
 		hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
@@ -1504,10 +1504,13 @@ local function applySetSystemBroken(setName)
 		StopAnimForCharacter(char)
 		hum:Move(Vector3.zero)
 	end)
-
+ 
 	animate.Disabled = false
-	print("✅ Animaciones aplicadas correctamente ->", setName)
-
+ 
+	lastAppliedSet = setName
+ 
+	---print("✅ Animaciones aplicadas correctamente ->", setName)
+ 
 	if Rayfield and Rayfield.Notify then
 		Rayfield:Notify({
 			Title = "Animaciones Aplicadas",
@@ -1517,21 +1520,33 @@ local function applySetSystemBroken(setName)
 		})
 	end
 end
-
---// Interfaz Rayfield
-
+ 
+ 
+local function setupKeepOnDeath()
+	if characterAddedConn then return end
+	characterAddedConn = plr.CharacterAdded:Connect(function(char)
+		if not keepOnDeath then return end
+		if not lastAppliedSet then return end
+		task.wait(1) -- dar tiempo a que cargue Animate en el personaje nuevo
+		applySetSystemBroken(lastAppliedSet, char)
+	end)
+end
+ 
+ 
+ 
 AnimacionesTab:CreateButton({
-	Name = "📦 Cargar Animaciones",
+	Name = "📦 Paquetes de Animaciones oficiales",
 	Callback = function()
 		if buttonsCreated then return end
 		buttonsCreated = true
-
+ 
 		local success, data = pcall(function()
 			return HttpService:JSONDecode(game:HttpGet(animsURL))
 		end)
-
+ 
 		if not success or type(data) ~= "table" then
 			warn("No se pudo cargar el JSON de animaciones.")
+			buttonsCreated = false -- permite reintentar si fallo la carga
 			if Rayfield and Rayfield.Notify then
 				Rayfield:Notify({
 					Title = "Error",
@@ -1542,9 +1557,23 @@ AnimacionesTab:CreateButton({
 			end
 			return
 		end
-
+ 
 		animData = data
-
+ 
+		AnimacionesTab:CreateSection("Opciones")
+ 
+		AnimacionesTab:CreateToggle({
+			Name = "Mantener al Morir",
+			CurrentValue = true,
+			Callback = function(value)
+				keepOnDeath = value
+			end
+		})
+ 
+		setupKeepOnDeath()
+ 
+		AnimacionesTab:CreateSection("Paquetes de Animaciones")
+ 
 		for setName, _ in pairs(animData) do
 			AnimacionesTab:CreateButton({
 				Name = setName,
@@ -1553,7 +1582,7 @@ AnimacionesTab:CreateButton({
 				end
 			})
 		end
-
+ 
 		if Rayfield and Rayfield.Notify then
 			Rayfield:Notify({
 				Title = "Animaciones Cargadas",
@@ -1568,23 +1597,29 @@ AnimacionesTab:CreateButton({
 
 
 
-----UGC PAQUETES
 
 
 
+
+
+
+
+
+---UGC
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local plr = Players.LocalPlayer
  
--- URL con tu JSON (cámbiala si actualizas)
 local animsURL = "https://pastebin.com/raw/KGK2inGd"
  
--- Variables internas
 local animData = nil
 local buttonsCreated = false
  
---// Funciones base
+local keepOnDeath = true      -- arranca activado por defecto
+local lastAppliedSet = nil    -- guarda el ultimo set aplicado para reaplicarlo al respawnear
+local characterAddedConn = nil
+ 
 local function StopAnimForCharacter(char)
 	if not char then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1603,15 +1638,17 @@ local function normAnimId(a)
 	return a
 end
  
-local function applySetSystemBroken(setName)
+local function applySetSystemBroken(setName, char)
 	if not animData then
 		warn("⚠️ No hay datos cargados todavía.")
 		return
 	end
  
-	local char = plr.Character or plr.CharacterAdded:Wait()
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local animate = char:FindFirstChild("Animate")
+	-- pasa usa el actual/espera a que exista, igual que antes.
+	char = char or plr.Character or plr.CharacterAdded:Wait()
+ 
+	local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+	local animate = char:FindFirstChild("Animate") or char:WaitForChild("Animate", 5)
 	if not hum or not animate then
 		warn("No se encontró Humanoid o Animate en el personaje.")
 		return
@@ -1626,7 +1663,7 @@ local function applySetSystemBroken(setName)
 	animate.Disabled = true
 	StopAnimForCharacter(char)
  
-	-- Normalizar IDs
+ 
 	local idle1 = normAnimId(data.idle1)
 	local idle2 = normAnimId(data.idle2)
 	local walk = normAnimId(data.walk)
@@ -1635,7 +1672,6 @@ local function applySetSystemBroken(setName)
 	local climb = normAnimId(data.climb)
 	local fall = normAnimId(data.fall)
  
-	-- Asignar animaciones
 	if animate:FindFirstChild("idle") then
 		local idle = animate.idle
 		if idle:FindFirstChild("Animation1") and idle1 then
@@ -1686,7 +1722,10 @@ local function applySetSystemBroken(setName)
 	end)
  
 	animate.Disabled = false
-	print("✅ Animaciones aplicadas correctamente ->", setName)
+ 
+	lastAppliedSet = setName
+ 
+	---print("✅ Animaciones aplicadas correctamente ->", setName)
  
 	if Rayfield and Rayfield.Notify then
 		Rayfield:Notify({
@@ -1698,10 +1737,21 @@ local function applySetSystemBroken(setName)
 	end
 end
  
---// Interfaz Rayfield
+ 
+local function setupKeepOnDeath()
+	if characterAddedConn then return end
+	characterAddedConn = plr.CharacterAdded:Connect(function(char)
+		if not keepOnDeath then return end
+		if not lastAppliedSet then return end
+		task.wait(1) -- dar tiempo a que cargue Animate en el personaje nuevo
+		applySetSystemBroken(lastAppliedSet, char)
+	end)
+end
+ 
+ 
  
 AnimacionesTab:CreateButton({
-	Name = "📦 Cargar Paquetes UGC",
+	Name = "📦 Paquetes de Animaciones UGC",
 	Callback = function()
 		if buttonsCreated then return end
 		buttonsCreated = true
@@ -1712,6 +1762,7 @@ AnimacionesTab:CreateButton({
  
 		if not success or type(data) ~= "table" then
 			warn("No se pudo cargar el JSON de animaciones.")
+			buttonsCreated = false -- permite reintentar si fallo la carga
 			if Rayfield and Rayfield.Notify then
 				Rayfield:Notify({
 					Title = "Error",
@@ -1724,6 +1775,20 @@ AnimacionesTab:CreateButton({
 		end
  
 		animData = data
+ 
+		AnimacionesTab:CreateSection("Opciones")
+ 
+		AnimacionesTab:CreateToggle({
+			Name = "Mantener al Morir",
+			CurrentValue = true,
+			Callback = function(value)
+				keepOnDeath = value
+			end
+		})
+ 
+		setupKeepOnDeath()
+ 
+		AnimacionesTab:CreateSection("Paquetes de Animaciones UGCs")
  
 		for setName, _ in pairs(animData) do
 			AnimacionesTab:CreateButton({
