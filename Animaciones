@@ -1394,16 +1394,23 @@ end)
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local plr = Players.LocalPlayer
- 
-local animsURL = "https://pastebin.com/raw/14q07TEP"
- 
-local animData = nil
-local buttonsCreated = false
- 
-local keepOnDeath = true      -- arranca activado por defecto
-local lastAppliedSet = nil    -- guarda el ultimo set aplicado para reaplicarlo al respawnear
+
+-- URLs de cada categoria
+local animsURLOficiales = "https://pastebin.com/raw/14q07TEP"
+local animsURLUGC       = "https://pastebin.com/raw/KGK2inGd"
+
+
+local keepOnDeath = true      -- arranca activado por defecto (UN solo toggle para todo)
+local lastAppliedName = nil   -- nombre del ultimo set aplicado (cualquier categoria)
+local lastAppliedData = nil   -- datos (idle/walk/run/etc) del ultimo set aplicado
 local characterAddedConn = nil
- 
+local optionsCreated = false  -- evita crear el toggle/seccion "Opciones" dos veces
+
+local buttonsCreatedOficiales = false
+local buttonsCreatedUGC = false
+
+--// Funciones base
+
 local function StopAnimForCharacter(char)
 	if not char then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1412,7 +1419,7 @@ local function StopAnimForCharacter(char)
 		pcall(function() t:Stop() end)
 	end
 end
- 
+
 local function normAnimId(a)
 	if not a then return nil end
 	a = tostring(a)
@@ -1421,96 +1428,99 @@ local function normAnimId(a)
 	end
 	return a
 end
- 
-local function applySetSystemBroken(setName, char)
-	if not animData then
-		warn("⚠️ No hay datos cargados todavía.")
+
+
+local function applySetData(setName, data, char)
+	if not data then
+		warn("Set invalido:", setName)
 		return
 	end
- 
-	-- pasa usa el actual/espera a que exista, igual que antes.
+
 	char = char or plr.Character or plr.CharacterAdded:Wait()
- 
+
 	local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
 	local animate = char:FindFirstChild("Animate") or char:WaitForChild("Animate", 5)
 	if not hum or not animate then
 		warn("No se encontró Humanoid o Animate en el personaje.")
 		return
 	end
- 
-	local data = animData[setName]
-	if not data then
-		warn("Set no encontrado:", setName)
+
+
+	local ok, err = pcall(function()
+		animate.Disabled = true
+		StopAnimForCharacter(char)
+
+		local idle1 = normAnimId(data.idle1)
+		local idle2 = normAnimId(data.idle2)
+		local walk = normAnimId(data.walk)
+		local run = normAnimId(data.run or data.walk)
+		local jump = normAnimId(data.jump)
+		local climb = normAnimId(data.climb)
+		local fall = normAnimId(data.fall)
+
+		if animate:FindFirstChild("idle") then
+			local idle = animate.idle
+			if idle:FindFirstChild("Animation1") and idle1 then
+				idle.Animation1.AnimationId = idle1
+			end
+			if idle:FindFirstChild("Animation2") and idle2 then
+				idle.Animation2.AnimationId = idle2
+			end
+		end
+
+		if animate:FindFirstChild("walk") and walk then
+			local w = animate.walk:FindFirstChild("WalkAnim") or animate.walk:FindFirstChildWhichIsA("Animation")
+			if w then w.AnimationId = walk end
+		end
+
+		if animate:FindFirstChild("run") and run then
+			local r = animate.run:FindFirstChild("RunAnim")
+			if not r then
+				r = Instance.new("Animation")
+				r.Name = "RunAnim"
+				r.Parent = animate.run
+			end
+			r.AnimationId = run
+		end
+
+		if animate:FindFirstChild("jump") and jump then
+			local j = animate.jump:FindFirstChild("JumpAnim") or animate.jump:FindFirstChildWhichIsA("Animation")
+			if j then j.AnimationId = jump end
+		end
+
+		if animate:FindFirstChild("climb") and climb then
+			local c = animate.climb:FindFirstChild("ClimbAnim") or animate.climb:FindFirstChildWhichIsA("Animation")
+			if c then c.AnimationId = climb end
+		end
+
+		if animate:FindFirstChild("fall") and fall then
+			local f = animate.fall:FindFirstChild("FallAnim") or animate.fall:FindFirstChildWhichIsA("Animation")
+			if f then f.AnimationId = fall end
+		end
+
+		-- Recarga limpia
+		pcall(function()
+			hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+			task.wait(0.05)
+			hum:ChangeState(Enum.HumanoidStateType.Running)
+			StopAnimForCharacter(char)
+			hum:Move(Vector3.zero)
+		end)
+	end)
+
+	-- Pase lo que pase arriba, esto SIEMPRE se ejecuta.
+	if animate and animate.Parent then
+		animate.Disabled = false
+	end
+
+	if not ok then
+		warn("Error aplicando el set '"..tostring(setName).."':", err)
 		return
 	end
- 
-	animate.Disabled = true
-	StopAnimForCharacter(char)
- 
- 
-	local idle1 = normAnimId(data.idle1)
-	local idle2 = normAnimId(data.idle2)
-	local walk = normAnimId(data.walk)
-	local run = normAnimId(data.run or data.walk)
-	local jump = normAnimId(data.jump)
-	local climb = normAnimId(data.climb)
-	local fall = normAnimId(data.fall)
- 
-	if animate:FindFirstChild("idle") then
-		local idle = animate.idle
-		if idle:FindFirstChild("Animation1") and idle1 then
-			idle.Animation1.AnimationId = idle1
-		end
-		if idle:FindFirstChild("Animation2") and idle2 then
-			idle.Animation2.AnimationId = idle2
-		end
-	end
- 
-	if animate:FindFirstChild("walk") and walk then
-		local w = animate.walk:FindFirstChild("WalkAnim") or animate.walk:FindFirstChildWhichIsA("Animation")
-		if w then w.AnimationId = walk end
-	end
- 
-	if animate:FindFirstChild("run") and run then
-		local r = animate.run:FindFirstChild("RunAnim")
-		if not r then
-			r = Instance.new("Animation")
-			r.Name = "RunAnim"
-			r.Parent = animate.run
-		end
-		r.AnimationId = run
-	end
- 
-	if animate:FindFirstChild("jump") and jump then
-		local j = animate.jump:FindFirstChild("JumpAnim") or animate.jump:FindFirstChildWhichIsA("Animation")
-		if j then j.AnimationId = jump end
-	end
- 
-	if animate:FindFirstChild("climb") and climb then
-		local c = animate.climb:FindFirstChild("ClimbAnim") or animate.climb:FindFirstChildWhichIsA("Animation")
-		if c then c.AnimationId = climb end
-	end
- 
-	if animate:FindFirstChild("fall") and fall then
-		local f = animate.fall:FindFirstChild("FallAnim") or animate.fall:FindFirstChildWhichIsA("Animation")
-		if f then f.AnimationId = fall end
-	end
- 
-	-- Recarga limpia
-	pcall(function()
-		hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-		task.wait(0.05)
-		hum:ChangeState(Enum.HumanoidStateType.Running)
-		StopAnimForCharacter(char)
-		hum:Move(Vector3.zero)
-	end)
- 
-	animate.Disabled = false
- 
-	lastAppliedSet = setName
- 
-	---print("✅ Animaciones aplicadas correctamente ->", setName)
- 
+
+	lastAppliedName = setName
+	lastAppliedData = data
+
 	if Rayfield and Rayfield.Notify then
 		Rayfield:Notify({
 			Title = "Animaciones Aplicadas",
@@ -1520,33 +1530,57 @@ local function applySetSystemBroken(setName, char)
 		})
 	end
 end
- 
- 
+
+-- Conecta (UNA sola vez para TODO el script) el respawn para reaplicar
+-- el ultimo set, sea de la categoria que sea.
 local function setupKeepOnDeath()
 	if characterAddedConn then return end
 	characterAddedConn = plr.CharacterAdded:Connect(function(char)
 		if not keepOnDeath then return end
-		if not lastAppliedSet then return end
+		if not lastAppliedData then return end
 		task.wait(1) -- dar tiempo a que cargue Animate en el personaje nuevo
-		applySetSystemBroken(lastAppliedSet, char)
+		local ok, err = pcall(function()
+			applySetData(lastAppliedName, lastAppliedData, char)
+		end)
+		if not ok then
+			warn("Error reaplicando animaciones al respawnear:", err)
+		end
 	end)
 end
- 
- 
- 
+
+
+local function ensureOptionsUI()
+	if optionsCreated then return end
+	optionsCreated = true
+
+	AnimacionesTab:CreateSection("Opciones")
+
+	AnimacionesTab:CreateToggle({
+		Name = "Mantener al Morir",
+		CurrentValue = true,
+		Callback = function(value)
+			keepOnDeath = value
+		end
+	})
+
+	setupKeepOnDeath()
+end
+
+--// Botón: Paquetes de Animaciones oficiales
+
 AnimacionesTab:CreateButton({
 	Name = "📦 Paquetes de Animaciones oficiales",
 	Callback = function()
-		if buttonsCreated then return end
-		buttonsCreated = true
- 
+		if buttonsCreatedOficiales then return end
+		buttonsCreatedOficiales = true
+
 		local success, data = pcall(function()
-			return HttpService:JSONDecode(game:HttpGet(animsURL))
+			return HttpService:JSONDecode(game:HttpGet(animsURLOficiales))
 		end)
- 
+
 		if not success or type(data) ~= "table" then
-			warn("No se pudo cargar el JSON de animaciones.")
-			buttonsCreated = false -- permite reintentar si fallo la carga
+			warn("No se pudo cargar el JSON de animaciones oficiales.")
+			buttonsCreatedOficiales = false -- permite reintentar si fallo la carga
 			if Rayfield and Rayfield.Notify then
 				Rayfield:Notify({
 					Title = "Error",
@@ -1557,32 +1591,20 @@ AnimacionesTab:CreateButton({
 			end
 			return
 		end
- 
-		animData = data
- 
-		AnimacionesTab:CreateSection("Opciones")
- 
-		AnimacionesTab:CreateToggle({
-			Name = "Mantener al Morir",
-			CurrentValue = true,
-			Callback = function(value)
-				keepOnDeath = value
-			end
-		})
- 
-		setupKeepOnDeath()
- 
+
+		ensureOptionsUI()
+
 		AnimacionesTab:CreateSection("Paquetes de Animaciones")
- 
-		for setName, _ in pairs(animData) do
+
+		for setName, setData in pairs(data) do
 			AnimacionesTab:CreateButton({
 				Name = setName,
 				Callback = function()
-					applySetSystemBroken(setName)
+					applySetData(setName, setData)
 				end
 			})
 		end
- 
+
 		if Rayfield and Rayfield.Notify then
 			Rayfield:Notify({
 				Title = "Animaciones Cargadas",
@@ -1594,175 +1616,21 @@ AnimacionesTab:CreateButton({
 	end
 })
 
+--// Botón: Paquetes de Animaciones UGC
 
-
-
-
-
-
-
-
-
-
-
----UGC
-
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local plr = Players.LocalPlayer
- 
-local animsURL = "https://pastebin.com/raw/KGK2inGd"
- 
-local animData = nil
-local buttonsCreated = false
- 
-local keepOnDeath = true      -- arranca activado por defecto
-local lastAppliedSet = nil    -- guarda el ultimo set aplicado para reaplicarlo al respawnear
-local characterAddedConn = nil
- 
-local function StopAnimForCharacter(char)
-	if not char then return end
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
-	for _, t in ipairs(hum:GetPlayingAnimationTracks()) do
-		pcall(function() t:Stop() end)
-	end
-end
- 
-local function normAnimId(a)
-	if not a then return nil end
-	a = tostring(a)
-	if a:match("^%d+$") then
-		return "rbxassetid://"..a
-	end
-	return a
-end
- 
-local function applySetSystemBroken(setName, char)
-	if not animData then
-		warn("⚠️ No hay datos cargados todavía.")
-		return
-	end
- 
-	-- pasa usa el actual/espera a que exista, igual que antes.
-	char = char or plr.Character or plr.CharacterAdded:Wait()
- 
-	local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
-	local animate = char:FindFirstChild("Animate") or char:WaitForChild("Animate", 5)
-	if not hum or not animate then
-		warn("No se encontró Humanoid o Animate en el personaje.")
-		return
-	end
- 
-	local data = animData[setName]
-	if not data then
-		warn("Set no encontrado:", setName)
-		return
-	end
- 
-	animate.Disabled = true
-	StopAnimForCharacter(char)
- 
- 
-	local idle1 = normAnimId(data.idle1)
-	local idle2 = normAnimId(data.idle2)
-	local walk = normAnimId(data.walk)
-	local run = normAnimId(data.run or data.walk)
-	local jump = normAnimId(data.jump)
-	local climb = normAnimId(data.climb)
-	local fall = normAnimId(data.fall)
- 
-	if animate:FindFirstChild("idle") then
-		local idle = animate.idle
-		if idle:FindFirstChild("Animation1") and idle1 then
-			idle.Animation1.AnimationId = idle1
-		end
-		if idle:FindFirstChild("Animation2") and idle2 then
-			idle.Animation2.AnimationId = idle2
-		end
-	end
- 
-	if animate:FindFirstChild("walk") and walk then
-		local w = animate.walk:FindFirstChild("WalkAnim") or animate.walk:FindFirstChildWhichIsA("Animation")
-		if w then w.AnimationId = walk end
-	end
- 
-	if animate:FindFirstChild("run") and run then
-		local r = animate.run:FindFirstChild("RunAnim")
-		if not r then
-			r = Instance.new("Animation")
-			r.Name = "RunAnim"
-			r.Parent = animate.run
-		end
-		r.AnimationId = run
-	end
- 
-	if animate:FindFirstChild("jump") and jump then
-		local j = animate.jump:FindFirstChild("JumpAnim") or animate.jump:FindFirstChildWhichIsA("Animation")
-		if j then j.AnimationId = jump end
-	end
- 
-	if animate:FindFirstChild("climb") and climb then
-		local c = animate.climb:FindFirstChild("ClimbAnim") or animate.climb:FindFirstChildWhichIsA("Animation")
-		if c then c.AnimationId = climb end
-	end
- 
-	if animate:FindFirstChild("fall") and fall then
-		local f = animate.fall:FindFirstChild("FallAnim") or animate.fall:FindFirstChildWhichIsA("Animation")
-		if f then f.AnimationId = fall end
-	end
- 
-	-- Recarga limpia
-	pcall(function()
-		hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-		task.wait(0.05)
-		hum:ChangeState(Enum.HumanoidStateType.Running)
-		StopAnimForCharacter(char)
-		hum:Move(Vector3.zero)
-	end)
- 
-	animate.Disabled = false
- 
-	lastAppliedSet = setName
- 
-	---print("✅ Animaciones aplicadas correctamente ->", setName)
- 
-	if Rayfield and Rayfield.Notify then
-		Rayfield:Notify({
-			Title = "Animaciones Aplicadas",
-			Content = "Se aplicó el set: " .. setName,
-			Duration = 3,
-			Image = 4483362458
-		})
-	end
-end
- 
- 
-local function setupKeepOnDeath()
-	if characterAddedConn then return end
-	characterAddedConn = plr.CharacterAdded:Connect(function(char)
-		if not keepOnDeath then return end
-		if not lastAppliedSet then return end
-		task.wait(1) -- dar tiempo a que cargue Animate en el personaje nuevo
-		applySetSystemBroken(lastAppliedSet, char)
-	end)
-end
- 
- 
- 
 AnimacionesTab:CreateButton({
 	Name = "📦 Paquetes de Animaciones UGC",
 	Callback = function()
-		if buttonsCreated then return end
-		buttonsCreated = true
- 
+		if buttonsCreatedUGC then return end
+		buttonsCreatedUGC = true
+
 		local success, data = pcall(function()
-			return HttpService:JSONDecode(game:HttpGet(animsURL))
+			return HttpService:JSONDecode(game:HttpGet(animsURLUGC))
 		end)
- 
+
 		if not success or type(data) ~= "table" then
-			warn("No se pudo cargar el JSON de animaciones.")
-			buttonsCreated = false -- permite reintentar si fallo la carga
+			warn("No se pudo cargar el JSON de animaciones UGC.")
+			buttonsCreatedUGC = false -- permite reintentar si fallo la carga
 			if Rayfield and Rayfield.Notify then
 				Rayfield:Notify({
 					Title = "Error",
@@ -1773,32 +1641,20 @@ AnimacionesTab:CreateButton({
 			end
 			return
 		end
- 
-		animData = data
- 
-		AnimacionesTab:CreateSection("Opciones")
- 
-		AnimacionesTab:CreateToggle({
-			Name = "Mantener al Morir",
-			CurrentValue = true,
-			Callback = function(value)
-				keepOnDeath = value
-			end
-		})
- 
-		setupKeepOnDeath()
- 
+
+		ensureOptionsUI()
+
 		AnimacionesTab:CreateSection("Paquetes de Animaciones UGCs")
- 
-		for setName, _ in pairs(animData) do
+
+		for setName, setData in pairs(data) do
 			AnimacionesTab:CreateButton({
 				Name = setName,
 				Callback = function()
-					applySetSystemBroken(setName)
+					applySetData(setName, setData)
 				end
 			})
 		end
- 
+
 		if Rayfield and Rayfield.Notify then
 			Rayfield:Notify({
 				Title = "Animaciones Cargadas",
@@ -1809,6 +1665,5 @@ AnimacionesTab:CreateButton({
 		end
 	end
 })
-
 
 
