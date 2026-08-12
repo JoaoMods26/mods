@@ -1217,7 +1217,7 @@ Button = MainTab:CreateButton({
 ---Quitar cooldown E---
 
 Button = MainTab:CreateButton({
-   Name = "Quitar Cooldown E",
+   Name = "Interacciones instantaneas (Quitar cooldown)",
    Callback = function()
    for i,v in pairs(game:GetService("Workspace"):GetDescendants()) do
 	if v:IsA("ProximityPrompt") then
