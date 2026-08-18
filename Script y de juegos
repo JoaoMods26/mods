@@ -465,6 +465,13 @@ boton= Juegostab:CreateButton({
 })
 
 boton= Juegostab:CreateButton({
+   Name = "Fake VR JMODS(Natural disaster)",
+   Callback = function()
+       loadstring(game:HttpGet('http://github.com/JoaoMods26/venekop/raw/refs/heads/main/Natural%20Desasters%20FVR'))()
+   end,
+})
+
+boton= Juegostab:CreateButton({
    Name = "Super ring v6 mod(Natural disaster)",
    Callback = function()
        loadstring(game:HttpGet('https://pastebin.com/raw/3T1GqKzQ'))()
