@@ -67,7 +67,6 @@ Note = "Falta poco. Más info en mi Discord: discord.gg/4bzTyQBBnt",
 
 
 
--- [[ notificaciones Jmods Universal
 
 task.delay(0.3, function()
     local success, err = pcall(function()
