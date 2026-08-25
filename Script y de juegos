@@ -69,6 +69,7 @@ local Button21 = TPTab:CreateButton({
    end,
 })
 
+
 local Button20 = TPTab:CreateButton({
    Name = "Black hole(Kawaii op)",
    Callback = function()
@@ -118,7 +119,7 @@ local Button6 = TPTab:CreateButton({
 })
 
 local Button12 = TPTab:CreateButton({
-   Name = 'GhostHub ("Mantenimiento")',
+   Name = 'GhostHub',
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/GhostPlayer352/Test4/main/GhostHub'))()
    end,
