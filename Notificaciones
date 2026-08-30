@@ -1,7 +1,3 @@
--- =============================================================
---  JMODS Notifier v2.7  |  Texto largo sin corte + altura dinamica
--- =============================================================
-
 local HttpService  = game:GetService("HttpService")
 local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -37,11 +33,6 @@ local POSICIONES = {
 }
 local posicionSeleccionada = "top_right"
 
--- ============================================================
---  POSICION CORREGIDA: usa ViewportSize para pixeles exactos.
---  El bug anterior usaba escala UDim2 (0-1) que varia segun
---  pantalla y el inset del topbar causaba desplazamiento.
--- ============================================================
 local function getPosUDim2(posId, frameW, frameH)
 	local cam = workspace.CurrentCamera
 	local vp  = cam and cam.ViewportSize or Vector2.new(1280, 720)
@@ -102,11 +93,6 @@ for _, g in ipairs(guiParent:GetChildren()) do
 	end
 end
 
--- =============================================================
---  FUNCION REUTILIZABLE: construir frame de notificacion
---  v2.7: altura dinamica real usando TextService:GetTextSize
---        TextWrapped = true, sin truncado.
--- =============================================================
 local function construirNotifFrame(parent, data, zBase)
 	zBase = zBase or 1
 	local msg   = data.mensaje    or ""
@@ -117,7 +103,6 @@ local function construirNotifFrame(parent, data, zBase)
 	local cg    = (data.color and data.color[2]) or 140
 	local cb    = (data.color and data.color[3]) or 255
 
-	-- Ancho disponible para texto: frame(340) - margenIzq(46) - margenDer(10)
 	local LABEL_W = esMobil and 228 or 284
 	local FONT     = Enum.Font.Gotham
 	local FSIZE = esMobil and 12 or 13
@@ -180,7 +165,6 @@ local function construirNotifFrame(parent, data, zBase)
 	end
 	local altH = math.max(80, yStart + contentH + 14)  -- 14 = barra + padding
 
-	-- ── Crear el frame ───────────────────────────────────────
 	local nFrame = Instance.new("Frame", parent)
 local FRAME_W = esMobil and 285 or 340
 
@@ -288,9 +272,6 @@ lbl.Position = UDim2.new(0, textX, 0, yOff)
 	return nFrame, pFill, posInicial, posId, dur
 end
 
--- =============================================================
---  PANEL DE CONTROL - solo duenos
--- =============================================================
 if duenos[player.Name] then
 
 	local screenGui = Instance.new("ScreenGui", guiParent)
@@ -308,7 +289,6 @@ if duenos[player.Name] then
 	local currentR, currentG, currentB = 100, 140, 255
 	local currentH, currentS, currentV = Color3.fromRGB(100,140,255):ToHSV()
 
-	-- Frame principal
 	local frame = Instance.new("Frame", screenGui)
 	frame.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
 	frame.Position = UDim2.new(0, 20, 0, esMobil and 60 or 80)
@@ -409,7 +389,6 @@ if duenos[player.Name] then
 	local secDur, _ = crearSeccion("DURACION (segundos)", 3)
 	local duracionBox = crearInputBox(secDur, "6", "6", 14)
 
-	-- Dropdown posicion
 	local secPos, _ = crearSeccion("POSICION", 4)
 	local dropBtn = Instance.new("TextButton", secPos)
 	dropBtn.Size = UDim2.new(1,0,0,INP_H); dropBtn.Position = UDim2.new(0,0,0,14)
@@ -474,7 +453,6 @@ if duenos[player.Name] then
 		end
 	end)
 
-	-- Seccion COLOR (RGB inputs)
 	local COL_W = math.floor((PANEL_W-PAD*2-40)/3)
 	local secColor, _ = crearSeccion("COLOR  (R / G / B)", 5)
 	secColor.Size = UDim2.new(1,0,0,INP_H+16)
@@ -506,9 +484,6 @@ if duenos[player.Name] then
 	colorG:GetPropertyChangedSignal("Text"):Connect(onRGBChange)
 	colorB:GetPropertyChangedSignal("Text"):Connect(onRGBChange)
 
-	-- ==========================================================
-	--  COLOR PICKER FLOTANTE
-	-- ==========================================================
 	local pickerGui = Instance.new("ScreenGui", guiParent)
 	pickerGui.Name = "JmodsColorPicker"; pickerGui.ResetOnSpawn = false
 	pickerGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -549,7 +524,6 @@ if duenos[player.Name] then
 	addCorner(pkClose,4)
 	pkClose.MouseButton1Click:Connect(function() pickerWin.Visible=false end)
 
-	-- Drag manual desde pkHeader
 	do
 		local dragWin=false; local dragStart=Vector2.new(); local winStart=Vector2.new()
 		pkHeader.InputBegan:Connect(function(input)
@@ -663,7 +637,6 @@ if duenos[player.Name] then
 	hexBox.TextColor3=Color3.fromRGB(210,210,228); hexBox.Font=Enum.Font.Gotham
 	hexBox.TextSize=FONT_INP; hexBox.ClearTextOnFocus=false
 
-	-- DRAG: variable unica activeZone
 	local activeZone = nil
 
 	local function getRelative(f, pos)
@@ -753,7 +726,6 @@ if duenos[player.Name] then
 		chip.MouseButton1Click:Connect(function() local h,s,v=col:ToHSV(); applyHSV(h,s,v) end)
 	end
 
-	-- Boton abrir/cerrar picker
 	local secColorBtn=Instance.new("Frame",content)
 	secColorBtn.Size=UDim2.new(1,0,0,BTN_H-4); secColorBtn.BackgroundTransparency=1; secColorBtn.LayoutOrder=6
 
@@ -780,7 +752,6 @@ if duenos[player.Name] then
 		end
 	end)
 
-	-- Toggle Fijar
 	local fijarNotificacion=false
 	local secFijar=Instance.new("Frame",content)
 	secFijar.Size=UDim2.new(1,0,0,INP_H); secFijar.BackgroundTransparency=1; secFijar.LayoutOrder=7
@@ -805,7 +776,6 @@ if duenos[player.Name] then
 		end
 	end)
 
-	-- Boton PREVIEW
 	local previewActive=false; local previewGui=nil
 	local secPreview=Instance.new("Frame",content)
 	secPreview.Size=UDim2.new(1,0,0,BTN_H); secPreview.BackgroundTransparency=1; secPreview.LayoutOrder=8
@@ -866,7 +836,6 @@ if duenos[player.Name] then
 		end
 	end)
 
-	-- Boton ENVIAR
 	local secEnviar=Instance.new("Frame",content)
 	secEnviar.Size=UDim2.new(1,0,0,BTN_H); secEnviar.BackgroundTransparency=1; secEnviar.LayoutOrder=9
 
@@ -943,11 +912,8 @@ if duenos[player.Name] then
 		toggleBtn.MouseButton1Click:Connect(function() frame.Visible=not frame.Visible end)
 	end
 
-end -- fin bloque duenos
+end
 
--- =============================================================
---  RECEPTOR DE NOTIFICACIONES - todos los jugadores
--- =============================================================
 task.spawn(function()
 	local req=(syn and syn.request) or (http and http.request) or request
 	if not req then return end
