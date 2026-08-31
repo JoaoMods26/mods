@@ -3237,8 +3237,7 @@ VCTab:CreateParagraph({
 
 
 
---hitbox nuevo
-----Hitbox Espander---- 
+--hitbox rework  XDD
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -3251,19 +3250,18 @@ getgenv().HitboxTransparency = 0.9
 getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
 
--- Crear grupo de colisión sin colisiones
 pcall(function()
     PhysicsService:RegisterCollisionGroup("NoCollision")
     PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
 end)
 
- function applyNoCollision(part)
+local function applyNoCollision(part)
     if part and part:IsA("BasePart") then
         PhysicsService:SetPartCollisionGroup(part, "NoCollision")
     end
 end
 
- function applyNoCollisionToCharacter(character)
+local function applyNoCollisionToCharacter(character)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
             applyNoCollision(part)
@@ -3271,65 +3269,116 @@ end
     end
 end
 
--- Hitboxes de vehículos
 local vehicleHitboxes = {}
 
--- Crear hitbox para jugador en vehículo
--- Crear hitbox para jugador en vehículo
- function createVehicleHitbox(player, targetPart)
+local function createVehicleHitbox(player, targetPart)
+    if vehicleHitboxes[player] then
+        if vehicleHitboxes[player].Parent then
+            vehicleHitboxes[player]:Destroy()
+        end
+        vehicleHitboxes[player] = nil
+    end
+
     local part = Instance.new("Part")
-    part.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+    part.Size = Vector3.new(
+        getgenv().HitboxSize,
+        getgenv().HitboxSize,
+        getgenv().HitboxSize
+    )
     part.Transparency = getgenv().HitboxTransparency
     part.Anchored = false
-    part.CanCollide = false -- <--- No bloquea nada
+    part.CanCollide = false
     part.Massless = true
     part.Name = "VehicleHitbox"
     part.Parent = Workspace
+
     vehicleHitboxes[player] = part
 end
--- Actualizar hitboxes
- function updateHitboxes()
+
+local function updateHitboxes()
+    if not getgenv().HitboxStatus then
+        return
+    end
+
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer and player.Character then
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if not humanoid or not hrp then continue end
 
-            local isEnemy = not getgenv().TeamCheck or (player.Team ~= Players.LocalPlayer.Team)
-            local size = isEnemy and Vector3.new(getgenv().HitboxSize,getgenv().HitboxSize,getgenv().HitboxSize) or Vector3.new(2,2,1)
-            local transparency = isEnemy and getgenv().HitboxTransparency or 1
-            local color = isEnemy and BrickColor.new("Really black") or BrickColor.new("Medium stone grey")
-            local material = isEnemy and Enum.Material.Neon or Enum.Material.Plastic
+            if not humanoid or not hrp then
+                continue
+            end
+
+            local isEnemy =
+                not getgenv().TeamCheck
+                or (player.Team ~= Players.LocalPlayer.Team)
+
+            local size = isEnemy
+                and Vector3.new(
+                    getgenv().HitboxSize,
+                    getgenv().HitboxSize,
+                    getgenv().HitboxSize
+                )
+                or Vector3.new(2, 2, 1)
+
+            local transparency = isEnemy
+                and getgenv().HitboxTransparency
+                or 1
+
+            local color = isEnemy
+                and BrickColor.new("Really black")
+                or BrickColor.new("Medium stone grey")
+
+            local material = isEnemy
+                and Enum.Material.Neon
+                or Enum.Material.Plastic
 
             local seatPart = humanoid.SeatPart
 
             if seatPart then
-                -- En vehículo: usar hitbox extra
                 if not vehicleHitboxes[player] then
                     createVehicleHitbox(player, seatPart)
                 end
-local hb = vehicleHitboxes[player]
-hb.Size = size
-hb.Position = seatPart.Position
-hb.CFrame = seatPart.CFrame
-hb.Transparency = transparency
-hb.BrickColor = color
-hb.Material = material
-hb.CanCollide = false
+
+                local hb = vehicleHitboxes[player]
+
+                if hb and hb.Parent then
+                    hb.Size = size
+                    hb.Position = seatPart.Position
+                    hb.CFrame = seatPart.CFrame
+                    hb.Transparency = transparency
+                    hb.BrickColor = color
+                    hb.Material = material
+                    hb.CanCollide = false
+                end
             else
-                -- A pie: modificar HRP directamente
                 if vehicleHitboxes[player] then
                     if vehicleHitboxes[player].Parent then
                         vehicleHitboxes[player]:Destroy()
                     end
+
                     vehicleHitboxes[player] = nil
                 end
 
-                if hrp.Size ~= size then hrp.Size = size end
-                if hrp.Transparency ~= transparency then hrp.Transparency = transparency end
-                if hrp.BrickColor ~= color then hrp.BrickColor = color end
-                if hrp.Material ~= material then hrp.Material = material end
-                if hrp.CanCollide then hrp.CanCollide = false end
+                if hrp.Size ~= size then
+                    hrp.Size = size
+                end
+
+                if hrp.Transparency ~= transparency then
+                    hrp.Transparency = transparency
+                end
+
+                if hrp.BrickColor ~= color then
+                    hrp.BrickColor = color
+                end
+
+                if hrp.Material ~= material then
+                    hrp.Material = material
+                end
+
+                if hrp.CanCollide then
+                    hrp.CanCollide = false
+                end
             end
 
             applyNoCollisionToCharacter(player.Character)
@@ -3337,89 +3386,144 @@ hb.CanCollide = false
     end
 end
 
--- Reset hitboxes
- function resetHitboxes()
+local function resetHitboxes()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            local humanoid = player.Character:FindFirstChild("Humanoid")
+
             if hrp then
-                hrp.Size = Vector3.new(2,2,1)
+                hrp.Size = Vector3.new(2, 2, 1)
                 hrp.Transparency = 1
                 hrp.BrickColor = BrickColor.new("Medium stone grey")
                 hrp.Material = Enum.Material.Plastic
                 hrp.CanCollide = false
             end
+
             if vehicleHitboxes[player] then
                 if vehicleHitboxes[player].Parent then
                     vehicleHitboxes[player]:Destroy()
                 end
+
                 vehicleHitboxes[player] = nil
             end
         end
     end
+
+    for player, part in pairs(vehicleHitboxes) do
+        if part then
+            if part.Parent then
+                part:Destroy()
+            end
+        end
+
+        vehicleHitboxes[player] = nil
+    end
 end
 
--- Toggle principal
+getgenv().HitboxStatus = false
+
 local hitboxConnection
+local lastHitboxUpdate = 0
+
+local function stopHitbox()
+    getgenv().HitboxStatus = false
+    lastHitboxUpdate = 0
+
+    if hitboxConnection then
+        hitboxConnection:Disconnect()
+        hitboxConnection = nil
+    end
+
+    resetHitboxes()
+end
+
+stopHitbox()
+
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
     CurrentValue = false,
     Flag = "HitboxToggle",
     Callback = function(state)
-        getgenv().HitboxStatus = state
-        if state then
-            updateHitboxes()
-            hitboxConnection = RunService.Heartbeat:Connect(function()
-                if getgenv().HitboxStatus then
-                    updateHitboxes()
-                    task.wait(0.2)
-                end
-            end)
-        else
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-                hitboxConnection = nil
-            end
-            resetHitboxes()
+        if not state then
+            stopHitbox()
+            return
         end
+
+        if hitboxConnection then
+            hitboxConnection:Disconnect()
+            hitboxConnection = nil
+        end
+
+        getgenv().HitboxStatus = true
+        lastHitboxUpdate = tick()
+
+        updateHitboxes()
+
+        hitboxConnection = RunService.Heartbeat:Connect(function()
+            if not getgenv().HitboxStatus then
+                if hitboxConnection then
+                    hitboxConnection:Disconnect()
+                    hitboxConnection = nil
+                end
+
+                return
+            end
+
+            local now = tick()
+
+            if now - lastHitboxUpdate >= 0.2 then
+                lastHitboxUpdate = now
+                updateHitboxes()
+            end
+        end)
     end
 })
 
--- Toggle Team Check
 HitboxTab:CreateToggle({
     Name = "Team Checker",
     CurrentValue = false,
     Flag = "TeamCheckToggle",
     Callback = function(state)
         getgenv().TeamCheck = state
+
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
     end
 })
 
--- Slider tamaño
 HitboxTab:CreateSlider({
     Name = "Tamaño del Hitbox",
-    Range = {2,500},
+    Range = {2, 500},
     Increment = 1,
     Suffix = "studs",
     CurrentValue = getgenv().HitboxSize,
     Flag = "HitboxSizeSlider",
     Callback = function(val)
         getgenv().HitboxSize = val
+
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
     end
 })
 
--- Slider transparencia
 HitboxTab:CreateSlider({
     Name = "Transparencia",
-    Range = {0,1},
+    Range = {0, 1},
     Increment = 0.05,
     CurrentValue = getgenv().HitboxTransparency,
     Flag = "HitboxTransparencySlider",
     Callback = function(val)
         getgenv().HitboxTransparency = val
+
+        if getgenv().HitboxStatus then
+            updateHitboxes()
+        end
     end
 })
+
+
 
 
 
