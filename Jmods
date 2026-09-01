@@ -3238,19 +3238,24 @@ VCTab:CreateParagraph({
 
 
 --hitbox rework XDD
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
 local Workspace = game:GetService("Workspace")
+
 local HitboxTab = Window:CreateTab("Hitbox", nil)
+
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
 getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
+
 local vehicleHitboxes = {}
 local hitboxConnection = nil
 local lastHitboxUpdate = 0
 local collisionGroupReady = false
+local hitboxHasBeenUsed = false
 
 local function setupCollisionGroup()
     if collisionGroupReady then
@@ -3448,6 +3453,10 @@ local function updateHitboxes()
 end
 
 local function resetHitboxes()
+    if not hitboxHasBeenUsed then
+        return
+    end
+
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -3477,9 +3486,15 @@ local function resetHitboxes()
 
         vehicleHitboxes[player] = nil
     end
+
+    hitboxHasBeenUsed = false
 end
 
 local function stopHitbox()
+    if not getgenv().HitboxStatus and not hitboxConnection and not hitboxHasBeenUsed then
+        return
+    end
+
     getgenv().HitboxStatus = false
     lastHitboxUpdate = 0
 
@@ -3502,12 +3517,18 @@ local function startHitbox()
     end
 
     getgenv().HitboxStatus = true
+    hitboxHasBeenUsed = true
     lastHitboxUpdate = tick()
 
     updateHitboxes()
 
     if not getgenv().HitboxStatus then
         return
+    end
+
+    if hitboxConnection then
+        hitboxConnection:Disconnect()
+        hitboxConnection = nil
     end
 
     hitboxConnection = RunService.Heartbeat:Connect(function()
@@ -3532,11 +3553,10 @@ end
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
     CurrentValue = false,
-    Flag = "HitboxToggle",
     Callback = function(state)
-        if state then
+        if state == true then
             startHitbox()
-        else
+        elseif getgenv().HitboxStatus or hitboxHasBeenUsed or hitboxConnection then
             stopHitbox()
         end
     end
