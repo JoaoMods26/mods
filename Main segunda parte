@@ -2217,3 +2217,96 @@ MainTab:CreateToggle({
 		end
 	end
 })
+
+
+
+
+-----sentao
+local ForceSitEnabled = false
+local ForceSitConnection = nil
+local ForceSitCharacterConnection = nil
+local function ForceSit()
+    local character = game:GetService("Players").LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health > 0 then
+        humanoid.Sit = true
+        humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+    end
+end
+
+local function StopForceSit()
+    ForceSitEnabled = false
+
+    if ForceSitConnection then
+        ForceSitConnection:Disconnect()
+        ForceSitConnection = nil
+    end
+
+    if ForceSitCharacterConnection then
+        ForceSitCharacterConnection:Disconnect()
+        ForceSitCharacterConnection = nil
+    end
+
+    local character = game:GetService("Players").LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    if humanoid then
+        humanoid.Sit = false
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+end
+
+local function StartForceSit()
+    if ForceSitEnabled then
+        return
+    end
+
+    ForceSitEnabled = true
+
+    ForceSit()
+
+    ForceSitConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not ForceSitEnabled then
+            return
+        end
+
+        local character = game:GetService("Players").LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+        if humanoid and humanoid.Health > 0 and not humanoid.Sit then
+            humanoid.Sit = true
+            humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+        end
+    end)
+
+    ForceSitCharacterConnection = game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(character)
+        if not ForceSitEnabled then
+            return
+        end
+
+        local humanoid = character:WaitForChild("Humanoid", 5)
+
+        if humanoid and ForceSitEnabled then
+            task.wait(0.1)
+
+            if ForceSitEnabled then
+                humanoid.Sit = true
+                humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+            end
+        end
+    end)
+end
+
+MainTab:CreateToggle({
+    Name = "Sentarse",
+    CurrentValue = false,
+    Flag = "ForceSit",
+    Callback = function(Value)
+        if Value then
+            StartForceSit()
+        else
+            StopForceSit()
+        end
+    end
+})
+
