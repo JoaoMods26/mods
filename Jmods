@@ -3237,54 +3237,92 @@ VCTab:CreateParagraph({
 
 
 
---hitbox rework  XDD
+--hitbox rework XDD
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
 local Workspace = game:GetService("Workspace")
-
 local HitboxTab = Window:CreateTab("Hitbox", nil)
-
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.9
 getgenv().HitboxStatus = false
 getgenv().TeamCheck = false
+local vehicleHitboxes = {}
+local hitboxConnection = nil
+local lastHitboxUpdate = 0
+local collisionGroupReady = false
 
-pcall(function()
-    PhysicsService:RegisterCollisionGroup("NoCollision")
-    PhysicsService:CollisionGroupSetCollidable("NoCollision", "NoCollision", false)
-end)
+local function setupCollisionGroup()
+    if collisionGroupReady then
+        return true
+    end
+
+    local success = pcall(function()
+        if PhysicsService.RegisterCollisionGroup then
+            PhysicsService:RegisterCollisionGroup("NoCollision")
+        end
+
+        PhysicsService:CollisionGroupSetCollidable(
+            "NoCollision",
+            "NoCollision",
+            false
+        )
+    end)
+
+    if success then
+        collisionGroupReady = true
+    end
+
+    return success
+end
 
 local function applyNoCollision(part)
-    if part and part:IsA("BasePart") then
-        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
+    if not part or not part:IsA("BasePart") then
+        return
     end
+
+    pcall(function()
+        PhysicsService:SetPartCollisionGroup(part, "NoCollision")
+    end)
 end
 
 local function applyNoCollisionToCharacter(character)
+    if not character then
+        return
+    end
+
     for _, part in pairs(character:GetDescendants()) do
+        if not getgenv().HitboxStatus then
+            return
+        end
+
         if part:IsA("BasePart") then
             applyNoCollision(part)
         end
     end
 end
 
-local vehicleHitboxes = {}
+local function createVehicleHitbox(player)
+    if not getgenv().HitboxStatus then
+        return nil
+    end
 
-local function createVehicleHitbox(player, targetPart)
     if vehicleHitboxes[player] then
         if vehicleHitboxes[player].Parent then
             vehicleHitboxes[player]:Destroy()
         end
+
         vehicleHitboxes[player] = nil
     end
 
     local part = Instance.new("Part")
+
     part.Size = Vector3.new(
         getgenv().HitboxSize,
         getgenv().HitboxSize,
         getgenv().HitboxSize
     )
+
     part.Transparency = getgenv().HitboxTransparency
     part.Anchored = false
     part.CanCollide = false
@@ -3293,6 +3331,8 @@ local function createVehicleHitbox(player, targetPart)
     part.Parent = Workspace
 
     vehicleHitboxes[player] = part
+
+    return part
 end
 
 local function updateHitboxes()
@@ -3301,9 +3341,14 @@ local function updateHitboxes()
     end
 
     for _, player in pairs(Players:GetPlayers()) do
+        if not getgenv().HitboxStatus then
+            return
+        end
+
         if player ~= Players.LocalPlayer and player.Character then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local character = player.Character
+            local humanoid = character:FindFirstChild("Humanoid")
+            local hrp = character:FindFirstChild("HumanoidRootPart")
 
             if not humanoid or not hrp then
                 continue
@@ -3313,31 +3358,47 @@ local function updateHitboxes()
                 not getgenv().TeamCheck
                 or (player.Team ~= Players.LocalPlayer.Team)
 
-            local size = isEnemy
-                and Vector3.new(
+            local size
+
+            if isEnemy then
+                size = Vector3.new(
                     getgenv().HitboxSize,
                     getgenv().HitboxSize,
                     getgenv().HitboxSize
                 )
-                or Vector3.new(2, 2, 1)
+            else
+                size = Vector3.new(2, 2, 1)
+            end
 
-            local transparency = isEnemy
-                and getgenv().HitboxTransparency
-                or 1
+            local transparency
 
-            local color = isEnemy
-                and BrickColor.new("Really black")
-                or BrickColor.new("Medium stone grey")
+            if isEnemy then
+                transparency = getgenv().HitboxTransparency
+            else
+                transparency = 1
+            end
 
-            local material = isEnemy
-                and Enum.Material.Neon
-                or Enum.Material.Plastic
+            local color
+
+            if isEnemy then
+                color = BrickColor.new("Really black")
+            else
+                color = BrickColor.new("Medium stone grey")
+            end
+
+            local material
+
+            if isEnemy then
+                material = Enum.Material.Neon
+            else
+                material = Enum.Material.Plastic
+            end
 
             local seatPart = humanoid.SeatPart
 
             if seatPart then
                 if not vehicleHitboxes[player] then
-                    createVehicleHitbox(player, seatPart)
+                    createVehicleHitbox(player)
                 end
 
                 local hb = vehicleHitboxes[player]
@@ -3381,7 +3442,7 @@ local function updateHitboxes()
                 end
             end
 
-            applyNoCollisionToCharacter(player.Character)
+            applyNoCollisionToCharacter(character)
         end
     end
 end
@@ -3410,20 +3471,13 @@ local function resetHitboxes()
     end
 
     for player, part in pairs(vehicleHitboxes) do
-        if part then
-            if part.Parent then
-                part:Destroy()
-            end
+        if part and part.Parent then
+            part:Destroy()
         end
 
         vehicleHitboxes[player] = nil
     end
 end
-
-getgenv().HitboxStatus = false
-
-local hitboxConnection
-local lastHitboxUpdate = 0
 
 local function stopHitbox()
     getgenv().HitboxStatus = false
@@ -3437,45 +3491,54 @@ local function stopHitbox()
     resetHitboxes()
 end
 
-stopHitbox()
+local function startHitbox()
+    if getgenv().HitboxStatus then
+        return
+    end
+
+    if not setupCollisionGroup() then
+        getgenv().HitboxStatus = false
+        return
+    end
+
+    getgenv().HitboxStatus = true
+    lastHitboxUpdate = tick()
+
+    updateHitboxes()
+
+    if not getgenv().HitboxStatus then
+        return
+    end
+
+    hitboxConnection = RunService.Heartbeat:Connect(function()
+        if not getgenv().HitboxStatus then
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
+
+            return
+        end
+
+        local now = tick()
+
+        if now - lastHitboxUpdate >= 0.2 then
+            lastHitboxUpdate = now
+            updateHitboxes()
+        end
+    end)
+end
 
 HitboxTab:CreateToggle({
     Name = "Hitbox Expander",
     CurrentValue = false,
     Flag = "HitboxToggle",
     Callback = function(state)
-        if not state then
+        if state then
+            startHitbox()
+        else
             stopHitbox()
-            return
         end
-
-        if hitboxConnection then
-            hitboxConnection:Disconnect()
-            hitboxConnection = nil
-        end
-
-        getgenv().HitboxStatus = true
-        lastHitboxUpdate = tick()
-
-        updateHitboxes()
-
-        hitboxConnection = RunService.Heartbeat:Connect(function()
-            if not getgenv().HitboxStatus then
-                if hitboxConnection then
-                    hitboxConnection:Disconnect()
-                    hitboxConnection = nil
-                end
-
-                return
-            end
-
-            local now = tick()
-
-            if now - lastHitboxUpdate >= 0.2 then
-                lastHitboxUpdate = now
-                updateHitboxes()
-            end
-        end)
     end
 })
 
