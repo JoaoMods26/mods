@@ -6,7 +6,6 @@ local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 
--- CAMBIO: no inicializamos personaje al cargar
 local character = nil
 local humanoidRootPart = nil
 local camera = workspace.CurrentCamera
@@ -333,7 +332,6 @@ MainTab:CreateToggle({
 
 
 -- SHIFTLOCK
--- SHIFTLOCK
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -507,7 +505,6 @@ function UI.updateButton(isActive)
             end
         end
         
-        -- Calcular el tamaño reducido correctamente
         local smallSize = UDim2.new(
             Config.buttonSize.X.Scale * 0.9,
             Config.buttonSize.X.Offset * 0.9,
@@ -629,7 +626,6 @@ function ShiftlockCore.activate()
         return 
     end
     
-    -- En móvil, la validación es diferente porque no usamos el mouse
     local isValid = Utils.isValidForShiftlock()
     if not isValid and not Services.UserInputService.TouchEnabled then
         return
@@ -637,7 +633,6 @@ function ShiftlockCore.activate()
     
     State.active = true
     
-    -- En PC ocultar cursor, en móvil no
     if not Services.UserInputService.TouchEnabled then
         Services.UserInputService.MouseIconEnabled = false
         Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
@@ -656,7 +651,6 @@ function ShiftlockCore.deactivate()
     
     State.active = false
     
-    -- Restaurar cursor solo si no es móvil
     if not Services.UserInputService.TouchEnabled then
         Services.UserInputService.MouseIconEnabled = true
         Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
@@ -690,21 +684,16 @@ function ShiftlockCore.disable()
     
     State.enabled = false
     
-    -- Primero desactivar si está activo
     if State.active then
         ShiftlockCore.deactivate()
     end
     
-    -- Limpiar todas las conexiones
     Utils.cleanupConnections()
     
-    -- Destruir UI
     UI.destroy()
     
-    -- Limpiar input
     Input.cleanup()
     
-    -- Forzar reset del estado activo por si acaso
     State.active = false
 end
 
@@ -754,7 +743,6 @@ getgenv().ToggleShiftlock = ToggleShiftlock
 
 
 
----Volar autos
 --Volar autos y normal
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -763,8 +751,6 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-
--- CAMBIO: no inicializamos personaje al cargar
 local Character = nil
 local Humanoid = nil
 local RootPart = nil
@@ -1040,7 +1026,6 @@ function ToggleFlyVehicle(state)
     end
 end
 
--- CAMBIO: inicializar personaje y CharacterAdded solo al primer uso
 FlyToggle = MainTab:CreateToggle({
     Name = "Volar en Vehiculos",
     CurrentValue = false,
@@ -1096,7 +1081,6 @@ local isWalkingInAir = false
 local floorPart = nil
 local airWalkHeartbeat = nil
 
--- Detectar si está tocando suelo REAL (no nuestra plataforma)
  function isTouchingRealGround()
     local character = player.Character
     if not character then return false end
@@ -1128,7 +1112,6 @@ local airWalkHeartbeat = nil
     return false
 end
 
--- Crear el piso invisible
  function createFloor()
     if floorPart then
         floorPart:Destroy()
@@ -1144,7 +1127,6 @@ end
     floorPart.CastShadow = false
     floorPart.Parent = workspace
     
-    -- Posición inicial debajo del jugador
     local character = player.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
         local root = character.HumanoidRootPart
@@ -1152,7 +1134,6 @@ end
     end
 end
 
--- Limpiar el piso
 function destroyFloor()
     if floorPart then
         floorPart:Destroy()
@@ -1160,7 +1141,6 @@ function destroyFloor()
     end
 end
 
--- Limpiar la conexión
 local function disconnectAirWalkHeartbeat()
     if airWalkHeartbeat then
         airWalkHeartbeat:Disconnect()
@@ -1198,19 +1178,14 @@ airWalkHeartbeat = RunService.Heartbeat:Connect(function()
                 local onRealGround = isTouchingRealGround()
                 
                 if onRealGround then
-                    -- Si está en suelo real, mover la plataforma lejos
                     floorPart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 1000, root.Position.Z)
                 else
-                    -- Si está en el aire, mantener la plataforma debajo
-                    -- La plataforma sigue al jugador horizontalmente pero mantiene altura relativa
                     local targetY = root.Position.Y - 3
                     
-                    -- Si la plataforma está muy lejos verticalmente, reposicionarla
                     local distance = math.abs(floorPart.Position.Y - targetY)
                     if distance > 5 then
                         floorPart.CFrame = CFrame.new(root.Position.X, targetY, root.Position.Z)
                     else
-                        -- Solo actualizar posición horizontal para mantener estabilidad
                         floorPart.CFrame = CFrame.new(root.Position.X, floorPart.Position.Y, root.Position.Z)
                     end
                 end
@@ -1224,7 +1199,6 @@ disconnectAirWalkHeartbeat()
     end,
 })
 
--- Limpiar al morir o cambiar de personaje
 player.CharacterAdded:Connect(function(newChar)
     task.wait(0.3)
     
@@ -1236,7 +1210,6 @@ disconnectAirWalkHeartbeat()
     end
 end)
 
--- Limpiar al salir del juego
 game:GetService("Players").PlayerRemoving:Connect(function(playerWhoLeft)
     if playerWhoLeft == player then
 disconnectAirWalkHeartbeat()
@@ -1353,7 +1326,6 @@ MainTab:CreateToggle({
 	CurrentValue = false,
 	Callback = function(enabled)
 		if enabled then
-			-- Guardar valores originales
 			originalSettings.Brightness = Lighting.Brightness
 			originalSettings.ClockTime = Lighting.ClockTime
 			originalSettings.Ambient = Lighting.Ambient
@@ -1371,7 +1343,6 @@ MainTab:CreateToggle({
 				end)
 			end
 		else
-			-- Restaurar valores
 			if connection then
 				connection:Disconnect()
 				connection = nil
@@ -1394,18 +1365,15 @@ MainTab:CreateToggle({
 
 
 
--- Asegúrate de que estas variables están definidas
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Variables de control
 local boostEnabled = false
 local boostStrength = 100
 local baseWalkSpeed = 16
 local baseJumpPower = 50
 local originalStats = {}
 
--- Función para aplicar boost
  function applyBoost()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
@@ -1425,7 +1393,6 @@ local originalStats = {}
 	end
 end
 
--- Restaurar valores originales
  function restoreStats()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildWhichIsA("Humanoid")
@@ -1435,7 +1402,6 @@ end
 	end
 end
 
--- Toggle en MainTab
 MainTab:CreateToggle({
 	Name = "Salto y Velocidad Indetectable",
 	Flag = "movementBoost",
@@ -1450,7 +1416,6 @@ MainTab:CreateToggle({
 	end
 })
 
--- Slider en MainTab
 MainTab:CreateSlider({
 	Name = "Aumento Velocidad Indetectable",
 	Flag = "boostStrength",
@@ -1505,7 +1470,6 @@ player.CharacterAdded:Connect(function(char)
     bindCharacter(char)
 end)
 
--- Simula input a nivel de sistema (resetea el timer de Idled de Roblox)
 local function SimulateVirtualInput()
     if not AntiAfkEnabled then return end
     pcall(function()
@@ -1515,7 +1479,6 @@ local function SimulateVirtualInput()
     end)
 end
 
--- Movimiento físico del personaje (cubre detección por inactividad de posición)
 local function PhysicsMovement()
     if not AntiAfkEnabled then return end
     if not humanoid or not hrp then return end
@@ -1536,7 +1499,6 @@ local function PhysicsMovement()
     end
 end
 
--- Mecanismo REACTIVO: se dispara solo cuando Roblox detecta inactividad real
 local function StartIdledListener()
     if AntiAfkIdledConn then
         AntiAfkIdledConn:Disconnect()
@@ -1560,7 +1522,6 @@ local function StopIdledListener()
     end
 end
 
--- Mecanismo PROACTIVO: corre en intervalos aleatorios, no espera a Idled
 local function RunAntiAfk()
     pcall(function() VirtualUser:CaptureController() end) -- una sola vez al iniciar
 
@@ -1684,7 +1645,6 @@ MainTab:CreateKeybind({
 ----
 
 
--- Variables para guardar configuraciones originales
 local originalSettings = {
     Lighting = {},
     Terrain = {},
@@ -1705,9 +1665,7 @@ local fpsBoosterActive = false
 local descendantConnection = nil
 local modifiedInstances = {}
 
--- Guardar configuraciones originales
 function SaveOriginalSettings()
-    -- Lighting
     originalSettings.Lighting.GlobalShadows = Lighting.GlobalShadows
     originalSettings.Lighting.FogEnd = Lighting.FogEnd
     originalSettings.Lighting.ShadowSoftness = Lighting.ShadowSoftness
@@ -1715,7 +1673,6 @@ function SaveOriginalSettings()
         originalSettings.Lighting.Technology = Lighting.Technology
     end
     
-    -- Terrain
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         originalSettings.Terrain.WaterWaveSize = terrain.WaterWaveSize
@@ -1723,7 +1680,6 @@ function SaveOriginalSettings()
         originalSettings.Terrain.WaterReflectance = terrain.WaterReflectance
         originalSettings.Terrain.WaterTransparency = terrain.WaterTransparency
         
-        -- CORRECCIÓN: Guardar Decoration para restaurar el pasto
         if sethiddenproperty then
             pcall(function()
                 originalSettings.Terrain.Decoration = gethiddenproperty(terrain, "Decoration")
@@ -1731,17 +1687,13 @@ function SaveOriginalSettings()
         end
     end
     
-    -- Rendering
     originalSettings.Rendering.QualityLevel = settings().Rendering.QualityLevel
     originalSettings.Rendering.MeshPartDetailLevel = settings().Rendering.MeshPartDetailLevel
     
-    -- Materials
     originalSettings.Materials.Use2022Materials = MaterialService.Use2022Materials
 end
 
--- Restaurar configuraciones originales
 function RestoreOriginalSettings()
-    -- Lighting
     Lighting.GlobalShadows = originalSettings.Lighting.GlobalShadows
     Lighting.FogEnd = originalSettings.Lighting.FogEnd
     Lighting.ShadowSoftness = originalSettings.Lighting.ShadowSoftness
@@ -1749,7 +1701,6 @@ function RestoreOriginalSettings()
         sethiddenproperty(Lighting, "Technology", originalSettings.Lighting.Technology)
     end
     
-    -- Terrain
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         terrain.WaterWaveSize = originalSettings.Terrain.WaterWaveSize
@@ -1757,7 +1708,6 @@ function RestoreOriginalSettings()
         terrain.WaterReflectance = originalSettings.Terrain.WaterReflectance
         terrain.WaterTransparency = originalSettings.Terrain.WaterTransparency
         
-        -- CORRECCIÓN: Restaurar Decoration para que vuelva el pasto
         if sethiddenproperty and originalSettings.Terrain.Decoration ~= nil then
             pcall(function()
                 sethiddenproperty(terrain, "Decoration", originalSettings.Terrain.Decoration)
@@ -1765,14 +1715,11 @@ function RestoreOriginalSettings()
         end
     end
     
-    -- Rendering
     settings().Rendering.QualityLevel = originalSettings.Rendering.QualityLevel
     settings().Rendering.MeshPartDetailLevel = originalSettings.Rendering.MeshPartDetailLevel
     
-    -- Materials
     MaterialService.Use2022Materials = originalSettings.Materials.Use2022Materials
     
-    -- Restaurar instancias modificadas
     for inst, data in pairs(modifiedInstances) do
         if inst and inst.Parent then
             pcall(function()
@@ -1803,8 +1750,6 @@ function RestoreOriginalSettings()
     
     modifiedInstances = {}
 end
-
--- Verificar si una instancia debe ser ignorada
 function ShouldIgnore(Inst)
     if Inst:IsDescendantOf(Players) then return true end
     if ME.Character and Inst:IsDescendantOf(ME.Character) then return true end
@@ -1819,7 +1764,6 @@ function ShouldIgnore(Inst)
     return false
 end
 
--- Aplicar optimizaciones a una instancia
 function OptimizeInstance(Inst)
     if ShouldIgnore(Inst) then return end
     
@@ -1893,9 +1837,7 @@ function OptimizeInstance(Inst)
     end)
 end
 
--- Aplicar todas las optimizaciones
 function ApplyOptimizations()
-    -- Optimizaciones de Lighting
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     Lighting.ShadowSoftness = 0
@@ -1903,7 +1845,6 @@ function ApplyOptimizations()
         sethiddenproperty(Lighting, "Technology", 2)
     end
     
-    -- Optimizaciones de Terrain
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         terrain.WaterWaveSize = 0
@@ -1915,29 +1856,20 @@ function ApplyOptimizations()
         end
     end
     
-    -- Optimizaciones de Rendering
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
     settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
     
-    -- Optimizaciones de Materials
     MaterialService.Use2022Materials = false
     
-    -- FPS Cap
     if setfpscap then
         setfpscap(1e6)
     end
     
-    -- Optimizar todas las instancias existentes
     for _, v in pairs(game:GetDescendants()) do
         OptimizeInstance(v)
     end
 end
 
--- Guardar configuraciones originales al inicio
-
-
-
--- Toggle principal
 MainTab:CreateToggle({
     Name = "Activar FPS Booster",
     CurrentValue = false,
@@ -1980,17 +1912,14 @@ local LocalPlayer = Players.LocalPlayer
 
 
 
--- FakeLag vars
 local FakeLagEnabled = false
 local FakeLagThread = nil
 local FakeLagWaitTime = 0.05
 local FakeLagDelayTime = 0.4
 
--- Falling vars
 local FallingEnabled = false
 
 
--- ---------- FakeLag functions ----------
 function StartFakeLag()
 	if FakeLagThread then return end
 
@@ -2061,7 +1990,7 @@ MainTab:CreateToggle({
 
 
 
--- Equip vars
+-- Equipar TODO
 local ToolsEquipped = false
 
 
