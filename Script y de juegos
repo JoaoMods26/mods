@@ -552,7 +552,7 @@ boton= Juegostab:CreateButton({
 boton= Juegostab:CreateButton({
    Name = "Duelos (JDuelosMods)",
    Callback = function()
-       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Duel'))()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/JoaoMods26/venekop/refs/heads/main/Duelos%20xD'))()
    end,
 })
 
