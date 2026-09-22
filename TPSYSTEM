@@ -1,0 +1,2198 @@
+local Window = _G.Window or (getgenv and getgenv().Window)
+if not Window then
+    return
+end
+
+local JmodsLib = _G.JmodsLib or _G.Rayfield or (getgenv and getgenv().JmodsLib) or (getgenv and getgenv().Rayfield)
+local TeleportsTab = Window:CreateTab("Teleports")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local SAVE_ROOT = "JmodsLib"
+local SAVE_FOLDER = "JmodsLib/tps"
+local SAVE_FILE = "JmodsLib/tps/data.json"
+local savedTPs = {}
+local selectedMode = "CFrame"
+local teleportSpeed = 100
+local instantTeleport = false
+local useSavedSettings = false
+local safeLanding = false
+local quickAccessEnabled = false
+local saveName = ""
+local tp1Selected = nil
+local tp2Selected = nil
+local tp3Selected = nil
+local deleteSelected = nil
+local movementToken = 0
+local activeCleanup = function() end
+local activeMovementName = nil
+local clearPhysicsRep
+local updatingDropdowns = false
+local Slot1Dropdown
+local Slot2Dropdown
+local Slot3Dropdown
+local DeleteDropdown
+local ModeDropdown
+local MobileTP1
+local MobileTP2
+local MobileTP3
+local MODE_OPTIONS = {
+    "CFrame",
+    "Tween",
+    "CFrame Suave",
+    "MoveTo",
+    "Pathfinding",
+    "Pathfinding Preciso",
+    "PhysicsRep",
+    "AlignPosition",
+    "LinearVelocity",
+    "Velocidad + Gravedad"
+}
+local function notify(title, content)
+    JmodsLib:Notify({
+        Title = title,
+        Content = content,
+        Duration = 3
+    })
+end
+local function hasFileSystem()
+    return type(isfolder) == "function"
+        and type(makefolder) == "function"
+        and type(isfile) == "function"
+        and type(readfile) == "function"
+        and type(writefile) == "function"
+end
+local function prepareStorage()
+    if not hasFileSystem() then
+        return false
+    end
+    pcall(function()
+        if not isfolder(SAVE_ROOT) then
+            makefolder(SAVE_ROOT)
+        end
+    end)
+    pcall(function()
+        if not isfolder(SAVE_FOLDER) then
+            makefolder(SAVE_FOLDER)
+        end
+    end)
+    return true
+end
+local function getCharacter()
+    local character = LocalPlayer.Character
+    if not character or not character.Parent then
+        return nil
+    end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then
+        return nil
+    end
+    if humanoid.Health <= 0 then
+        return nil
+    end
+    return character, humanoid, root
+end
+local function serializeCFrame(cf)
+    return {
+        cf:GetComponents()
+    }
+end
+local function deserializeCFrame(data)
+    if type(data) ~= "table" or #data < 12 then
+        return nil
+    end
+    local success, result = pcall(function()
+        return CFrame.new(table.unpack(data))
+    end)
+    if success then
+        return result
+    end
+    return nil
+end
+local function saveStorage()
+    if not hasFileSystem() then
+        return false
+    end
+    local data = {
+        version = 6,
+        tps = savedTPs,
+        slots = {
+            tp1 = tp1Selected,
+            tp2 = tp2Selected,
+            tp3 = tp3Selected
+        }
+    }
+    return pcall(function()
+        writefile(
+            SAVE_FILE,
+            HttpService:JSONEncode(data)
+        )
+    end)
+end
+local function loadStorage()
+    if not prepareStorage() then
+        savedTPs = {}
+        tp1Selected = nil
+        tp2Selected = nil
+        tp3Selected = nil
+        return false
+    end
+    if not isfile(SAVE_FILE) then
+        savedTPs = {}
+        tp1Selected = nil
+        tp2Selected = nil
+        tp3Selected = nil
+        return true
+    end
+    local success, decoded = pcall(function()
+        return HttpService:JSONDecode(
+            readfile(SAVE_FILE)
+        )
+    end)
+    if not success or type(decoded) ~= "table" then
+        savedTPs = {}
+        return false
+    end
+    if type(decoded.tps) == "table" then
+        savedTPs = decoded.tps
+        if type(decoded.slots) == "table" then
+            tp1Selected = decoded.slots.tp1
+            tp2Selected = decoded.slots.tp2
+            tp3Selected = decoded.slots.tp3
+        end
+    else
+        savedTPs = decoded
+    end
+    if tp1Selected and not savedTPs[tp1Selected] then
+        tp1Selected = nil
+    end
+    if tp2Selected and not savedTPs[tp2Selected] then
+        tp2Selected = nil
+    end
+    if tp3Selected and not savedTPs[tp3Selected] then
+        tp3Selected = nil
+    end
+    return true
+end
+local function getTPNames()
+    local names = {}
+    for name in pairs(savedTPs) do
+        if type(name) == "string" then
+            table.insert(names, name)
+        end
+    end
+    table.sort(names, function(a, b)
+        return a:lower() < b:lower()
+    end)
+    if #names == 0 then
+        return {
+            "Sin TPs guardados"
+        }
+    end
+    return names
+end
+local function getTPData(name)
+    if not name or name == "Sin TPs guardados" then
+        return nil
+    end
+    return savedTPs[name]
+end
+local function getTP(name)
+    local data = getTPData(name)
+    if not data then
+        return nil
+    end
+    return deserializeCFrame(
+        data.cframe
+    )
+end
+local function getSlotSelection(slot)
+    if slot == 1 then
+        return tp1Selected
+    end
+    if slot == 2 then
+        return tp2Selected
+    end
+    if slot == 3 then
+        return tp3Selected
+    end
+    return nil
+end
+local function setSlotSelection(slot, value)
+    if value == "Sin TPs guardados" then
+        value = nil
+    end
+    if slot == 1 then
+        tp1Selected = value
+    elseif slot == 2 then
+        tp2Selected = value
+    elseif slot == 3 then
+        tp3Selected = value
+    end
+    if not updatingDropdowns then
+        saveStorage()
+    end
+end
+local function shortName(name, maxLength)
+    if not name or name == "" then
+        return "Vacío"
+    end
+    if #name <= maxLength then
+        return name
+    end
+    return name:sub(1, maxLength - 3) .. "..."
+end
+local function updateMobileNames()
+    if MobileTP1 then
+        MobileTP1:SetText(
+            "TP1: " .. shortName(tp1Selected, 11)
+        )
+    end
+    if MobileTP2 then
+        MobileTP2:SetText(
+            "TP2: " .. shortName(tp2Selected, 11)
+        )
+    end
+    if MobileTP3 then
+        MobileTP3:SetText(
+            "TP3: " .. shortName(tp3Selected, 11)
+        )
+    end
+end
+local function refreshDropdowns()
+    local options = getTPNames()
+    updatingDropdowns = true
+    if Slot1Dropdown then
+        Slot1Dropdown:UpdateOptions(options)
+        if tp1Selected and savedTPs[tp1Selected] then
+            Slot1Dropdown:Set(tp1Selected)
+        else
+            tp1Selected = nil
+        end
+    end
+    if Slot2Dropdown then
+        Slot2Dropdown:UpdateOptions(options)
+        if tp2Selected and savedTPs[tp2Selected] then
+            Slot2Dropdown:Set(tp2Selected)
+        else
+            tp2Selected = nil
+        end
+    end
+    if Slot3Dropdown then
+        Slot3Dropdown:UpdateOptions(options)
+        if tp3Selected and savedTPs[tp3Selected] then
+            Slot3Dropdown:Set(tp3Selected)
+        else
+            tp3Selected = nil
+        end
+    end
+    if DeleteDropdown then
+        DeleteDropdown:UpdateOptions(options)
+        if deleteSelected and savedTPs[deleteSelected] then
+            DeleteDropdown:Set(deleteSelected)
+        else
+            deleteSelected = nil
+        end
+    end
+    updatingDropdowns = false
+    updateMobileNames()
+end
+local function zeroVelocity(root)
+    if not root then
+        return
+    end
+    pcall(function()
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+local function stopHumanoid(humanoid)
+    if not humanoid then
+        return
+    end
+    pcall(function()
+        humanoid:Move(
+            Vector3.zero,
+            false
+        )
+    end)
+end
+local function finishMovement(token)
+    if token ~= movementToken then
+        return false
+    end
+    if activeCleanup then
+        pcall(activeCleanup)
+    end
+    activeCleanup = function() end
+    activeMovementName = nil
+    return true
+end
+local function cancelMovement()
+    movementToken += 1
+    local cleanup = activeCleanup
+    activeCleanup = function() end
+    activeMovementName = nil
+    if cleanup then
+        pcall(cleanup)
+    end
+    local _, humanoid, root = getCharacter()
+    if humanoid then
+        stopHumanoid(humanoid)
+    end
+    if root then
+        zeroVelocity(root)
+    end
+end
+local function beginMovement(name)
+    cancelMovement()
+    movementToken += 1
+    activeMovementName = name
+    return movementToken
+end
+local function getTargetPivot(
+    character,
+    root,
+    targetRootCFrame
+)
+    local currentRoot = root.CFrame
+    local currentPivot = character:GetPivot()
+    local rootToPivot =
+        currentRoot:ToObjectSpace(
+            currentPivot
+        )
+    return targetRootCFrame * rootToPivot
+end
+local function directCFrame(targetCF)
+    local _, _, root =
+        getCharacter()
+    if not root then
+        return false
+    end
+    root.CFrame =
+        targetCF
+    zeroVelocity(root)
+    return true
+end
+local function pivotToTarget(targetCF)
+    local character, _, root =
+        getCharacter()
+    if not character or not root then
+        return false
+    end
+    character:PivotTo(
+        getTargetPivot(
+            character,
+            root,
+            targetCF
+        )
+    )
+    zeroVelocity(root)
+    return true
+end
+local function runTween(
+    targetCF,
+    speed,
+    token
+)
+    local character, humanoid, root =
+        getCharacter()
+    if not character
+        or not humanoid
+        or not root then
+        return false
+    end
+    local startPivot =
+        character:GetPivot()
+    local targetPivot =
+        getTargetPivot(
+            character,
+            root,
+            targetCF
+        )
+    local distance =
+        (
+            startPivot.Position
+            - targetPivot.Position
+        ).Magnitude
+    if distance <= 0.05 then
+        character:PivotTo(
+            targetPivot
+        )
+        zeroVelocity(root)
+        finishMovement(token)
+        return true
+    end
+    local duration =
+        math.max(
+            distance
+            / math.max(speed, 1),
+            0.05
+        )
+    local alpha =
+        Instance.new("NumberValue")
+    alpha.Value = 0
+    local tween =
+        TweenService:Create(
+            alpha,
+            TweenInfo.new(
+                duration,
+                Enum.EasingStyle.Linear,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Value = 1
+            }
+        )
+    local renderName =
+        "JmodsTween_" .. tostring(token)
+    local cleanupDone = false
+    local function cleanup()
+        if cleanupDone then
+            return
+        end
+        cleanupDone = true
+        pcall(function()
+            tween:Cancel()
+        end)
+        pcall(function()
+            RunService:UnbindFromRenderStep(
+                renderName
+            )
+        end)
+        pcall(function()
+            alpha:Destroy()
+        end)
+    end
+    activeCleanup = cleanup
+    RunService:BindToRenderStep(
+        renderName,
+        Enum.RenderPriority.Character.Value + 2,
+        function()
+            if token ~= movementToken then
+                return
+            end
+            if not character.Parent then
+                return
+            end
+            character:PivotTo(
+                startPivot:Lerp(
+                    targetPivot,
+                    alpha.Value
+                )
+            )
+        end
+    )
+    tween:Play()
+    tween.Completed:Wait()
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    character:PivotTo(
+        targetPivot
+    )
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function runSmoothCFrame(
+    targetCF,
+    speed,
+    token
+)
+    local character, humanoid, root =
+        getCharacter()
+    if not character
+        or not humanoid
+        or not root then
+        return false
+    end
+    local currentPivot =
+        character:GetPivot()
+    local targetPivot =
+        getTargetPivot(
+            character,
+            root,
+            targetCF
+        )
+    local distance =
+        (
+            currentPivot.Position
+            - targetPivot.Position
+        ).Magnitude
+    if distance <= 0.05 then
+        character:PivotTo(
+            targetPivot
+        )
+        zeroVelocity(root)
+        finishMovement(token)
+        return true
+    end
+    local smoothTime =
+        math.clamp(
+            distance
+            / math.max(speed, 1)
+            * 0.42,
+            0.06,
+            0.6
+        )
+    local velocity =
+        CFrame.new()
+    local renderName =
+        "JmodsSmooth_" .. tostring(token)
+    local done = false
+    local function cleanup()
+        if done then
+            return
+        end
+        done = true
+        pcall(function()
+            RunService:UnbindFromRenderStep(
+                renderName
+            )
+        end)
+    end
+    activeCleanup = cleanup
+    RunService:BindToRenderStep(
+        renderName,
+        Enum.RenderPriority.Character.Value + 2,
+        function(dt)
+            if token ~= movementToken then
+                return
+            end
+            if not character.Parent
+                or humanoid.Health <= 0 then
+                return
+            end
+            currentPivot, velocity =
+                TweenService:SmoothDamp(
+                    currentPivot,
+                    targetPivot,
+                    velocity,
+                    smoothTime,
+                    math.huge,
+                    dt
+                )
+            character:PivotTo(
+                currentPivot
+            )
+        end
+    )
+    local started =
+        os.clock()
+    while token == movementToken do
+        if not character.Parent
+            or humanoid.Health <= 0 then
+            cleanup()
+            return false
+        end
+        local remaining =
+            (
+                currentPivot.Position
+                - targetPivot.Position
+            ).Magnitude
+        if remaining <= 0.08 then
+            break
+        end
+        if os.clock() - started >
+            math.max(
+                3,
+                distance
+                    / math.max(speed, 1)
+                    * 4
+            ) then
+            break
+        end
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    character:PivotTo(
+        targetPivot
+    )
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function restoreHumanoid(
+    humanoid,
+    oldWalkSpeed,
+    oldAutoRotate,
+    oldPlatformStand,
+    oldSit
+)
+    if not humanoid then
+        return
+    end
+    pcall(function()
+        humanoid.WalkSpeed =
+            oldWalkSpeed
+        humanoid.AutoRotate =
+            oldAutoRotate
+        humanoid.PlatformStand =
+            oldPlatformStand
+        humanoid.Sit =
+            oldSit
+    end)
+end
+local function runMoveTo(
+    targetCF,
+    speed,
+    token
+)
+    local _, humanoid, root =
+        getCharacter()
+    if not humanoid or not root then
+        return false
+    end
+    local oldWalkSpeed =
+        humanoid.WalkSpeed
+    local oldAutoRotate =
+        humanoid.AutoRotate
+    local oldPlatformStand =
+        humanoid.PlatformStand
+    local oldSit =
+        humanoid.Sit
+    humanoid.PlatformStand =
+        false
+    humanoid.Sit =
+        false
+    humanoid.AutoRotate =
+        true
+    humanoid.WalkSpeed =
+        math.max(speed, 1)
+    local cleanupDone = false
+    local function cleanup()
+        if cleanupDone then
+            return
+        end
+        cleanupDone = true
+        stopHumanoid(humanoid)
+        restoreHumanoid(
+            humanoid,
+            oldWalkSpeed,
+            oldAutoRotate,
+            oldPlatformStand,
+            oldSit
+        )
+    end
+    activeCleanup = cleanup
+    local targetPosition =
+        targetCF.Position
+    local started =
+        os.clock()
+    local refreshAt =
+        0
+    while token == movementToken do
+        if humanoid.Health <= 0
+            or not root.Parent then
+            cleanup()
+            return false
+        end
+        local delta =
+            targetPosition
+            - root.Position
+        local horizontal =
+            Vector3.new(
+                delta.X,
+                0,
+                delta.Z
+            )
+        local distance =
+            horizontal.Magnitude
+        if distance <= 1.1 then
+            break
+        end
+        if os.clock() - started >= 45 then
+            cleanup()
+            return false
+        end
+        if os.clock() >= refreshAt then
+            humanoid:MoveTo(
+                targetPosition
+            )
+            refreshAt =
+                os.clock() + 5
+        end
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    stopHumanoid(humanoid)
+    restoreHumanoid(
+        humanoid,
+        oldWalkSpeed,
+        oldAutoRotate,
+        oldPlatformStand,
+        oldSit
+    )
+    local y =
+        root.Position.Y
+    root.CFrame =
+        CFrame.new(
+            targetPosition.X,
+            y,
+            targetPosition.Z
+        )
+        * targetCF.Rotation
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function trySetPhysicsRep(root,target)
+    if not root or type(sethiddenproperty)~="function" then
+        return false
+    end
+    local ok=pcall(function()
+        sethiddenproperty(root,"PhysicsRepRootPart",target)
+    end)
+    if not ok then
+        return false
+    end
+    if type(gethiddenproperty)=="function" then
+        local verified,current=pcall(function()
+            return gethiddenproperty(root,"PhysicsRepRootPart")
+        end)
+        if verified and current~=nil and current~=target then
+            return false
+        end
+    end
+    return true
+end
+local function clearPhysicsRep(root)
+    if not root or type(sethiddenproperty)~="function" then
+        return
+    end
+    pcall(function()
+        sethiddenproperty(root,"PhysicsRepRootPart",nil)
+    end)
+end
+local function createPhysicsGuide(cframe)
+    local guide=Instance.new("Part")
+    guide.Name="JmodsTP_PhysicsGuide"
+    guide.Size=Vector3.new(2,2,2)
+    guide.CFrame=cframe
+    guide.Anchored=true
+    guide.CanCollide=false
+    guide.CanTouch=false
+    guide.CanQuery=false
+    guide.CastShadow=false
+    guide.Transparency=1
+    guide.Parent=workspace
+    return guide
+end
+local function resolveSafeTarget(targetCF,character,humanoid,root)
+    if not targetCF or not character or not humanoid or not root then
+        return targetCF
+    end
+    local params=RaycastParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances={character}
+    local result=workspace:Raycast(targetCF.Position+Vector3.new(0,8,0),Vector3.new(0,-20,0),params)
+    if not result or not result.Instance or not result.Instance.CanCollide then
+        return targetCF
+    end
+    if result.Position.Y>targetCF.Position.Y+3 then
+        return targetCF
+    end
+    local rootHalfHeight=root.Size.Y*0.5
+    local y=result.Position.Y+humanoid.HipHeight+rootHalfHeight+0.05
+    return CFrame.new(targetCF.Position.X,y,targetCF.Position.Z)*targetCF.Rotation
+end
+local function getGroundedState(humanoid)
+    return humanoid.FloorMaterial
+        ~= Enum.Material.Air
+end
+local function tryVerticalAssist(targetPosition,humanoid,root,token,precise)
+    if not targetPosition or not humanoid or not root then
+        return false,false
+    end
+    local timeout=precise and 18 or 12
+    local started=os.clock()
+    local lastProgressY=root.Position.Y
+    local lastProgress=os.clock()
+    local noProgress=0
+    local side=1
+    local movedUp=false
+    while token==movementToken and humanoid.Health>0 and root.Parent and os.clock()-started<timeout do
+        local delta=targetPosition-root.Position
+        local horizontal=Vector3.new(delta.X,0,delta.Z)
+        local horizontalDistance=horizontal.Magnitude
+        if math.abs(delta.Y)<=0.9 and horizontalDistance<= (precise and 1 or 1.8) then
+            return true,movedUp
+        end
+        local direction=horizontalDistance>0.05 and horizontal.Unit or Vector3.zero
+        local forwardDistance=math.min(horizontalDistance,precise and 4 or 5)
+        local sideDirection=direction~=Vector3.zero and Vector3.new(-direction.Z,0,direction.X)*side*(precise and 1.25 or 1.5) or Vector3.zero
+        local probe=root.Position+direction*forwardDistance+sideDirection
+        local moveTarget=Vector3.new(probe.X,root.Position.Y,probe.Z)
+        local finished=false
+        local reached=false
+        local finishedConnection=humanoid.MoveToFinished:Connect(function(success)
+            finished=true
+            reached=success
+        end)
+        humanoid:MoveTo(moveTarget)
+        if getGroundedState(humanoid) then
+            humanoid.Jump=true
+            pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end)
+        end
+        local attemptStarted=os.clock()
+        local leftGround=false
+        while token==movementToken and humanoid.Health>0 and root.Parent and not finished and os.clock()-attemptStarted<(precise and 2.6 or 2.5) do
+            if not getGroundedState(humanoid) then
+                leftGround=true
+            elseif leftGround and os.clock()-attemptStarted>0.25 then
+                break
+            end
+            local currentDelta=targetPosition-root.Position
+            local currentHorizontal=Vector3.new(currentDelta.X,0,currentDelta.Z)
+            if math.abs(currentDelta.Y)<=0.9 and currentHorizontal.Magnitude<=(precise and 1 or 1.8) then
+                reached=true
+                break
+            end
+            RunService.Heartbeat:Wait()
+        end
+        pcall(function() finishedConnection:Disconnect() end)
+        if token~=movementToken then
+            return false,movedUp
+        end
+        local landingStarted=os.clock()
+        while token==movementToken and humanoid.Health>0 and root.Parent and not getGroundedState(humanoid) and os.clock()-landingStarted<3 do
+            RunService.Heartbeat:Wait()
+        end
+        local newY=root.Position.Y
+        if newY>lastProgressY+0.35 then
+            lastProgressY=newY
+            lastProgress=os.clock()
+            noProgress=0
+            movedUp=true
+            side=-side
+        elseif os.clock()-lastProgress>=2.5 then
+            noProgress+=1
+            lastProgress=os.clock()
+            side=-side
+            if noProgress>=2 then
+                return false,movedUp
+            end
+        end
+        if reached then
+            local currentDelta=targetPosition-root.Position
+            local currentHorizontal=Vector3.new(currentDelta.X,0,currentDelta.Z)
+            if math.abs(currentDelta.Y)<=0.9 and currentHorizontal.Magnitude<=(precise and 1 or 1.8) then
+                return true,movedUp
+            end
+        end
+    end
+    local finalDelta=targetPosition-root.Position
+    local finalHorizontal=Vector3.new(finalDelta.X,0,finalDelta.Z)
+    return math.abs(finalDelta.Y)<=0.9 and finalHorizontal.Magnitude<=(precise and 1 or 1.8),movedUp
+end
+local function waitForGround(
+    humanoid,
+    token
+)
+    local started =
+        os.clock()
+    while token == movementToken
+        and humanoid.Health > 0
+        and not getGroundedState(humanoid)
+        and os.clock() - started < 1.5 do
+        RunService.Heartbeat:Wait()
+    end
+end
+local function getPathTarget(
+    targetPosition,
+    character
+)
+    local params =
+        RaycastParams.new()
+    params.FilterType =
+        Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {
+        character
+    }
+    local result =
+        workspace:Raycast(
+            targetPosition
+                + Vector3.new(
+                    0,
+                    8,
+                    0
+                ),
+            Vector3.new(
+                0,
+                -20,
+                0
+            ),
+            params
+        )
+    if result
+        and result.Instance
+        and result.Instance.CanCollide then
+        return result.Position
+    end
+    return targetPosition
+end
+local function createPath(root,destination,precise)
+    local path=PathfindingService:CreatePath({
+        AgentRadius=2,
+        AgentHeight=5,
+        AgentCanJump=true,
+        AgentCanClimb=true,
+        WaypointSpacing=precise and 2 or 4
+    })
+    local success=pcall(function()
+        path:ComputeAsync(root.Position,destination)
+    end)
+    if not success or path.Status~=Enum.PathStatus.Success then
+        return nil
+    end
+    return path
+end
+local function runPathfinding(targetCF,speed,token,precise)
+    local character,humanoid,root=getCharacter()
+    if not character or not humanoid or not root then
+        return false
+    end
+    local oldWalkSpeed=humanoid.WalkSpeed
+    local oldAutoRotate=humanoid.AutoRotate
+    local oldPlatformStand=humanoid.PlatformStand
+    local oldSit=humanoid.Sit
+    local cleaned=false
+    local blockedConnection
+    local function cleanup()
+        if cleaned then
+            return
+        end
+        cleaned=true
+        if blockedConnection then
+            pcall(function() blockedConnection:Disconnect() end)
+            blockedConnection=nil
+        end
+        stopHumanoid(humanoid)
+        restoreHumanoid(humanoid,oldWalkSpeed,oldAutoRotate,oldPlatformStand,oldSit)
+        zeroVelocity(root)
+    end
+    activeCleanup=cleanup
+    humanoid.PlatformStand=false
+    humanoid.Sit=false
+    humanoid.AutoRotate=true
+    humanoid.WalkSpeed=math.max(speed,1)
+    waitForGround(humanoid,token)
+    if token~=movementToken then
+        cleanup()
+        return false
+    end
+    local pathTarget=getPathTarget(targetCF.Position,character)
+    local waypointTolerance=precise and 0.75 or 1.5
+    local finalTolerance=precise and 0.8 or 2
+    local started=os.clock()
+    local function disconnectBlocked()
+        if blockedConnection then
+            pcall(function() blockedConnection:Disconnect() end)
+            blockedConnection=nil
+        end
+    end
+    while token==movementToken and humanoid.Health>0 and root.Parent do
+        if os.clock()-started>=60 then
+            cleanup()
+            return false
+        end
+        if (root.Position-targetCF.Position).Magnitude<=finalTolerance then
+            break
+        end
+        disconnectBlocked()
+        local path=createPath(root,pathTarget,precise)
+        if not path then
+            local verticalDifference=targetCF.Position.Y-root.Position.Y
+            if verticalDifference>1.5 then
+                local assistReached,assistProgress=tryVerticalAssist(targetCF.Position,humanoid,root,token,precise)
+                if token~=movementToken then
+                    cleanup()
+                    return false
+                end
+                if assistReached then
+                    break
+                end
+                if assistProgress then
+                    pathTarget=getPathTarget(targetCF.Position,character)
+                    task.wait(0.05)
+                    continue
+                end
+            end
+            task.wait(0.2)
+            continue
+        end
+        local waypoints=path:GetWaypoints()
+        if #waypoints<2 then
+            task.wait(0.15)
+            continue
+        end
+        local blocked=false
+        blockedConnection=path.Blocked:Connect(function(blockedIndex)
+            if blockedIndex>=2 then
+                blocked=true
+            end
+        end)
+        local needRepath=false
+        for index=2,#waypoints do
+            if token~=movementToken or humanoid.Health<=0 or not root.Parent then
+                cleanup()
+                return false
+            end
+            if blocked then
+                needRepath=true
+                break
+            end
+            local waypoint=waypoints[index]
+            if (root.Position-waypoint.Position).Magnitude<=waypointTolerance then
+                continue
+            end
+            local reached=false
+            local finished=false
+            local finishedConnection=humanoid.MoveToFinished:Connect(function(success)
+                finished=true
+                reached=success
+            end)
+            humanoid:MoveTo(waypoint.Position)
+            local jumpWaypoint=waypoint.Action==Enum.PathWaypointAction.Jump
+            if jumpWaypoint then
+                humanoid.Jump=true
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end)
+            end
+            local waypointStarted=os.clock()
+            local leftGround=false
+            local landed=not jumpWaypoint
+            while token==movementToken and humanoid.Health>0 and root.Parent and not finished and not blocked do
+                local distance=(root.Position-waypoint.Position).Magnitude
+                local grounded=getGroundedState(humanoid)
+                if not grounded then
+                    leftGround=true
+                elseif jumpWaypoint and leftGround then
+                    landed=true
+                end
+                if distance<=waypointTolerance and (not jumpWaypoint or landed) then
+                    reached=true
+                    break
+                end
+                if os.clock()-waypointStarted>=8 then
+                    break
+                end
+                RunService.Heartbeat:Wait()
+            end
+            pcall(function() finishedConnection:Disconnect() end)
+            if token~=movementToken or humanoid.Health<=0 or not root.Parent then
+                cleanup()
+                return false
+            end
+            if blocked then
+                needRepath=true
+                break
+            end
+            if not reached and (root.Position-waypoint.Position).Magnitude>waypointTolerance then
+                needRepath=true
+                break
+            end
+            if jumpWaypoint then
+                local landingStarted=os.clock()
+                while token==movementToken and humanoid.Health>0 and root.Parent and not getGroundedState(humanoid) and os.clock()-landingStarted<4 do
+                    RunService.Heartbeat:Wait()
+                end
+                if token~=movementToken then
+                    cleanup()
+                    return false
+                end
+            end
+        end
+        disconnectBlocked()
+        if token~=movementToken then
+            cleanup()
+            return false
+        end
+        if (root.Position-targetCF.Position).Magnitude<=finalTolerance then
+            break
+        end
+        local verticalDifference=targetCF.Position.Y-root.Position.Y
+        if needRepath and verticalDifference>1.5 then
+            local assistReached,assistProgress=tryVerticalAssist(targetCF.Position,humanoid,root,token,precise)
+            if token~=movementToken then
+                cleanup()
+                return false
+            end
+            if assistReached then
+                break
+            end
+            if assistProgress then
+                pathTarget=getPathTarget(targetCF.Position,character)
+                task.wait(0.05)
+                continue
+            end
+        end
+        if needRepath then
+            task.wait(0.05)
+            continue
+        end
+        local targetDistance=(root.Position-targetCF.Position).Magnitude
+        if targetDistance>finalTolerance and verticalDifference>1.5 then
+            local horizontalDistance=Vector3.new(
+                targetCF.Position.X-root.Position.X,
+                0,
+                targetCF.Position.Z-root.Position.Z
+            ).Magnitude
+            if horizontalDistance<=12 then
+                local assistReached,assistProgress=tryVerticalAssist(targetCF.Position,humanoid,root,token,precise)
+                if token~=movementToken then
+                    cleanup()
+                    return false
+                end
+                if assistReached then
+                    break
+                end
+                if assistProgress then
+                    pathTarget=getPathTarget(targetCF.Position,character)
+                    task.wait(0.05)
+                    continue
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+    if token~=movementToken then
+        cleanup()
+        return false
+    end
+    stopHumanoid(humanoid)
+    zeroVelocity(root)
+    if (root.Position-targetCF.Position).Magnitude<=3 then
+        if precise then
+            character:PivotTo(getTargetPivot(character,root,targetCF))
+        else
+            local currentY=root.Position.Y
+            root.CFrame=CFrame.new(targetCF.Position.X,currentY,targetCF.Position.Z)*targetCF.Rotation
+        end
+        zeroVelocity(root)
+    end
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function runPhysicsRep(
+    targetCF,
+    speed,
+    token,
+    safeLandingOverride
+)
+    local character, humanoid, root = getCharacter()
+    if not character or not humanoid or not root then
+        return false
+    end
+    if type(sethiddenproperty) ~= "function" then
+        notify("PhysicsRep","Tu executor no expone PhysicsRepRootPart.")
+        return false
+    end
+    local useSafeLanding = safeLanding
+    if type(safeLandingOverride) == "boolean" then
+        useSafeLanding = safeLandingOverride
+    end
+    local finalTarget = targetCF
+    if useSafeLanding then
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {character}
+        local result = workspace:Raycast(targetCF.Position + Vector3.new(0,8,0),Vector3.new(0,-20,0),params)
+        if result and result.Instance and result.Instance:IsA("BasePart") and result.Instance.CanCollide and result.Position.Y <= targetCF.Position.Y + 3 then
+            local rootHalfHeight = root.Size.Y * 0.5
+            local y = result.Position.Y + humanoid.HipHeight + rootHalfHeight + 0.05
+            finalTarget = CFrame.new(targetCF.Position.X,y,targetCF.Position.Z) * targetCF.Rotation
+        end
+    end
+    local referencePart
+    do
+        local params = OverlapParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {character}
+        local parts = workspace:GetPartBoundsInRadius(root.Position,100,params)
+        local bestDistance = math.huge
+        local fallbackPart
+        for _,part in ipairs(parts) do
+            if part:IsA("BasePart") and part ~= root and part.Parent then
+                local distance = (part.Position - root.Position).Magnitude
+                if not part.Anchored and distance < bestDistance then
+                    bestDistance = distance
+                    referencePart = part
+                end
+                if not fallbackPart then
+                    fallbackPart = part
+                end
+            end
+        end
+        if not referencePart then
+            referencePart = fallbackPart
+        end
+        if not referencePart then
+            local params2 = RaycastParams.new()
+            params2.FilterType = Enum.RaycastFilterType.Exclude
+            params2.FilterDescendantsInstances = {character}
+            local result = workspace:Raycast(finalTarget.Position + Vector3.new(0,8,0),Vector3.new(0,-20,0),params2)
+            if result and result.Instance and result.Instance:IsA("BasePart") and result.Instance ~= root then
+                referencePart = result.Instance
+            end
+        end
+    end
+    if not referencePart then
+        notify("PhysicsRep","No se encontró una BasePart de referencia.")
+        return false
+    end
+    local oldWalkSpeed = humanoid.WalkSpeed
+    local oldJumpPower = humanoid.JumpPower
+    local oldJumpHeight = humanoid.JumpHeight
+    local oldAutoRotate = humanoid.AutoRotate
+    local oldPlatformStand = humanoid.PlatformStand
+    local oldSit = humanoid.Sit
+    local cleaned = false
+    local connection
+    local function cleanup()
+        if cleaned then
+            return
+        end
+        cleaned = true
+        if connection then
+            pcall(function() connection:Disconnect() end)
+            connection = nil
+        end
+        pcall(function() sethiddenproperty(root,"PhysicsRepRootPart",nil) end)
+        if root and root.Parent then
+            pcall(function()
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+            end)
+        end
+        if humanoid and humanoid.Parent then
+            pcall(function() humanoid.WalkSpeed = oldWalkSpeed end)
+            pcall(function() humanoid.JumpPower = oldJumpPower end)
+            pcall(function() humanoid.JumpHeight = oldJumpHeight end)
+            pcall(function() humanoid.AutoRotate = oldAutoRotate end)
+            pcall(function() humanoid.PlatformStand = oldPlatformStand end)
+            pcall(function() humanoid.Sit = oldSit end)
+        end
+    end
+    activeCleanup = cleanup
+    humanoid.AutoRotate = false
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    pcall(function() humanoid.JumpHeight = 0 end)
+    humanoid.PlatformStand = false
+    humanoid.Sit = false
+    local ok = pcall(function()
+        sethiddenproperty(root,"PhysicsRepRootPart",referencePart)
+    end)
+    if not ok then
+        cleanup()
+        notify("PhysicsRep","No se pudo asignar PhysicsRepRootPart.")
+        return false
+    end
+    connection = RunService.Heartbeat:Connect(function()
+        if token ~= movementToken or not root.Parent or not character.Parent then
+            return
+        end
+        pcall(function()
+            sethiddenproperty(root,"PhysicsRepRootPart",referencePart)
+        end)
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+    local startCF = root.CFrame
+    local distance = (root.Position - finalTarget.Position).Magnitude
+    local duration = math.max(distance / math.max(speed,1),0.05)
+    local started = os.clock()
+    while token == movementToken and root.Parent and humanoid.Health > 0 do
+        local elapsed = os.clock() - started
+        local alpha = math.clamp(elapsed / duration,0,1)
+        local smoothAlpha = alpha * alpha * (3 - 2 * alpha)
+        local currentCF = startCF:Lerp(finalTarget,smoothAlpha)
+        root.CFrame = currentCF
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        if alpha >= 1 then
+            break
+        end
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken or not root.Parent or humanoid.Health <= 0 then
+        cleanup()
+        return false
+    end
+    root.CFrame = finalTarget
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function runAlignPosition(
+    targetCF,
+    speed,
+    token
+)
+    local _, humanoid, root =
+        getCharacter()
+    if not humanoid or not root then
+        return false
+    end
+    local attachment =
+        Instance.new(
+            "Attachment"
+        )
+    attachment.Name =
+        "JmodsTP_Attachment"
+    attachment.Parent =
+        root
+    local align =
+        Instance.new(
+            "AlignPosition"
+        )
+    align.Name =
+        "JmodsTP_AlignPosition"
+    align.Mode =
+        Enum.PositionAlignmentMode.OneAttachment
+    align.Attachment0 =
+        attachment
+    align.Position =
+        targetCF.Position
+    align.MaxForce =
+        math.huge
+    align.MaxVelocity =
+        math.max(
+            speed,
+            1
+        )
+    align.Responsiveness =
+        math.clamp(
+            speed * 2,
+            5,
+            200
+        )
+    align.ApplyAtCenterOfMass =
+        true
+    align.RigidityEnabled =
+        false
+    align.Parent =
+        root
+    local cleanupDone = false
+    local function cleanup()
+        if cleanupDone then
+            return
+        end
+        cleanupDone = true
+        pcall(function()
+            align:Destroy()
+        end)
+        pcall(function()
+            attachment:Destroy()
+        end)
+    end
+    activeCleanup = cleanup
+    local started =
+        os.clock()
+    while token == movementToken do
+        if humanoid.Health <= 0
+            or not root.Parent then
+            cleanup()
+            return false
+        end
+        local distance =
+            (
+                root.Position
+                - targetCF.Position
+            ).Magnitude
+        if distance <= 1 then
+            break
+        end
+        if os.clock() - started >= 30 then
+            break
+        end
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    root.CFrame =
+        targetCF
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function runLinearVelocity(
+    targetCF,
+    speed,
+    token
+)
+    local _, humanoid, root =
+        getCharacter()
+    if not humanoid or not root then
+        return false
+    end
+    local attachment =
+        Instance.new(
+            "Attachment"
+        )
+    attachment.Name =
+        "JmodsTP_VelocityAttachment"
+    attachment.Parent =
+        root
+    local velocity =
+        Instance.new(
+            "LinearVelocity"
+        )
+    velocity.Name =
+        "JmodsTP_LinearVelocity"
+    velocity.Attachment0 =
+        attachment
+    velocity.RelativeTo =
+        Enum.ActuatorRelativeTo.World
+    velocity.VelocityConstraintMode =
+        Enum.VelocityConstraintMode.Vector
+    velocity.MaxForce =
+        math.huge
+    velocity.VectorVelocity =
+        Vector3.zero
+    velocity.Parent =
+        root
+    local cleanupDone = false
+    local function cleanup()
+        if cleanupDone then
+            return
+        end
+        cleanupDone = true
+        pcall(function()
+            velocity:Destroy()
+        end)
+        pcall(function()
+            attachment:Destroy()
+        end)
+    end
+    activeCleanup = cleanup
+    local started =
+        os.clock()
+    while token == movementToken do
+        if humanoid.Health <= 0
+            or not root.Parent then
+            cleanup()
+            return false
+        end
+        local delta =
+            targetCF.Position
+            - root.Position
+        local distance =
+            delta.Magnitude
+        if distance <= 1 then
+            break
+        end
+        if os.clock() - started >= 30 then
+            break
+        end
+        if distance > 0 then
+            velocity.VectorVelocity =
+                delta.Unit
+                * math.max(
+                    speed,
+                    1
+                )
+        end
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    velocity.VectorVelocity =
+        Vector3.zero
+    root.CFrame =
+        targetCF
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function runVelocityGravity(
+    targetCF,
+    speed,
+    token
+)
+    local _, humanoid, root =
+        getCharacter()
+    if not humanoid or not root then
+        return false
+    end
+    local started =
+        os.clock()
+    local cleanupDone = false
+    local function cleanup()
+        if cleanupDone then
+            return
+        end
+        cleanupDone = true
+        zeroVelocity(root)
+    end
+    activeCleanup = cleanup
+    while token == movementToken do
+        if humanoid.Health <= 0
+            or not root.Parent then
+            cleanup()
+            return false
+        end
+        local delta =
+            targetCF.Position
+            - root.Position
+        local horizontal =
+            Vector3.new(
+                delta.X,
+                0,
+                delta.Z
+            )
+        local distance =
+            horizontal.Magnitude
+        if distance <= 2.5 then
+            break
+        end
+        if os.clock() - started >= 30 then
+            break
+        end
+        local horizontalVelocity =
+            Vector3.zero
+        if distance > 0 then
+            horizontalVelocity =
+                horizontal.Unit
+                * math.max(
+                    speed,
+                    1
+                )
+        end
+        local vertical =
+            root.AssemblyLinearVelocity.Y
+        root.AssemblyLinearVelocity =
+            Vector3.new(
+                horizontalVelocity.X,
+                vertical,
+                horizontalVelocity.Z
+            )
+        RunService.Heartbeat:Wait()
+    end
+    if token ~= movementToken then
+        cleanup()
+        return false
+    end
+    root.CFrame =
+        targetCF
+    zeroVelocity(root)
+    cleanup()
+    finishMovement(token)
+    return true
+end
+local function performTeleport(
+    targetCF,
+    mode,
+    speed,
+    instant,
+    safeLandingOverride
+)
+    if not targetCF then
+        notify(
+            "Teleport",
+            "El TP seleccionado no existe."
+        )
+        return
+    end
+    local token =
+        beginMovement(mode)
+    local _, _, root =
+        getCharacter()
+    if not root then
+        cancelMovement()
+        notify(
+            "Teleport",
+            "No se encontró tu personaje."
+        )
+        return
+    end
+    if instant then
+        pivotToTarget(
+            targetCF
+        )
+        finishMovement(token)
+        return
+    end
+    if mode == "CFrame" then
+        directCFrame(
+            targetCF
+        )
+        finishMovement(token)
+    elseif mode == "Tween" then
+        task.spawn(function()
+            runTween(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    elseif mode == "CFrame Suave" then
+        task.spawn(function()
+            runSmoothCFrame(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    elseif mode == "MoveTo" then
+        task.spawn(function()
+            runMoveTo(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    elseif mode == "Pathfinding" then
+        task.spawn(function()
+            runPathfinding(
+                targetCF,
+                speed,
+                token,
+                false
+            )
+        end)
+    elseif mode == "Pathfinding Preciso" then
+        task.spawn(function()
+            runPathfinding(
+                targetCF,
+                speed,
+                token,
+                true
+            )
+        end)
+    elseif mode == "PhysicsRep" then
+        task.spawn(function()
+            runPhysicsRep(
+                targetCF,
+                speed,
+                token,
+                safeLandingOverride
+            )
+        end)
+    elseif mode == "AlignPosition" then
+        task.spawn(function()
+            runAlignPosition(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    elseif mode == "LinearVelocity" then
+        task.spawn(function()
+            runLinearVelocity(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    elseif mode == "Velocidad + Gravedad" then
+        task.spawn(function()
+            runVelocityGravity(
+                targetCF,
+                speed,
+                token
+            )
+        end)
+    else
+        finishMovement(token)
+    end
+end
+local function getSettingsForTP(name)
+    local data =
+        getTPData(name)
+    local mode =
+        selectedMode
+    local speed =
+        teleportSpeed
+    local instant =
+        instantTeleport
+    local savedSafeLanding =
+        safeLanding
+    if useSavedSettings
+        and data then
+        if table.find(
+            MODE_OPTIONS,
+            data.mode
+        ) then
+            mode =
+                data.mode
+        end
+        if type(data.speed)
+            == "number" then
+            speed =
+                data.speed
+        end
+        if type(data.instant)
+            == "boolean" then
+            instant =
+                data.instant
+        end
+        if type(data.safeLanding)
+            == "boolean" then
+            savedSafeLanding =
+                data.safeLanding
+        end
+    end
+    return mode, speed, instant, savedSafeLanding
+end
+local function loadSlot(slot)
+    local selected =
+        getSlotSelection(slot)
+    if not selected then
+        notify(
+            "Teleports",
+            "Selecciona un TP para el Slot " .. slot .. "."
+        )
+        return
+    end
+    local target =
+        getTP(selected)
+    if not target then
+        notify(
+            "Teleports",
+            "El TP seleccionado ya no existe."
+        )
+        return
+    end
+    local mode
+    local speed
+    local instant
+    local savedSafeLanding
+    mode, speed, instant, savedSafeLanding =
+        getSettingsForTP(
+            selected
+        )
+    performTeleport(
+        target,
+        mode,
+        speed,
+        instant,
+        savedSafeLanding
+    )
+end
+loadStorage()
+TeleportsTab:CreateSection(
+    "Guardar TP"
+)
+TeleportsTab:CreateInput({
+    Name = "Nombre del TP",
+    PlaceholderText = "Ej: Spawn, Casa, Generador...",
+    Callback = function(text)
+        saveName =
+            text:gsub(
+                "^%s+",
+                ""
+            ):gsub(
+                "%s+$",
+                ""
+            )
+    end
+})
+TeleportsTab:CreateButton({
+    Name = "Guardar posición actual",
+    Callback = function()
+        local _, _, root =
+            getCharacter()
+        if not root then
+            notify(
+                "Teleports",
+                "No se encontró tu personaje."
+            )
+            return
+        end
+        if saveName == "" then
+            notify(
+                "Teleports",
+                "Escribe un nombre para el TP."
+            )
+            return
+        end
+        local overwritten =
+            savedTPs[saveName] ~= nil
+        savedTPs[saveName] = {
+            cframe =
+                serializeCFrame(
+                    root.CFrame
+                ),
+            mode =
+                selectedMode,
+            speed =
+                teleportSpeed,
+            instant =
+                instantTeleport,
+            safeLanding =
+                safeLanding,
+            created =
+                os.time()
+        }
+        if saveStorage() then
+            refreshDropdowns()
+            notify(
+                "TP guardado",
+                overwritten
+                    and (
+                        "Actualizado: "
+                        .. saveName
+                    )
+                    or (
+                        "Guardado: "
+                        .. saveName
+                    )
+            )
+        else
+            notify(
+                "Teleports",
+                "No se pudo guardar data.json."
+            )
+        end
+    end
+})
+TeleportsTab:CreateSection(
+    "Movimiento"
+)
+ModeDropdown =
+    TeleportsTab:CreateDropdown({
+        Name = "Modo de movimiento",
+        Options =
+            MODE_OPTIONS,
+        Callback = function(value)
+            if not table.find(
+                MODE_OPTIONS,
+                value
+            ) then
+                return
+            end
+            if not updatingDropdowns then
+                cancelMovement()
+            end
+            selectedMode =
+                value
+        end
+    })
+TeleportsTab:CreateToggle({
+    Name = "Usar ajustes guardados",
+    CurrentValue = false,
+    Callback = function(state)
+        useSavedSettings =
+            state
+    end
+})
+TeleportsTab:CreateToggle({
+    Name = "Aterrizaje seguro",
+    CurrentValue = false,
+    Callback = function(state)
+        safeLanding =
+            state
+    end
+})
+TeleportsTab:CreateSlider({
+    Name = "Velocidad",
+    Range = {
+        1,
+        500
+    },
+    Increment = 1,
+    Suffix = " studs/s",
+    CurrentValue = 100,
+    Callback = function(value)
+        teleportSpeed =
+            value
+    end
+})
+TeleportsTab:CreateSection(
+    "TP 1"
+)
+Slot1Dropdown =
+    TeleportsTab:CreateDropdown({
+        Name = "Seleccionar TP 1",
+        Options = getTPNames(),
+        Callback = function(value)
+            setSlotSelection(
+                1,
+                value
+            )
+            updateMobileNames()
+        end
+    })
+TeleportsTab:CreateButton({
+    Name = "→ Cargar TP 1",
+    Callback = function()
+        loadSlot(1)
+    end
+})
+TeleportsTab:CreateSection(
+    "TP 2"
+)
+Slot2Dropdown =
+    TeleportsTab:CreateDropdown({
+        Name = "Seleccionar TP 2",
+        Options = getTPNames(),
+        Callback = function(value)
+            setSlotSelection(
+                2,
+                value
+            )
+            updateMobileNames()
+        end
+    })
+TeleportsTab:CreateButton({
+    Name = "→ Cargar TP 2",
+    Callback = function()
+        loadSlot(2)
+    end
+})
+TeleportsTab:CreateSection(
+    "TP 3"
+)
+Slot3Dropdown =
+    TeleportsTab:CreateDropdown({
+        Name = "Seleccionar TP 3",
+        Options = getTPNames(),
+        Callback = function(value)
+            setSlotSelection(
+                3,
+                value
+            )
+            updateMobileNames()
+        end
+    })
+TeleportsTab:CreateButton({
+    Name = "→ Cargar TP 3",
+    Callback = function()
+        loadSlot(3)
+    end
+})
+TeleportsTab:CreateSection(
+    "Accesos rápidos"
+)
+TeleportsTab:CreateToggle({
+    Name = "Activar accesos rápidos",
+    CurrentValue = false,
+    Callback = function(state)
+        quickAccessEnabled =
+            state
+        if MobileTP1 then
+            MobileTP1:SetVisible(
+                state
+            )
+        end
+        if MobileTP2 then
+            MobileTP2:SetVisible(
+                state
+            )
+        end
+        if MobileTP3 then
+            MobileTP3:SetVisible(
+                state
+            )
+        end
+    end
+})
+TeleportsTab:CreateKeybind({
+    Name = "Cargar TP 1",
+    CurrentKeybind = "F",
+    Callback = function()
+        if not quickAccessEnabled then
+            return
+        end
+        loadSlot(1)
+    end
+})
+TeleportsTab:CreateKeybind({
+    Name = "Cargar TP 2",
+    CurrentKeybind = "G",
+    Callback = function()
+        if not quickAccessEnabled then
+            return
+        end
+        loadSlot(2)
+    end
+})
+TeleportsTab:CreateKeybind({
+    Name = "Cargar TP 3",
+    CurrentKeybind = "H",
+    Callback = function()
+        if not quickAccessEnabled then
+            return
+        end
+        loadSlot(3)
+    end
+})
+MobileTP1 =
+    TeleportsTab:CreateButtonFloat({
+        Name =
+            "TP1: "
+            .. shortName(
+                tp1Selected,
+                11
+            ),
+        Width = 105,
+        Height = 42,
+        X = 0.84,
+        Y = 0.56,
+        Draggable = true,
+        MobileOnly = true,
+        CornerRadius = 10,
+        Callback = function()
+            if not quickAccessEnabled then
+                return
+            end
+            loadSlot(1)
+        end
+    })
+MobileTP2 =
+    TeleportsTab:CreateButtonFloat({
+        Name =
+            "TP2: "
+            .. shortName(
+                tp2Selected,
+                11
+            ),
+        Width = 105,
+        Height = 42,
+        X = 0.84,
+        Y = 0.69,
+        Draggable = true,
+        MobileOnly = true,
+        CornerRadius = 10,
+        Callback = function()
+            if not quickAccessEnabled then
+                return
+            end
+            loadSlot(2)
+        end
+    })
+MobileTP3 =
+    TeleportsTab:CreateButtonFloat({
+        Name =
+            "TP3: "
+            .. shortName(
+                tp3Selected,
+                11
+            ),
+        Width = 105,
+        Height = 42,
+        X = 0.84,
+        Y = 0.82,
+        Draggable = true,
+        MobileOnly = true,
+        CornerRadius = 10,
+        Callback = function()
+            if not quickAccessEnabled then
+                return
+            end
+            loadSlot(3)
+        end
+    })
+MobileTP1:Hide()
+MobileTP2:Hide()
+MobileTP3:Hide()
+updateMobileNames()
+TeleportsTab:CreateSection(
+    "Administrar"
+)
+DeleteDropdown =
+    TeleportsTab:CreateDropdown({
+        Name = "TP para borrar",
+        Options = getTPNames(),
+        Callback = function(value)
+            if value
+                ~= "Sin TPs guardados" then
+                deleteSelected =
+                    value
+            else
+                deleteSelected =
+                    nil
+            end
+        end
+    })
+TeleportsTab:CreateButton({
+    Name = "Borrar TP seleccionado",
+    Callback = function()
+        if not deleteSelected
+            or not savedTPs[deleteSelected] then
+            notify(
+                "Teleports",
+                "Selecciona un TP para borrar."
+            )
+            return
+        end
+        local deleted =
+            deleteSelected
+        savedTPs[deleted] =
+            nil
+        if tp1Selected == deleted then
+            tp1Selected = nil
+        end
+        if tp2Selected == deleted then
+            tp2Selected = nil
+        end
+        if tp3Selected == deleted then
+            tp3Selected = nil
+        end
+        deleteSelected = nil
+        saveStorage()
+        refreshDropdowns()
+        notify(
+            "TP eliminado",
+            "Eliminado: " .. deleted
+        )
+    end
+})
+TeleportsTab:CreateButton({
+    Name = "Recargar TPs locales",
+    Callback = function()
+        if loadStorage() then
+            refreshDropdowns()
+            notify(
+                "Teleports",
+                "TPs y slots locales recargados."
+            )
+        else
+            notify(
+                "Teleports",
+                "No se pudo leer data.json."
+            )
+        end
+    end
+})
+TeleportsTab:CreateButton({
+    Name = "Cancelar movimiento",
+    Callback = function()
+        cancelMovement()
+        notify(
+            "Teleports",
+            "Movimiento cancelado."
+        )
+    end
+})
+if not hasFileSystem() then
+    notify(
+        "Teleports",
+        "Tu executor no tiene funciones de almacenamiento local."
+    )
+end
