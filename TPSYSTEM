@@ -51,6 +51,29 @@ local MODE_OPTIONS = {
     "LinearVelocity",
     "Velocidad + Gravedad"
 }
+
+local MODE_DISPLAY_NAMES = {
+    ["CFrame"] = "CF",
+    ["Tween"] = "Tween",
+    ["CFrame Suave"] = "CF Suave",
+    ["MoveTo"] = "Move",
+    ["Pathfinding"] = "Path",
+    ["Pathfinding Preciso"] = "Path Preciso",
+    ["PhysicsRep"] = "Physics",
+    ["AlignPosition"] = "Align",
+    ["LinearVelocity"] = "Velocity",
+    ["Velocidad + Gravedad"] = "Velocidad + Gravedad"
+}
+
+local MODE_DISPLAY_OPTIONS = {}
+
+for _, mode in ipairs(MODE_OPTIONS) do
+    table.insert(
+        MODE_DISPLAY_OPTIONS,
+        MODE_DISPLAY_NAMES[mode] or mode
+    )
+end
+
 local function notify(title, content)
     JmodsLib:Notify({
         Title = title,
@@ -1873,24 +1896,31 @@ TeleportsTab:CreateButton({
 })
 TeleportsTab:CreateSection(
     "Movimiento"
-)
-ModeDropdown =
+)ModeDropdown =
     TeleportsTab:CreateDropdown({
         Name = "Modo de movimiento",
         Options =
-            MODE_OPTIONS,
+            MODE_DISPLAY_OPTIONS,
         Callback = function(value)
-            if not table.find(
-                MODE_OPTIONS,
-                value
-            ) then
+            local internalMode = nil
+
+            for mode, displayName in pairs(MODE_DISPLAY_NAMES) do
+                if displayName == value then
+                    internalMode = mode
+                    break
+                end
+            end
+
+            if not internalMode then
                 return
             end
+
             if not updatingDropdowns then
                 cancelMovement()
             end
+
             selectedMode =
-                value
+                internalMode
         end
     })
 TeleportsTab:CreateToggle({
