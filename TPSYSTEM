@@ -1,3 +1,5 @@
+----when
+
 local Window = _G.Window or (getgenv and getgenv().Window)
 if not Window then
     return
@@ -41,6 +43,7 @@ local MobileTP2
 local MobileTP3
 local MODE_OPTIONS = {
     "CFrame",
+    "PivotTo",
     "Tween",
     "CFrame Suave",
     "MoveTo",
@@ -51,29 +54,6 @@ local MODE_OPTIONS = {
     "LinearVelocity",
     "Velocidad + Gravedad"
 }
-
-local MODE_DISPLAY_NAMES = {
-    ["CFrame"] = "CF",
-    ["Tween"] = "Tween",
-    ["CFrame Suave"] = "CF Suave",
-    ["MoveTo"] = "Move",
-    ["Pathfinding"] = "Path",
-    ["Pathfinding Preciso"] = "Path Preciso",
-    ["PhysicsRep"] = "Physics",
-    ["AlignPosition"] = "Align",
-    ["LinearVelocity"] = "Velocity",
-    ["Velocidad + Gravedad"] = "Velocidad + Gravedad"
-}
-
-local MODE_DISPLAY_OPTIONS = {}
-
-for _, mode in ipairs(MODE_OPTIONS) do
-    table.insert(
-        MODE_DISPLAY_OPTIONS,
-        MODE_DISPLAY_NAMES[mode] or mode
-    )
-end
-
 local function notify(title, content)
     JmodsLib:Notify({
         Title = title,
@@ -415,6 +395,20 @@ local function pivotToTarget(targetCF)
         )
     )
     zeroVelocity(root)
+    return true
+end
+local function runPivotTo(targetCF,token)
+    local character,humanoid,root=getCharacter()
+    if not character or not humanoid or not root then
+        return false
+    end
+    local targetPivot=getTargetPivot(character,root,targetCF)
+    if token~=movementToken then
+        return false
+    end
+    character:PivotTo(targetPivot)
+    zeroVelocity(root)
+    finishMovement(token)
     return true
 end
 local function runTween(
@@ -1665,6 +1659,10 @@ local function performTeleport(
             targetCF
         )
         finishMovement(token)
+    elseif mode == "PivotTo" then
+        task.spawn(function()
+            runPivotTo(targetCF,token)
+        end)
     elseif mode == "Tween" then
         task.spawn(function()
             runTween(
@@ -1896,31 +1894,24 @@ TeleportsTab:CreateButton({
 })
 TeleportsTab:CreateSection(
     "Movimiento"
-)ModeDropdown =
+)
+ModeDropdown =
     TeleportsTab:CreateDropdown({
         Name = "Modo de movimiento",
         Options =
-            MODE_DISPLAY_OPTIONS,
+            MODE_OPTIONS,
         Callback = function(value)
-            local internalMode = nil
-
-            for mode, displayName in pairs(MODE_DISPLAY_NAMES) do
-                if displayName == value then
-                    internalMode = mode
-                    break
-                end
-            end
-
-            if not internalMode then
+            if not table.find(
+                MODE_OPTIONS,
+                value
+            ) then
                 return
             end
-
             if not updatingDropdowns then
                 cancelMovement()
             end
-
             selectedMode =
-                internalMode
+                value
         end
     })
 TeleportsTab:CreateToggle({
