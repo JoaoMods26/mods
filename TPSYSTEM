@@ -1,5 +1,3 @@
-----when
-
 local Window = _G.Window or (getgenv and getgenv().Window)
 if not Window then
     return
@@ -397,13 +395,35 @@ local function pivotToTarget(targetCF)
     zeroVelocity(root)
     return true
 end
-local function runPivotTo(targetCF,token)
+local function runPivotTo(targetCF,speed,token)
     local character,humanoid,root=getCharacter()
     if not character or not humanoid or not root then
         return false
     end
+    local startPivot=character:GetPivot()
     local targetPivot=getTargetPivot(character,root,targetCF)
+    local distance=(startPivot.Position-targetPivot.Position).Magnitude
     if token~=movementToken then
+        return false
+    end
+    if distance<=0.05 then
+        character:PivotTo(targetPivot)
+        zeroVelocity(root)
+        finishMovement(token)
+        return true
+    end
+    local duration=distance/math.max(speed,1)
+    local elapsed=0
+    while elapsed<duration do
+        if token~=movementToken or not character.Parent then
+            return false
+        end
+        local dt=RunService.Heartbeat:Wait()
+        elapsed+=dt
+        local alpha=math.clamp(elapsed/duration,0,1)
+        character:PivotTo(startPivot:Lerp(targetPivot,alpha))
+    end
+    if token~=movementToken or not character.Parent then
         return false
     end
     character:PivotTo(targetPivot)
@@ -1661,7 +1681,11 @@ local function performTeleport(
         finishMovement(token)
     elseif mode == "PivotTo" then
         task.spawn(function()
-            runPivotTo(targetCF,token)
+            runPivotTo(
+                targetCF,
+                speed,
+                token
+            )
         end)
     elseif mode == "Tween" then
         task.spawn(function()
