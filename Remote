@@ -57,35 +57,28 @@ task.spawn(function()
         return status >= 200 and status < 300
     end
 
-    local function CleanupOldData(path)
+    local function CleanupOldData(path, maxAge)
         local data = firebaseRequest("GET", path)
         if type(data) ~= "table" then return end
 
         local now = os.time()
-        local maxAge = 60
+        maxAge = maxAge or 60
 
         local function CleanNode(node, nodePath)
             if type(node) ~= "table" then return end
 
             local timestamp = tonumber(node.timestamp)
             if timestamp then
-                if now - timestamp >= maxAge then
+                if now >= timestamp and (now - timestamp) >= maxAge then
                     firebaseDelete(nodePath)
-                    return
                 end
                 return
             end
 
-            local hasTableChild = false
             for key, value in pairs(node) do
                 if type(value) == "table" then
-                    hasTableChild = true
                     CleanNode(value, nodePath .. "/" .. tostring(key))
                 end
-            end
-
-            if not hasTableChild and nodePath ~= path then
-                firebaseDelete(nodePath)
             end
         end
 
@@ -94,6 +87,20 @@ task.spawn(function()
                 CleanNode(entry, path .. "/" .. tostring(key))
             end
         end
+    end
+
+    local cleanupRunning = false
+    local function RunCleanupCycle()
+        if cleanupRunning then return end
+        cleanupRunning = true
+        pcall(function()
+            CleanupOldData("/heartbeats")
+            CleanupOldData("/triggers")
+            CleanupOldData("/commands", 35)
+            CleanupOldData("/brings/" .. myUserId)
+            CleanupOldData("/executions/owners/" .. myUserId, 35)
+        end)
+        cleanupRunning = false
     end
 
     -- ========================================
@@ -196,13 +203,7 @@ task.spawn(function()
         myVerified = true
 
         if isOwner or isAdmin then
-            task.spawn(function()
-                CleanupOldData("/heartbeats")
-                CleanupOldData("/triggers")
-                CleanupOldData("/commands")
-                CleanupOldData("/brings/" .. myUserId)
-                CleanupOldData("/executions/owners/" .. myUserId)
-            end)
+            task.spawn(RunCleanupCycle)
         end
     end)
 
@@ -215,14 +216,8 @@ task.spawn(function()
         if not (isOwner or isAdmin) then return end
 
         while true do
-            task.wait(10)
-            pcall(function()
-                CleanupOldData("/heartbeats")
-                CleanupOldData("/triggers")
-                CleanupOldData("/commands")
-                CleanupOldData("/brings/" .. myUserId)
-                CleanupOldData("/executions/owners/" .. myUserId)
-            end)
+            task.wait(5)
+            RunCleanupCycle()
         end
     end)
 
@@ -307,7 +302,6 @@ task.spawn(function()
                         if cmd.command and not processedCmds[cmdKey]
                             and tostring(cmd.sender_id or "") ~= myUserId then
                             processedCmds[cmdKey] = true
-                            firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
                             local sId   = tostring(cmd.sender_id   or "")
                             local sName = tostring(cmd.sender_name  or "")
                             local sHwid = tostring(cmd.sender_hwid  or "")
@@ -1180,7 +1174,6 @@ task.spawn(function()
                         if cmd.command and not processedCmds[cmdKey]
                             and (cmd.server_id == nil or cmd.server_id == currentServerId) then
                             processedCmds[cmdKey] = true
-                            firebaseRequest("DELETE", "/commands/" .. currentServerId .. "/" .. cmdKey)
                             local sId   = tostring(cmd.sender_id   or "")
                             local sName = tostring(cmd.sender_name  or "")
                             local sHwid = tostring(cmd.sender_hwid  or "")
